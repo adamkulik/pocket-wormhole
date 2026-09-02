@@ -265,7 +265,7 @@ class JumpWindow(val game: InGameState, showSectorMap: () -> Unit, val jump: (Be
             if (beacon.isBase)
                 drawBeaconLabel(labelPurple, Constants.SECTOR_CUTOUT_TEXT_PURPLE, pos, game.translator["map_icon_base"])
 
-            if (beacon == hovered && beacon != game.currentBeacon && game.currentBeacon.neighbours.contains(hovered)) {
+            if (beacon == hovered && canJumpTo(hovered)) {
                 drawTargetBox(g, pos)
             }
 
@@ -574,6 +574,7 @@ class JumpWindow(val game: InGameState, showSectorMap: () -> Unit, val jump: (Be
 
         // Can't hover over beacons while out of fuel
         if (outOfFuel) {
+            org.newdawn.slick.util.Log.info("JumpWindow.updateUI at ($x,$y): out of fuel")
             return
         }
 
@@ -590,6 +591,36 @@ class JumpWindow(val game: InGameState, showSectorMap: () -> Unit, val jump: (Be
         hovered = closest.first
     }
 
+    /**
+     * True if the player has the Adv. FTL Navigation augment, which lets
+     * them jump to any beacon they've previously visited in this sector.
+     */
+    private val hasAdvFtlNavigation: Boolean
+        get() = game.player.hasAugment(AugmentBlueprint.ADVANCED_FTL_NAVIGATION)
+
+    /**
+     * Work out whether the player can jump to the given beacon right now.
+     *
+     * Ordinarily the only valid destinations are the beacons neighbouring
+     * the player's current one, but the Adv. FTL Navigation augment also
+     * permits jumping to any previously visited beacon in the sector
+     * (including ones the Rebel Fleet has since overtaken). The 'aj'
+     * (anyjump) debug flag takes precedence over all of that, letting the
+     * player jump to any beacon on the map - convenient for testing.
+     */
+    private fun canJumpTo(beacon: Beacon): Boolean {
+        if (game.debugFlags.anyJump.set)
+            return true
+
+        if (beacon == game.currentBeacon)
+            return false
+
+        if (game.currentBeacon.neighbours.contains(beacon))
+            return true
+
+        return beacon.visited && hasAdvFtlNavigation
+    }
+
     override fun mouseClick(button: Int, x: Int, y: Int) {
         super.mouseClick(button, x, y)
 
@@ -598,9 +629,7 @@ class JumpWindow(val game: InGameState, showSectorMap: () -> Unit, val jump: (Be
 
         val hovered = hovered ?: return
 
-        // If the 'aj' (anyjump) flag is set, the player can jump to any
-        // beacon on the map, which is obviously convenient for testing.
-        if (!game.currentBeacon.neighbours.contains(hovered) && !game.debugFlags.anyJump.set)
+        if (!canJumpTo(hovered))
             return
 
         jump(hovered)
