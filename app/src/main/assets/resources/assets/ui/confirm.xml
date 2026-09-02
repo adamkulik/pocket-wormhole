@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ui>
+    <widget type="vbox">
+        <!-- 286 is the width of the dismiss crew box -->
+        <widget type="free" w="286">
+            <!-- Top of the window -->
+            <widget type="image" pTop="-7" pLeft="-7" w="27" h="27"/>
+            <widget type="image" pTop="-7" pLeft="20" pRight="20" ix="27" w="30" h="27"/>
+            <widget type="image" pTop="-7" pRight="-7" ix="-27" h="27"/>
+
+            <!-- Mid-section -->
+            <widget type="image" pTop="20" pBottom="15" iy="25" pLeft="-7" w="27" h="3"/>
+            <widget type="image" pTop="20" pBottom="15" iy="25" pLeft="20" pRight="20" ix="27" w="30" h="3"/>
+            <widget type="image" pTop="20" pBottom="15" iy="25" pRight="-7" ix="-27" h="3"/>
+
+            <!-- Bottom of the message area -->
+            <widget type="image" pBottom="0" h="15" iy="31" pLeft="-7" w="27"/>
+            <widget type="image" pBottom="0" h="15" iy="31" pLeft="20" pRight="20" ix="27" w="30"/>
+            <widget type="image" pBottom="0" h="15" iy="31" pRight="-7" ix="-27"/>
+
+            <widget type="label" id="message" text="noloc:change me in code xyz"
+                    font="HL1" scale="2" colour="glow-white"
+                    pLeft="10" pRight="10" pTop="16" pBottom="15"/>
+        </widget>
+        <widget type="hbox" pLeft="-7" pRight="-7" id="button-box">
+            <!-- Glow start and continuation -->
+            <widget type="image" w="17"/>
+            <widget type="image" ix="20" w="2" xStretch="1"/>
+
+            <!-- Start of yes button -->
+            <widget type="image" ix="22" w="30"/>
+
+            <!-- Middle of yes button -->
+            <widget type="image" ix="50" w="5">
+                <widget type="button" id="yes" pLeft="-10" pRight="-10" pTop="4">
+                    <widget type="label" text="confirm_yes"/>
+                </widget>
+            </widget>
+
+            <!-- Border between yes and no buttons -->
+            <widget type="image" ix="53" w="34"/>
+
+            <!-- Middle of no button -->
+            <widget type="image" ix="85" w="5">
+                <widget type="button" id="no" pLeft="-10" pRight="-10" pTop="4">
+                    <widget type="label" text="confirm_no"/>
+                </widget>
+            </widget>
+
+            <!-- End of no button -->
+            <widget type="image" ix="88" w="30"/>
+
+            <!-- Glow continuation and end -->
+            <widget type="image" ix="20" w="2" xStretch="1"/>
+            <widget type="image" ix="-17"/>
+        </widget>
+    </widget>
+
+    <style>
+        image {
+        img: "img/confirm_window.png";
+        }
+
+        #button-box > image {
+        iy: 46;
+        }
+
+        button > label {
+        font: "HL2";
+        scale: 2;
+        colour: "text-dark";
+
+        pLeft: 3;
+        pRight: 3;
+        pTop: 4;
+        pBottom: 4;
+        }
+    </style>
+</ui>

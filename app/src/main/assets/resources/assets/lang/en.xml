@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FTL>
+    <!--
+    Custom XFTL strings.
+    All string IDs must be prefixed with 'xftl_' to make their origin obvious in code
+    Try to use vanilla strings where possible (eg for ok/cancel) as they're already translated.
+    -->
+
+    <text name="xftl_edit_ship">EDIT SHIP</text>
+    <text name="xftl_clear_edit_ship">DISCARD CHANGES</text>
+
+    <text name="xftl_select_datafile_title">Select an FTL datafile</text>
+    <text name="xftl_select_datafile_desc">
+        Project Wormhole uses the original game assets, which requires a copy of the original game.
+        If you have installed FTL via the Steam or Epic Games storefronts, it should be auto-detected.
+
+        Otherwise, run FTL and it will also be auto-detected.
+
+        If neither of the above work, you'll have to set the path to ftl.dat manually.
+        To do this, put the full OS path to FTL's data/ftl.dat file in:
+        \1
+    </text>
+    <text name="xftl_select_datafile_not_found">No auto-detected FTL installations</text>
+
+    <!-- Hotkeys -->
+    <text name="xftl_hotkeys_crew_group">CREW MANAGEMENT</text>
+    <text name="xftl_hotkeys_system_power_group">SYSTEM POWER</text>
+    <text name="xftl_hotkeys_weapons_group">WEAPONS AND DRONES</text>
+    <text name="xftl_hotkeys_system_actions_group">SYSTEM ACTIONS</text>
+    <text name="xftl_hotkeys_ui_group">GAME CONTROL</text>
+    <text name="xftl_hotkeys_dev_group">CHEATS AND MODDING</text>
+    <text name="xftl_hotkeys_default_tooltip">Default: \1</text>
+    <text name="xftl_hotkeys_default_tooltip_none">Default: none</text>
+    <text name="xftl_hotkeys_conflicts_tooltip">Conflicts with:</text>
+
+    <text name="xftl_hotkeys_console">Debug console</text>
+    <text name="xftl_hotkeys_frame_step">Unpause for 10ms</text>
+    <text name="xftl_hotkeys_fast_forward">Fast-forward</text>
+</FTL>

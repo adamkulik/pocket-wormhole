@@ -1,0 +1,29 @@
+# Gradle
+.gradle/
+build/
+app/build/
+
+# Android Studio / IntelliJ
+.idea/
+*.iml
+captures/
+
+# Local SDK paths (per-machine)
+local.properties
+
+# Build artifacts
+*.apk
+*.aab
+*.jks
+*.keystore
+
+# Screenshots & logs at the repo root (never commit game art — it belongs
+# to Subset Games; engine assets under app/src/main/assets are xftl's own)
+/*.png
+/*.jpg
+/*.log
+/*.tar
+
+# OS cruft
+.DS_Store
+Thumbs.db

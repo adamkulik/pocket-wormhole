@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ui>
+    <widget type="vbox">
+        <widget type="hbox">
+            <widget type="image" w="120" h="63"/>
+            <widget type="image" ix="120" w="20" h="63" xStretch="1">
+                <widget type="label" text="gameover_title_gameover" font="HL2" scale="4" colour="text-dark"
+                        pTop="19" pLeft="0" pRight="0"
+                        id="title"/> <!-- Set an ID as this changes for the victory screen -->
+            </widget>
+            <widget type="image" ix="-120" h="63"/>
+        </widget>
+
+        <widget type="hbox">
+            <widget type="image" iy="63" w="210" h="212"/>
+            <widget type="image" iy="63" ix="210" w="20" h="212" xStretch="1">
+                <widget type="button" pBottom="4" pLeft="-8" pRight="-7" id="stats">
+                    <widget type="label" text="gameover_button_stats"/>
+                </widget>
+            </widget>
+            <widget type="image" iy="63" ix="-210" h="212"/>
+        </widget>
+
+        <widget type="hbox">
+            <widget type="image" iy="275" w="25"/>
+            <widget type="image" iy="275" ix="25" w="20" xStretch="1">
+                <widget type="button" pBottom="16" pLeft="-9" pRight="-12" id="restart">
+                    <widget type="label" text="gameover_button_restart"/>
+                </widget>
+            </widget>
+            <widget type="image" iy="275" ix="105" w="45"/>
+            <widget type="image" iy="275" ix="25" w="20" xStretch="1">
+                <widget type="button" pBottom="16" pLeft="-11" pRight="-12" id="hangar">
+                    <widget type="label" text="gameover_button_hangar"/>
+                </widget>
+            </widget>
+            <widget type="image" iy="275" ix="105" w="45"/>
+            <widget type="image" iy="275" ix="25" w="20" xStretch="1">
+                <widget type="button" pBottom="16" pLeft="-11" pRight="-12" id="mainmenu">
+                    <widget type="label" text="gameover_button_mainmenu"/>
+                </widget>
+            </widget>
+            <widget type="image" iy="275" ix="105" w="45"/>
+            <widget type="image" iy="275" ix="25" w="20" xStretch="1">
+                <widget type="button" pBottom="16" pLeft="-11" pRight="-9" id="quit">
+                    <widget type="label" text="gameover_button_quit"/>
+                </widget>
+            </widget>
+            <widget type="image" iy="275" ix="-25"/>
+        </widget>
+    </widget>
+
+    <style>
+        image {
+        img: "img/scoreUI/gameover_main.png";
+        }
+        button {
+        zOrder: 1000;
+        }
+        button > label {
+        font: "HL2";
+        scale: 2;
+        colour: "text-dark";
+        pBottom: 4;
+        pTop: 4;
+        pLeft: 3;
+        pRight: 3;
+        }
+    </style>
+</ui>

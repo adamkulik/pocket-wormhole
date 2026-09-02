@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ui>
+    <widget type="vbox">
+        <widget type="free">
+            <widget type="image" pLeft="-7" pTop="-7" pRight="-7" h="37"/>
+            <widget type="image" pLeft="-7" pTop="30" pBottom="0" pRight="-7" h="1" iy="37"/>
+
+            <widget type="label" id="title" text="sell_box_title"
+                    colour="text-dark" font="HL2" scale="3"
+                    pTop="8" pBottom="8" pLeft="0" pRight="0"/>
+        </widget>
+
+        <widget type="free">
+            <widget type="image" pLeft="-7" pRight="-7" pTop="0" h="15" iy="47"/>
+            <widget type="image" pLeft="-7" pRight="-7" pTop="15" pBottom="21" iy="60" h="5"/>
+            <widget type="image" pLeft="-7" pRight="-7" pBottom="-7" iy="66"/>
+
+            <!-- Don't use an actual message, since widgets can only expand -->
+            <widget type="label" id="message" text="noloc:message goes here"
+                    colour="glow-white" font="HL1" scale="2"
+                    pTop="12" pBottom="14" pLeft="0" pRight="0"/>
+        </widget>
+    </widget>
+
+    <style>
+        image {
+        img: "img/dropbox_on.png";
+        }
+    </style>
+</ui>

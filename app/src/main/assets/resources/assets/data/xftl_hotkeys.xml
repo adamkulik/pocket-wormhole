@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<hotkeys>
+    <group id="group_crew" ui_name="xftl_hotkeys_crew_group">
+        <hotkey id="select_crew_1" ui_name="hotkey_crew1" default_bind="f1"/>
+        <hotkey id="select_crew_2" ui_name="hotkey_crew2" default_bind="f2"/>
+        <hotkey id="select_crew_3" ui_name="hotkey_crew3" default_bind="f3"/>
+        <hotkey id="select_crew_4" ui_name="hotkey_crew4" default_bind="f4"/>
+        <hotkey id="select_crew_5" ui_name="hotkey_crew5" default_bind="f5"/>
+        <hotkey id="select_crew_6" ui_name="hotkey_crew6" default_bind="f6"/>
+        <hotkey id="select_crew_7" ui_name="hotkey_crew7" default_bind="f7"/>
+        <hotkey id="select_crew_8" ui_name="hotkey_crew8" default_bind="f8"/>
+        <hotkey id="select_crew_all" ui_name="hotkey_crew_all" default_bind="q"/>
+        <hotkey id="load_crew_pos" ui_name="hotkey_loadPositions" default_bind="enter"/>
+        <hotkey id="save_crew_pos" ui_name="hotkey_savePositions" default_bind="stroke"/>
+        <hotkey id="lockdown_activate" ui_name="hotkey_lockdown" default_bind="p"/>
+    </group>
+
+    <group id="system_power" ui_name="xftl_hotkeys_system_power_group" columns="2">
+        <!-- Note: the names of the systems must match those in the blueprints,
+             since these IDs are specially known by the code. -->
+        <hotkey id="sys_power_shields" ui_name="hotkey_shields" default_bind="a"/>
+        <hotkey id="sys_power_shields_off" ui_name="hotkey_un_shields"/>
+        <hotkey id="sys_power_engines" ui_name="hotkey_engines" default_bind="s"/>
+        <hotkey id="sys_power_engines_off" ui_name="hotkey_un_engines"/>
+        <hotkey id="sys_power_oxygen" ui_name="hotkey_oxygen" default_bind="f"/>
+        <hotkey id="sys_power_oxygen_off" ui_name="hotkey_un_oxygen"/>
+        <hotkey id="sys_power_medical" ui_name="hotkey_medbay" default_bind="d"/>
+        <hotkey id="sys_power_medical_off" ui_name="hotkey_un_medbay"/>
+        <hotkey id="sys_power_teleporter" ui_name="hotkey_teleporter" default_bind="g"/>
+        <hotkey id="sys_power_teleporter_off" ui_name="hotkey_un_teleporter"/>
+        <hotkey id="sys_power_cloaking" ui_name="hotkey_cloaking" default_bind="h"/>
+        <hotkey id="sys_power_cloaking_off" ui_name="hotkey_un_cloaking"/>
+        <hotkey id="sys_power_mind" ui_name="hotkey_mind" default_bind="k"/>
+        <hotkey id="sys_power_mind_off" ui_name="hotkey_un_mind"/>
+        <hotkey id="sys_power_hacking" ui_name="hotkey_hacking" default_bind="l"/>
+        <hotkey id="sys_power_hacking_off" ui_name="hotkey_un_hacking"/>
+        <hotkey id="sys_power_artillery" ui_name="hotkey_artillery" default_bind="y"/>
+        <hotkey id="sys_power_artillery_off" ui_name="hotkey_un_artillery"/>
+        <hotkey id="sys_power_weapons" ui_name="hotkey_weapons" default_bind="w"/>
+        <hotkey id="sys_power_weapons_off" ui_name="hotkey_un_weapons"/>
+        <hotkey id="sys_power_drones" ui_name="hotkey_drones" default_bind="e"/>
+        <hotkey id="sys_power_drones_off" ui_name="hotkey_un_drones"/>
+    </group>
+
+    <group id="system_actions" ui_name="xftl_hotkeys_system_actions_group">
+        <hotkey id="sys_action_door_open" ui_name="hotkey_open" default_bind="z"/>
+        <hotkey id="sys_action_door_close" ui_name="hotkey_close" default_bind="x"/>
+        <hotkey id="sys_action_cloaking" ui_name="hotkey_activate_cloak" default_bind="c"/>
+        <hotkey id="sys_action_teleport_send" ui_name="hotkey_send_tele" default_bind="t"/>
+        <hotkey id="sys_action_teleport_recv" ui_name="hotkey_ret_tele" default_bind="r"/>
+        <hotkey id="sys_action_hacking" ui_name="hotkey_start_hacking" default_bind="n"/>
+        <hotkey id="sys_action_mind" ui_name="hotkey_mindControl" default_bind="m"/>
+        <hotkey id="sys_action_battery" ui_name="hotkey_activate_battery" default_bind="b"/>
+    </group>
+
+    <group id="ui_actions" ui_name="xftl_hotkeys_ui_group">
+        <hotkey id="pause" ui_name="hotkey_pause" default_bind="space"/>
+        <hotkey id="ftl_jump" ui_name="hotkey_jump" default_bind="j"/>
+        <hotkey id="ship_inventory" ui_name="hotkey_ship_inv" default_bind="i"/>
+        <hotkey id="ship_upgrades" ui_name="hotkey_ship_info" default_bind="u"/>
+        <hotkey id="ship_crew" ui_name="hotkey_ship_crew"/>
+        <hotkey id="open_store" ui_name="hotkey_store"/>
+        <hotkey id="open_options" ui_name="hotkey_options" default_bind="o"/>
+    </group>
+
+    <group id="weapons_drones" ui_name="xftl_hotkeys_weapons_group">
+        <hotkey id="weapon_slot_1" ui_name="hotkey_weapon1" default_bind="1"/>
+        <hotkey id="weapon_slot_2" ui_name="hotkey_weapon2" default_bind="2"/>
+        <hotkey id="weapon_slot_3" ui_name="hotkey_weapon3" default_bind="3"/>
+        <hotkey id="weapon_slot_4" ui_name="hotkey_weapon4" default_bind="4"/>
+
+        <hotkey id="drone_slot_1" ui_name="hotkey_drone1" default_bind="5"/>
+        <hotkey id="drone_slot_2" ui_name="hotkey_drone2" default_bind="6"/>
+        <hotkey id="drone_slot_3" ui_name="hotkey_drone3" default_bind="7"/>
+
+        <hotkey id="weapon_autofire_toggle" ui_name="hotkey_autofire" default_bind="v"/>
+        <hotkey id="weapon_autofire_target" ui_name="hotkey_force_autofire" default_bind="lctrl"/>
+    </group>
+
+    <group id="development" ui_name="xftl_hotkeys_dev_group">
+        <hotkey id="dev_console" ui_name="xftl_hotkeys_console" default_bind="backtick"/>
+        <hotkey id="dev_frame_step" ui_name="xftl_hotkeys_frame_step" default_bind="full_stop"/>
+        <hotkey id="dev_fast_forward" ui_name="xftl_hotkeys_fast_forward" default_bind="tab"/>
+    </group>
+</hotkeys>

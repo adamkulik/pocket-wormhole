@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ui>
+    <widget type="free">
+        <widget type="window" w="400" h="250" pLeft="0">
+            <title font="HL2" text="options_frame_video" scale="2" colour="text-dark"/>
+
+            <!-- TODO video options -->
+        </widget>
+
+        <widget type="window" w="400" h="250" pLeft="450" pRight="0">
+            <title font="HL2" text="options_frame_gameplay" scale="2" colour="text-dark"/>
+
+            <!-- TODO gameplay options -->
+
+            <widget type="button" pTop="45" pLeft="15" id="keybinds">
+                <widget type="label" text="configure_controls"/>
+            </widget>
+        </widget>
+
+        <widget type="window" w="400" h="150" pLeft="0" pTop="300" pBottom="0">
+            <title font="HL2" text="options_frame_audio" scale="2" colour="text-dark"/>
+
+            <widget type="label" class="main-label" text="sound_volume" pLeft="30" pTop="50"/>
+            <widget type="slider" id="sound" pLeft="200" pTop="47" pRight="30"/>
+
+            <widget type="label" class="main-label" text="music_volume" pLeft="30" pTop="90"/>
+            <widget type="slider" id="music" pLeft="200" pTop="87" pRight="30"/>
+        </widget>
+
+        <!-- TODO close button -->
+    </widget>
+
+    <style>
+        .main-label {
+        font: "JustinFont12Bold";
+        scale: 1;
+        colour: "glow-white";
+        }
+
+        button > label {
+        font: "JustinFont10";
+        scale: 1;
+        colour: "text-dark";
+
+        pLeft: 3;
+        pRight: 3;
+        pTop: 4;
+        pBottom: 4;
+        }
+    </style>
+</ui>

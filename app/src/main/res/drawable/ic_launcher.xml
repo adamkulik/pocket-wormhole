@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <!-- Dark space background -->
+    <path
+        android:fillColor="#0B1020"
+        android:pathData="M4,4 h40 v40 h-40 z" />
+    <!-- Stars -->
+    <path android:fillColor="#E8EAF6" android:pathData="M10,10 h1 v1 h-1 z" />
+    <path android:fillColor="#E8EAF6" android:pathData="M36,14 h1 v1 h-1 z" />
+    <path android:fillColor="#9FA8DA" android:pathData="M30,34 h1 v1 h-1 z" />
+    <path android:fillColor="#E8EAF6" android:pathData="M14,32 h1 v1 h-1 z" />
+    <!-- Player ship (cruiser silhouette) -->
+    <path
+        android:fillColor="#B0BEC5"
+        android:pathData="M24,10 L27,16 L27,26 L33,30 L33,36 L26,36 L24,40 L22,36 L15,36 L15,30 L21,26 L21,16 Z" />
+    <!-- Engine glow -->
+    <path
+        android:fillColor="#FF7043"
+        android:pathData="M23,40 L25,40 L24,46 Z" />
+</vector>

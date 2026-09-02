@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ui>
+    <widget type="free">
+        <widget type="free" id="column" pTop="0" pBottom="0" pLeft="0">
+            <widget type="image" pLeft="-7" w="37"/>
+            <widget type="image" pRight="-7" ix="-37" img="img/optionsUI/escape_main.png"/>
+            <widget type="image" pLeft="30" pRight="30" ix="37" w="20" img="img/optionsUI/escape_main.png"/>
+
+            <widget type="button" pTop="11" id="continue">
+                <widget type="label" text="escape_continue"/>
+            </widget>
+
+            <widget type="button" pTop="62" id="main_menu">
+                <widget type="label" text="escape_mainmenu"/>
+            </widget>
+            <widget type="button" pTop="99" id="hangar">
+                <widget type="label" text="escape_hangar"/>
+            </widget>
+            <widget type="button" pTop="136" id="restart">
+                <widget type="label" text="escape_reset"/>
+            </widget>
+            <widget type="button" pTop="173" id="options">
+                <widget type="label" text="escape_options"/>
+            </widget>
+            <widget type="button" pTop="210" id="controls">
+                <widget type="label" text="escape_controls"/>
+            </widget>
+            <widget type="button" pTop="247" id="quit">
+                <widget type="label" text="escape_save"/>
+            </widget>
+        </widget>
+
+        <widget type="free" pTop="30" pLeft="200">
+            <widget type="image" class="paddingFit" img="img/optionsUI/info_difficulty.png"/>
+            <widget type="label" pLeft="0" pRight="0" pTop="9"
+                    text="menu_status_difficulty" font="JustinFont12Bold" scale="1" colour="glow-white"/>
+            <widget type="label" pLeft="0" pRight="0" pTop="35" id="difficulty"
+                    text="normal_button" font="HL2" scale="2" colour="text-dark"/>
+        </widget>
+
+        <widget type="free" pTop="30" pLeft="348">
+            <widget type="image" class="paddingFit" img="img/optionsUI/info_dlc.png"/>
+            <widget type="label" pLeft="0" pRight="0" pTop="9"
+                    text="menu_status_ae_content" font="JustinFont12Bold" scale="1" colour="glow-white"/>
+            <widget type="label" pLeft="0" pRight="0" pTop="35" id="ae-status"
+                    text="advanced_on_button" font="HL2" scale="2" colour="text-dark"/>
+        </widget>
+
+        <widget type="free" pTop="104" pLeft="200" pRight="0">
+            <widget type="image" class="paddingFit" img="img/optionsUI/info_achievements.png"/>
+            <widget type="label" pLeft="0" pRight="0" pTop="9"
+                    text="menu_status_achievements" font="JustinFont12Bold" scale="1" colour="glow-white"/>
+
+            <!-- The hover-based colour outline is custom-drawn on top -->
+            <widget type="image" pLeft="15" pTop="38" id="ach1" img="img/achievements/kestral_1.png"/>
+            <widget type="image" pLeft="86" pTop="38" id="ach2" img="img/achievements/kestral_2.png"/>
+            <widget type="image" pLeft="157" pTop="38" id="ach3" img="img/achievements/kestral_3.png"/>
+
+            <widget type="image" pLeft="238" pTop="38" id="quest" img="img/achievements/S_Q_off.png"/>
+            <widget type="image" pLeft="238" pTop="72" id="victory" img="img/achievements/S_V_off.png"/>
+        </widget>
+    </widget>
+
+    <style>
+        #column > image {
+        pTop: -7; // Padding
+        pBottom: -7;
+        img: "img/optionsUI/escape_main.png";
+        }
+        #column > button {
+        pLeft: 10;
+        pRight: 10;
+        }
+        #column > button > label {
+        pTop: 4;
+        pBottom: 4;
+        pLeft: 2;
+        pRight: 2;
+        colour: "text-dark";
+        font: "HL2";
+        scale: 2;
+        }
+
+        .paddingFit {
+        pLeft: -7;
+        pRight: -7;
+        pTop: -7;
+        pBottom: -7;
+        }
+    </style>
+</ui>

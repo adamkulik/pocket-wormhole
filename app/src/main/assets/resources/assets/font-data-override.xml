@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<fontdata>
+    <!--
+    Per-font override data.
+    This is required to find the top of a line of text in relation to it's baseline,
+    since the 'baseline' global field in the font data is often wrong.
+
+    To set these, open the font palette, turn on the baseline, and use your IDE's hot
+    reload key then F5 in the viewer to reload this.
+
+    lineTop sets how far the top of the line is above the font's baseline
+    lineBottom sets how far the true bottom of the text is below the font's baseline,
+      which is only used for HL2 where the baseline is shifted up 1px
+    -->
+
+    <font name="fonts/c&amp;c.font">
+        <lineTop value="7"/>
+    </font>
+
+    <font name="fonts/c&amp;cnew.font">
+        <lineTop value="7"/>
+    </font>
+
+    <!-- HL1/HL2 are always in caps, so this value is set for those -->
+    <font name="fonts/HL1.font">
+        <lineTop value="6"/>
+    </font>
+    <font name="fonts/HL2.font">
+        <lineTop value="7"/>
+        <lineBottom value="1"/>
+    </font>
+
+    <font name="fonts/JustinFont8.font">
+        <lineTop value="8"/>
+    </font>
+
+    <font name="fonts/JustinFont10.font">
+        <lineTop value="10"/>
+    </font>
+
+    <font name="fonts/JustinFont11Bold.font">
+        <lineTop value="11"/>
+    </font>
+
+    <font name="fonts/JustinFont12Bold.font">
+        <lineTop value="12"/>
+    </font>
+
+    <font name="fonts/num_font.font">
+        <lineTop value="14"/>
+    </font>
+</fontdata>

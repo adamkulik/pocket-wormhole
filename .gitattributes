@@ -1,0 +1,13 @@
+# Normalize line endings: LF in the repo, native on checkout
+* text=auto
+
+# Windows scripts need CRLF
+*.bat text eol=crlf
+# Unix scripts need LF
+gradlew text eol=lf
+
+# Binaries
+*.jar binary
+*.font binary
+*.png binary
+*.svg text

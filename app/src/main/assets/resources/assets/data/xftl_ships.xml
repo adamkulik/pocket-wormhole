@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ship_data>
+    <!--
+        FTL's XML files don't list the achievements for each ship, so instead
+        of hardcoding them into XFTL as well, they're listed here.
+
+        Note the unlockId property corresponds to the ID passed to the
+        <unlockShip> element in events. Note that while this is always an
+        integer in vanilla, it can be anything here.
+
+        hasQuest (a boolean) sets whether the exclamation mark appears in
+        the pause menu and hangar to show the unlock quest. It's automatically
+        set to true when the unlockId attribute is present, but can be used
+        to disable the mark for a ship that shouldn't show it.
+    -->
+
+    <ship_family>
+        <ship id="PLAYER_SHIP_HARD"/>
+        <ship id="PLAYER_SHIP_HARD_2"/>
+        <ship id="PLAYER_SHIP_HARD_3"/>
+
+        <ach id="ACH_UNITED_FEDERATION"/>
+        <ach id="ACH_FULL_ARSENAL"/>
+        <ach id="ACH_TOUGH_SHIP"/>
+    </ship_family>
+
+    <ship_family>
+        <ship id="PLAYER_SHIP_CIRCLE"/>
+        <ship id="PLAYER_SHIP_CIRCLE_2"/>
+        <ship id="PLAYER_SHIP_CIRCLE_3"/>
+
+        <ach id="ACH_ROBOTIC"/>
+        <ach id="ACH_ONLY_DRONES"/>
+        <ach id="ACH_IONED"/>
+    </ship_family>
+
+    <ship_family unlockId="4">
+        <ship id="PLAYER_SHIP_FED"/>
+        <ship id="PLAYER_SHIP_FED_2"/>
+        <ship id="PLAYER_SHIP_FED_3"/>
+
+        <ach id="ACH_FED_PATIENCE"/>
+        <ach id="ACH_FED_DIPLOMACY"/>
+        <ach id="ACH_FED_UPGRADE"/>
+    </ship_family>
+
+    <ship_family unlockId="7">
+        <ship id="PLAYER_SHIP_ENERGY"/>
+        <ship id="PLAYER_SHIP_ENERGY_2"/>
+        <ship id="PLAYER_SHIP_ENERGY_3"/>
+
+        <ach id="ACH_ENERGY_SHIELDS"/>
+        <ach id="ACH_ENERGY_POWER"/>
+        <ach id="ACH_ENERGY_MANPOWER"/>
+    </ship_family>
+
+    <ship_family unlockId="2">
+        <ship id="PLAYER_SHIP_MANTIS"/>
+        <ship id="PLAYER_SHIP_MANTIS_2"/>
+        <ship id="PLAYER_SHIP_MANTIS_3"/>
+
+        <ach id="ACH_MANTIS_CREW_DEAD"/>
+        <ach id="ACH_MANTIS_SLAUGHTER"/>
+        <ach id="ACH_MANTIS_SURVIVOR"/>
+    </ship_family>
+
+    <ship_family unlockId="5">
+        <ship id="PLAYER_SHIP_JELLY"/>
+        <ship id="PLAYER_SHIP_JELLY_2"/>
+        <ship id="PLAYER_SHIP_JELLY_3"/>
+
+        <ach id="ACH_SLUG_VISION"/>
+        <ach id="ACH_SLUG_NEBULA"/>
+        <ach id="ACH_SLUG_BIO"/>
+    </ship_family>
+
+    <ship_family unlockId="6">
+        <ship id="PLAYER_SHIP_ROCK"/>
+        <ship id="PLAYER_SHIP_ROCK_2"/>
+        <ship id="PLAYER_SHIP_ROCK_3"/>
+
+        <ach id="ACH_ROCK_FIRE"/>
+        <ach id="ACH_ROCK_MISSILES"/>
+        <ach id="ACH_ROCK_CRYSTAL"/>
+    </ship_family>
+
+    <ship_family unlockId="1">
+        <ship id="PLAYER_SHIP_STEALTH"/>
+        <ship id="PLAYER_SHIP_STEALTH_2"/>
+        <ship id="PLAYER_SHIP_STEALTH_3"/>
+
+        <ach id="ACH_STEALTH_DESTROY"/>
+        <ach id="ACH_STEALTH_AVOID"/>
+        <ach id="ACH_STEALTH_TACTICAL"/>
+    </ship_family>
+
+
+    <ship_family>
+        <ship id="PLAYER_SHIP_ANAEROBIC"/>
+        <ship id="PLAYER_SHIP_ANAEROBIC_2"/>
+        <ship id="PLAYER_SHIP_ANAEROBIC_3"/>
+
+        <ach id="ACH_LANIUS_ADVANCED"/>
+        <ach id="ACH_LANIUS_SCRAP"/>
+        <ach id="ACH_LANIUS_OXYGEN"/>
+    </ship_family>
+
+    <ship_family unlockId="8">
+        <ship id="PLAYER_SHIP_CRYSTAL"/>
+        <ship id="PLAYER_SHIP_CRYSTAL_2"/>
+        <ship id="PLAYER_SHIP_CRYSTAL_3"/>
+
+        <ach id="ACH_CRYSTAL_SHARD"/>
+        <ach id="ACH_CRYSTAL_LOCKDOWN"/>
+        <ach id="ACH_CRYSTAL_CLASH"/>
+    </ship_family>
+</ship_data>

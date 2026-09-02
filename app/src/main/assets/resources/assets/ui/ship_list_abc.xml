@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ui>
+    <widget type="free">
+        <widget type="image" img="img/customizeUI/box_shipselect.png"
+                pLeft="-6" pRight="-7" pTop="-7" pBottom="-7"/>
+
+        <widget type="label" colour="text-dark" font="HL2" scale="2" text="hangar_frame_ship"
+                pLeft="13" pTop="6"/>
+
+        <widget type="hbox" pTop="32" pLeft="0" pRight="0">
+            <widget type="free" xStretch="1"/>
+
+            <widget type="image-button" select2="img/customizeUI/button_arrow"/>
+
+            <widget type="free" w="7"/>
+
+            <widget type="button" id="list">
+                <widget type="label" colour="text-dark" font="HL2" scale="2" text="ship_list_button"
+                        pLeft="4" pRight="4" pTop="6" pBottom="6"/>
+            </widget>
+
+            <widget type="free" w="7"/>
+
+            <widget type="image-button" select2="img/customizeUI/button_arrow" mirror="true"/>
+
+            <widget type="free" xStretch="1"/>
+        </widget>
+
+        <widget type="hbox" pTop="65" pLeft="0" pRight="0">
+            <widget type="free" xStretch="1"/>
+
+            <widget type="button" id="random">
+                <widget type="label" colour="text-dark" font="HL2" scale="2" text="ship_random_button"
+                        pLeft="4" pRight="4" pTop="6" pBottom="6"/>
+            </widget>
+
+            <widget type="free" xStretch="1"/>
+        </widget>
+
+        <widget type="label" colour="text-dark" font="HL2" scale="2" text="hangar_frame_layout"
+                pLeft="13" pTop="108"/>
+
+        <widget type="hbox" pTop="135" pLeft="0" pRight="0">
+            <widget type="free" xStretch="1"/>
+
+            <widget type="button" w="36" h="34" id="type_a">
+                <widget type="label" colour="text-dark" font="HL2" scale="3" text="typebutton_a"
+                        pLeft="0" pRight="0" pTop="5"/>
+            </widget>
+
+            <widget type="free" w="9"/>
+
+            <widget type="button" w="36" h="34" id="type_b">
+                <widget type="label" colour="text-dark" font="HL2" scale="3" text="typebutton_b"
+                        pLeft="0" pRight="0" pTop="5"/>
+            </widget>
+
+            <widget type="free" w="9"/>
+
+            <widget type="button" w="36" h="34" id="type_c">
+                <widget type="label" colour="text-dark" font="HL2" scale="3" text="typebutton_c"
+                        pLeft="0" pRight="0" pTop="5"/>
+            </widget>
+
+            <widget type="free" xStretch="1"/>
+        </widget>
+
+        <widget type="hbox" pTop="188" pLeft="0" pRight="0">
+            <widget type="free" xStretch="1"/>
+
+            <widget type="button" pTop="0">
+                <widget type="label" colour="text-dark" font="HL2" scale="2" text="ship_hiderooms_button"
+                        pLeft="10" pRight="10" pTop="6" pBottom="6"/>
+            </widget>
+
+            <widget type="free" xStretch="1"/>
+        </widget>
+
+    </widget>
+
+    <style>
+    </style>
+</ui>
