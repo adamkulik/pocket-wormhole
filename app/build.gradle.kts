@@ -12,12 +12,32 @@ android {
         minSdk = 26
         targetSdk = 34
         versionCode = 1
-        versionName = "0.1"
+        versionName = "0.1.0"
+    }
+
+    // Release signing is opt-in via Gradle properties (kept out of the repo):
+    //   pocketwormhole.storeFile / .storePassword / .keyAlias / .keyPassword
+    // e.g. in ~/.gradle/gradle.properties. Without them, release builds are
+    // unsigned.
+    val ksFilePath: String? = findProperty("pocketwormhole.storeFile") as String?
+
+    signingConfigs {
+        if (ksFilePath != null) {
+            create("release") {
+                storeFile = file(ksFilePath)
+                storePassword = findProperty("pocketwormhole.storePassword") as String?
+                keyAlias = findProperty("pocketwormhole.keyAlias") as String? ?: "pocketwormhole"
+                keyPassword = findProperty("pocketwormhole.keyPassword") as String?
+            }
+        }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
+            if (ksFilePath != null) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
 
