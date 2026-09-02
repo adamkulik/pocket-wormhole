@@ -90,6 +90,28 @@ class Ship(
 
     val floorImage: Image? = type.floorImage?.let { sys.getImg(it) }
     val hullImage: Image = type.hullImage.firstNotNullOf { sys.getImgIfExists(it) }
+
+    /** The centre of the hull image, in ship-local coordinates - useful as
+     *  a pivot for rendering effects like the beacon-arrival animation
+     *  (issue #4). */
+    val hullCentreX: Float
+        get() = hullOffset.x + hullImage.width / 2f
+
+    /** The vertical centre of the hull image, in ship-local coordinates. */
+    val hullCentreY: Float
+        get() = hullOffset.y + hullImage.height / 2f
+
+    /** The left/right edges of the hull image, in ship-local coordinates:
+     *  the beacon-arrival flare sweeps between the two (issue #4). */
+    val hullLeftX: Float
+        get() = hullOffset.x.toFloat()
+    val hullRightX: Float
+        get() = hullOffset.x + hullImage.width.toFloat()
+
+    /** Extra transparency applied to the whole ship while rendering: 1 is
+     *  fully opaque, 0 invisible. Used by the beacon-arrival animation
+     *  (issue #4); reset it to 1 when done! */
+    var renderAlpha: Float = 1f
     val cloakImage: Image? = type.cloakImage?.let { sys.getImg(it) }
     val gibs: List<ShipGib.Instance>
 
@@ -573,9 +595,9 @@ class Ship(
             // Animate between cloaked and uncloaked
             val cloakFade = cloaking?.cloakFade ?: 0f
 
-            val interiorAlpha = 1f - cloakFade / 2f
+            val interiorAlpha = (1f - cloakFade / 2f) * renderAlpha
             val hullAlpha = when (cloakFade) {
-                0f -> 1f
+                0f -> renderAlpha
                 else -> interiorAlpha * 0.75f
             }
             hullImage.draw(hullOffset.x, hullOffset.y, Colour(1f, 1f, 1f, hullAlpha))
@@ -672,6 +694,7 @@ class Ship(
     }
 
     private fun renderSingleShield(alpha: Float, filter: Colour) {
+        val shieldAlpha = alpha * renderAlpha
         val basePosX = shieldOrigin.x - shieldHalfSize.x
         val basePosY = shieldOrigin.y - shieldHalfSize.y
 
@@ -681,7 +704,7 @@ class Ship(
             basePosX.f + shieldHalfSize.x * 2, basePosY.f + shieldHalfSize.y * 2,
             0f, 0f,
             shieldImage.width.f, shieldImage.height.f,
-            alpha, filter
+            shieldAlpha, filter
         )
     }
 

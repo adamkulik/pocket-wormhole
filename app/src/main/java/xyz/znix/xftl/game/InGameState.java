@@ -238,6 +238,10 @@ public class InGameState extends MainGame.GameState {
         }
 
         updateHotkeyBindings();
+
+        // Issue #4: the beacon-arrival flare (glowing star that sweeps along
+        // the hull as the ship scales up).
+        jumpFlare = getImg("img/effects/glowing_star.png");
     }
 
     @Override
@@ -358,8 +362,56 @@ public class InGameState extends MainGame.GameState {
     public void update(@NotNull GameContainer container, float delta) throws SlickException {
         renderingDeltaTime = delta;
 
-        if (!isPaused())
+        // The game stays frozen while an arrival or jump-out animation
+        // plays (issue #4).
+        if (!isPaused() && playerFlyIn <= 0 && playerJumpOut <= 0 && enemyJumpOut <= 0)
             updateGameState(delta);
+
+        // Tick the jump-out animations (issue #4). When the player's
+        // jump-out finishes, the beacon actually changes and the arrival
+        // animation plays at the new beacon. When the enemy's finishes, the
+        // ship is finally removed.
+        if (playerJumpOut > 0) {
+            playerJumpOut = Math.max(0f, playerJumpOut - delta / JUMP_OUT_TIME);
+            if (playerJumpOut == 0 && jumpOutTarget != null) {
+                Beacon target = jumpOutTarget;
+                jumpOutTarget = null;
+                setCurrentBeacon(target);
+            }
+        }
+
+        if (enemyJumpOut > 0) {
+            enemyJumpOut = Math.max(0f, enemyJumpOut - delta / JUMP_OUT_TIME);
+            if (enemyJumpOut == 0) {
+                IEvent jumpEvent = enemyJumpEvent;
+                enemyJumpEvent = null;
+                setEnemy(null);
+                currentBeacon.setShip(null);
+
+                if (jumpEvent != null) {
+                    showEventDialogue(jumpEvent.resolve(), Random.Default.nextInt());
+                }
+            }
+        }
+
+        // Tick the beacon-arrival animation; the deferred arrival dialogues
+        // only show once it's done (issue #4).
+        if (playerFlyIn > 0) {
+            playerFlyIn = Math.max(0f, playerFlyIn - delta / ARRIVAL_TIME);
+        }
+
+        if (arrivalEventsPending && playerFlyIn <= 0 && !isPaused()) {
+            arrivalEventsPending = false;
+            if (arrivalShowBeaconEvent) {
+                arrivalShowBeaconEvent = false;
+                showEventDialogue(currentBeacon.getEvent(), currentBeacon.getEnvironmentSeed());
+            }
+            if (arrivalEliteEvent != null) {
+                Event eliteEvent = arrivalEliteEvent;
+                arrivalEliteEvent = null;
+                showEventDialogue(eliteEvent, Random.Default.nextInt());
+            }
+        }
 
         Input in = container.getInput();
 
@@ -544,7 +596,92 @@ public class InGameState extends MainGame.GameState {
         // Get the player's ship away from the top UI
         g.pushTransform();
         g.translate(playerShipOffset.getX(), playerShipOffset.getY());
+
+        // Issue #4: beacon arrival, like vanilla. Phase 1 - the ship is
+        // small and mostly transparent while a glowing star sweeps the hull
+        // from bow to stern and the ship fades in. Phase 2 - the star is
+        // done, and the ship smoothly scales up to full size.
+        float arrivalSweep = 0f;
+        if (playerFlyIn > 0) {
+            float p = 1f - playerFlyIn;                       // 0 -> 1
+            float sweepFrac = Math.min(1f, p / ARRIVAL_SWEEP_END);
+            arrivalSweep = sweepFrac * sweepFrac * (3f - 2f * sweepFrac);
+
+            float scaleFrac = Math.max(0f, (p - ARRIVAL_SWEEP_END) / (1f - ARRIVAL_SWEEP_END));
+            float scale = 0.12f + 0.88f * (scaleFrac * scaleFrac * (3f - 2f * scaleFrac));
+            player.setRenderAlpha(0.15f + 0.85f * arrivalSweep);
+
+            float centreX = player.getHullCentreX();
+            float centreY = player.getHullCentreY();
+
+            g.translate(centreX, centreY);
+            g.scale(scale, scale);
+            g.translate(-centreX, -centreY);
+        }
+
+        // Leaving ships play the same animation reversed (issue #4): they
+        // scale down first, then the star sweeps back (stern -> bow) while
+        // the ship fades out.
+        float jumpOutSweep = 0f;
+        if (playerJumpOut > 0) {
+            float p = 1f - playerJumpOut;                     // 0 -> 1
+            float centreX = player.getHullCentreX();
+            float centreY = player.getHullCentreY();
+
+            if (p < JUMP_OUT_SCALE_END) {
+                float t = p / JUMP_OUT_SCALE_END;
+                float smooth = t * t * (3f - 2f * t);
+                float scale = 1f - 0.88f * smooth;
+
+                g.translate(centreX, centreY);
+                g.scale(scale, scale);
+                g.translate(-centreX, -centreY);
+            } else {
+                float fade = (p - JUMP_OUT_SCALE_END) / (1f - JUMP_OUT_SCALE_END);
+                float smooth = fade * fade * (3f - 2f * fade);
+                jumpOutSweep = smooth;
+                player.setRenderAlpha(1f - 0.85f * smooth);
+
+                g.translate(centreX, centreY);
+                g.scale(0.12f, 0.12f);
+                g.translate(-centreX, -centreY);
+            }
+        }
+
         player.render(g, true, hoveredRoom);
+
+        // The glowing star rides on top of the hull, unscaled.
+        //
+        // Arrival: small at the bow, largest amidships, gone before the
+        // scale-up starts.
+        if (playerFlyIn > 0 && arrivalSweep < 1f) {
+            float starSize = player.getHullImage().getHeight()
+                    * (0.2f + 1.6f * (float) Math.sin(Math.PI * arrivalSweep));
+            float flareX = player.getHullRightX()
+                    + (player.getHullLeftX() - player.getHullRightX()) * arrivalSweep;
+            float centreY = player.getHullCentreY();
+            float alpha = 0.55f + 0.45f * (float) Math.sin(Math.PI * arrivalSweep);
+
+            jumpFlare.draw(flareX - starSize / 2f, centreY - starSize / 2f,
+                    starSize, starSize, new Colour(1f, 1f, 1f, alpha));
+        }
+
+        // Jump-out: sweeps back the other way (stern -> bow) during the
+        // fade-out phase.
+        if (playerJumpOut > 0 && jumpOutSweep > 0f) {
+            float starSize = player.getHullImage().getHeight()
+                    * (0.2f + 1.6f * (float) Math.sin(Math.PI * jumpOutSweep));
+            float flareX = player.getHullLeftX()
+                    + (player.getHullRightX() - player.getHullLeftX()) * jumpOutSweep;
+            float centreY = player.getHullCentreY();
+            float alpha = 0.55f + 0.45f * (float) Math.sin(Math.PI * jumpOutSweep);
+
+            jumpFlare.draw(flareX - starSize / 2f, centreY - starSize / 2f,
+                    starSize, starSize, new Colour(1f, 1f, 1f, alpha));
+        }
+
+        player.setRenderAlpha(1f);
+
         if (player.getWeapons() != null) {
             // Some modded ships don't have a weapons system
             player.renderTargeting(g, player.getWeapons().getSelectedTargets());
@@ -705,7 +842,36 @@ public class InGameState extends MainGame.GameState {
         }
     }
 
+    // Issue #4: when arriving at a beacon the game pauses while the ship
+    // materialises: a glowing star sweeps from bow to stern as the ship
+    // fades in, then it smoothly scales up to full size. playerFlyIn goes
+    // from 1 (just arrived) to 0 (done).
+    private float playerFlyIn = 0f;
+    private boolean arrivalEventsPending = false;
+    private boolean arrivalShowBeaconEvent = false;
+    private Event arrivalEliteEvent;
+    public Image jumpFlare;   // issue #4: shared by the arrival and jump-away animations
+    private static final float ARRIVAL_TIME = 1.4f;
+
+    // The reverse animation when the player jumps away (issue #4): the ship
+    // scales down while the star sweeps back (stern -> bow) and it fades
+    // out. When it finishes, the beacon actually changes.
+    private float playerJumpOut = 0f;
+    private Beacon jumpOutTarget;
+    private static final float JUMP_OUT_TIME = 1.2f;
+    private static final float JUMP_OUT_SCALE_END = 0.35f;
+
+    // Same animation for an enemy ship jumping away mid-combat.
+    private float enemyJumpOut = 0f;
+    private IEvent enemyJumpEvent;
+
+    // Fraction of the animation spent on the star sweep + fade-in; the
+    // remainder is the ship's scale-up.
+    private static final float ARRIVAL_SWEEP_END = 0.65f;
+
     public void setCurrentBeacon(Beacon currentBeacon) {
+        boolean beaconChanged = this.currentBeacon == null || this.currentBeacon != currentBeacon;
+
         if (this.currentBeacon == null || this.currentBeacon.getSector() != currentBeacon.getSector()) {
             SectorType sectorType = currentBeacon.getSector().getType();
             lootPool = new LootPool(blueprintManager, sectorType);
@@ -738,7 +904,8 @@ public class InGameState extends MainGame.GameState {
 
             player.resetAfterJump();
             if (currentBeacon.getState() == Beacon.State.UNVISITED) {
-                showEventDialogue(currentBeacon.getEvent(), currentBeacon.getEnvironmentSeed());
+                // Deferred until the arrival animation finishes (issue #4).
+                arrivalShowBeaconEvent = true;
             }
         }
 
@@ -765,7 +932,7 @@ public class InGameState extends MainGame.GameState {
             }
 
             Event event = eventManager.get(eventName).resolve();
-            showEventDialogue(event, Random.Default.nextInt());
+            arrivalEliteEvent = event;
         }
 
         // If the flagship is here, spawn it in. Doing this last overwrites
@@ -774,7 +941,30 @@ public class InGameState extends MainGame.GameState {
 
         currentBeacon.setVisited(true);
 
-        // Note: the new ship is loaded by loadShipEvent, which is called by the event dialogue window.
+        // Fly the ship in, like vanilla does when arriving at a beacon
+        // (this includes the first beacon of a run and loading a game).
+        // Fly the ship in, like vanilla does when arriving at a beacon
+        // (this includes the first beacon of a run and loading a game).
+        if (beaconChanged) {
+            playerFlyIn = 1f;
+            arrivalEventsPending = arrivalShowBeaconEvent || arrivalEliteEvent != null;
+        }
+    }
+
+    /**
+     * Play the jump-out animation (issue #4), then switch to the target
+     * beacon - where the arrival animation plays. Used when the player
+     * jumps to a beacon from the star map.
+     */
+    public void beginJumpOut(Beacon target) {
+        // If an animation is still in progress, switch immediately.
+        if (playerFlyIn > 0 || playerJumpOut > 0 || enemyJumpOut > 0) {
+            setCurrentBeacon(target);
+            return;
+        }
+
+        jumpOutTarget = target;
+        playerJumpOut = 1f;
     }
 
     private void trySpawnBoss() {

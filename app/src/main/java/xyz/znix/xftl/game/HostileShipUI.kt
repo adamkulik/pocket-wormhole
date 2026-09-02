@@ -9,8 +9,24 @@ import xyz.znix.xftl.rendering.Graphics
 import xyz.znix.xftl.sys.GameContainer
 
 class HostileShipUI(private val game: InGameState, private val enemy: Ship) {
+    companion object {
+        private const val FLY_OUT_TIME = 1.2f
+        private const val FLY_OUT_SCALE_END = 0.35f
+    }
+
+
     private val mutableShipPos = Point(0, 0)
     val shipPos: IPoint get() = mutableShipPos
+
+    // Issue #4: the jump-away animation state (goes from 1 to 0). Started
+    // by [startFlyOut] when the ship's escape timer expires; InGameState
+    // removes the ship once [isFlyOutDone] is true.
+    private var flyOut = 0f
+    val isFlyOutDone: Boolean get() = flyOut <= 0f
+
+    fun startFlyOut() {
+        flyOut = 1f
+    }
 
     private val font = game.getFont("HL2")
     private val titleFont = game.getFont("HL2", 2f)
@@ -33,6 +49,12 @@ class HostileShipUI(private val game: InGameState, private val enemy: Ship) {
     private val maskBoss = game.getImg("img/combatUI/box_hostiles_boss_mask.png")
 
     fun render(gc: GameContainer, g: Graphics, hoveredRoom: Room?, interiorVisible: Boolean, isHostile: Boolean) {
+        // Tick the jump-away animation (issue #4). Ticked from render so it
+        // keeps playing while the game is frozen for the animation.
+        if (flyOut > 0) {
+            flyOut = (flyOut - game.renderingDeltaTime / FLY_OUT_TIME).coerceAtLeast(0f)
+        }
+
         val box = when (enemy.isUsingBossUI) {
             true -> boxBoss
             false -> boxNormal
@@ -94,7 +116,57 @@ class HostileShipUI(private val game: InGameState, private val enemy: Ship) {
         }) {
             g.pushTransform()
             g.translate(shipPos.x.f, shipPos.y.f)
+
+            // Issue #4: jumping away - scale down, then the glowing star
+            // sweeps from stern to bow (right to left for the mirrored
+            // enemy ship) while the ship fades out.
+            if (flyOut > 0) {
+                val p = 1f - flyOut
+                val centreX = enemy.hullCentreX
+                val centreY = enemy.hullCentreY
+
+                if (p < FLY_OUT_SCALE_END) {
+                    val t = p / FLY_OUT_SCALE_END
+                    val smooth = t * t * (3f - 2f * t)
+                    val scale = 1f - 0.88f * smooth
+
+                    g.translate(centreX, centreY)
+                    g.scale(scale, scale)
+                    g.translate(-centreX, -centreY)
+                } else {
+                    val fade = (p - FLY_OUT_SCALE_END) / (1f - FLY_OUT_SCALE_END)
+                    val smooth = fade * fade * (3f - 2f * fade)
+                    enemy.renderAlpha = 1f - smooth
+
+                    g.translate(centreX, centreY)
+                    g.scale(0.12f, 0.12f)
+                    g.translate(-centreX, -centreY)
+                }
+            }
+
             enemy.render(g, interiorVisible, hoveredRoom)
+
+            // The star rides on top, sweeping stern -> bow during the
+            // fade-out phase.
+            if (flyOut > 0) {
+                val p = 1f - flyOut
+                if (p >= FLY_OUT_SCALE_END) {
+                    val fade = (p - FLY_OUT_SCALE_END) / (1f - FLY_OUT_SCALE_END)
+                    val sweep = fade * fade * (3f - 2f * fade)
+                    val starSize = enemy.hullImage.height *
+                            (0.2f + 1.6f * (Math.sin(Math.PI * sweep)).toFloat())
+                    val flareX = enemy.hullRightX +
+                            (enemy.hullLeftX - enemy.hullRightX) * sweep
+                    val centreY = enemy.hullCentreY
+                    val alpha = 0.55f + 0.45f * (Math.sin(Math.PI * sweep)).toFloat()
+
+                    game.jumpFlare.draw(
+                        flareX - starSize / 2f, centreY - starSize / 2f,
+                        starSize, starSize, Colour(1f, 1f, 1f, alpha)
+                    )
+                }
+                enemy.renderAlpha = 1f
+            }
 
             val playerWeapons = game.shipUI.ship.weapons
             if (playerWeapons != null) {

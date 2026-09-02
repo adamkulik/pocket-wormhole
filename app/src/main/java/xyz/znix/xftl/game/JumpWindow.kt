@@ -640,9 +640,9 @@ class JumpWindow(val game: InGameState, showSectorMap: () -> Unit, val jump: (Be
         // if we're in a nebula that slows down the fleet pursuit.
         game.advanceFleet()
 
-        // Make sure we set the beacon after we've called the jump callback, so that the event
-        // dialogue window doesn't get closed by the callback.
-        game.currentBeacon = hovered
+        // Play the jump-out animation (issue #4); the beacon switch - and
+        // the arrival animation at the new beacon - happens when it ends.
+        game.beginJumpOut(hovered)
     }
 
     private fun waitOutOfFuel() {
