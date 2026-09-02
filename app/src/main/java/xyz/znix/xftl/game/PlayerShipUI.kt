@@ -308,6 +308,18 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
             return
         }
 
+        // Issue #11: releasing a drawn beam path fires the beam, like
+        // vanilla's auto-fire behaviour. The port previously required a
+        // second press after drawing, which made beams awkward to fire
+        // from touch input (draw, lift, tap again).
+        val beam = beamTargeting
+        if (beam != null && beam.visible && beam.hitRooms.isNotEmpty() &&
+            button == Input.MOUSE_LEFT_BUTTON
+        ) {
+            targetBeamWeapon()
+            return
+        }
+
         crewSelectionRectangle?.let {
             if (button != Input.MOUSE_LEFT_BUTTON) return@let
 
