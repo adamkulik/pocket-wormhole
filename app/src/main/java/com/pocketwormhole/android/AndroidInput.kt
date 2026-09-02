@@ -14,9 +14,7 @@ import java.util.Collections
  * engine's LWJGLInput (press/release/click-vs-drag detection, drag/move,
  * wheel).
  *
- * Right click = long-press (~450 ms), or a double-tap: the second tap of a
- * double-tap (soon + near the previous tap) has its left press deferred and
- * becomes a right click instead, so no stray left press/click is sent.
+ * Right click = long-press (~450 ms).
  *
  * A synthetic right click holds the right button down for exactly one update
  * frame: the in-game state (InGameState) detects clicks by polling
@@ -79,16 +77,6 @@ class AndroidInput : Input {
     private var longPressX = 0f
     private var longPressY = 0f
     private var longPressAt = 0L
-
-    // Double-tap right click: position/time of the previous genuine tap
-    private var lastTapAt = 0L
-    private var lastTapX = 0f
-    private var lastTapY = 0f
-
-    /** The current gesture's DOWN was the second tap of a double-tap: its
-     *  left press is deferred until we know it is not a right click. */
-    @Volatile
-    private var rightTapArmed = false
 
     // A synthetic right click in flight. Phases: 0 = idle, 1 = press queued
     // (not yet dispatched), 2 = press dispatched (release due next frame).
@@ -161,9 +149,6 @@ class AndroidInput : Input {
         if (longPressPending && System.nanoTime() - longPressAt > LONG_PRESS_NANOS) {
             longPressPending = false
             longPressFired = true
-            // The long-press produces the right click; the release must not
-            // fire a second one if this gesture was also a double-tap.
-            rightTapArmed = false
             val x = longPressX.toInt()
             val y = longPressY.toInt()
             eventQueue.add {
@@ -207,30 +192,18 @@ class AndroidInput : Input {
                     val now = System.nanoTime()
                     longPressAt = now
 
-                    // Double-tap detection: soon + near the previous tap
-                    val dxLast = lx - lastTapX
-                    val dyLast = ly - lastTapY
-                    if (now - lastTapAt <= DOUBLE_TAP_NANOS &&
-                        dxLast * dxLast + dyLast * dyLast <= DOUBLE_TAP_SLOP_SQ
-                    ) {
-                        // Second tap of a double-tap: defer the left press. If
-                        // this gesture ends as a click it becomes a right click
-                        // (see ACTION_UP); a drag flushes the press (ACTION_MOVE).
-                        rightTapArmed = true
-                    } else {
-                        pressQueued = true
-                        pressHeld = true
-                        eventQueue.add {
-                            if (lastX != mouseX || lastY != mouseY) {
-                                iterate(mouseListeners) { l -> l.mouseMoved(lastX, lastY, mouseX, mouseY) }
-                            }
+                    pressQueued = true
+                    pressHeld = true
+                    eventQueue.add {
+                        if (lastX != mouseX || lastY != mouseY) {
+                            iterate(mouseListeners) { l -> l.mouseMoved(lastX, lastY, mouseX, mouseY) }
                         }
-                        nextFrameQueue.add {
-                            pressHeld = false
-                            buttonsDown[Input.MOUSE_LEFT_BUTTON] = true
-                            pressRendered = false
-                            iterate(mouseListeners) { it.mousePressed(Input.MOUSE_LEFT_BUTTON, mouseX, mouseY) }
-                        }
+                    }
+                    nextFrameQueue.add {
+                        pressHeld = false
+                        buttonsDown[Input.MOUSE_LEFT_BUTTON] = true
+                        pressRendered = false
+                        iterate(mouseListeners) { it.mousePressed(Input.MOUSE_LEFT_BUTTON, mouseX, mouseY) }
                     }
                 }
             }
@@ -266,20 +239,6 @@ class AndroidInput : Input {
                             synchronized(nextFrameQueue) {
                                 eventQueue.addAll(nextFrameQueue)
                                 nextFrameQueue.clear()
-                            }
-                        }
-                        // The gesture has become a drag: if the left press was
-                        // deferred (double-tap arming), send it now so the drag
-                        // works normally.
-                        if (rightTapArmed) {
-                            rightTapArmed = false
-                            pressQueued = true
-                            val px = mouseClickPos.x
-                            val py = mouseClickPos.y
-                            eventQueue.add {
-                                buttonsDown[Input.MOUSE_LEFT_BUTTON] = true
-                                pressRendered = false
-                                iterate(mouseListeners) { it.mousePressed(Input.MOUSE_LEFT_BUTTON, px, py) }
                             }
                         }
                     }
@@ -324,36 +283,13 @@ class AndroidInput : Input {
                     val dist = Point(clickX, clickY).distToSq(mouseX, mouseY)
                     val isClick = dist <= CLICK_DISTANCE * CLICK_DISTANCE && !wasLongPress
 
-                    if (rightTapArmed) {
-                        // Second tap of a double-tap; no left press was ever
-                        // sent for it, so there is nothing to release.
-                        rightTapArmed = false
-                        pendingRelease = null
+                    pendingRelease = {
                         pressQueued = false
-                        if (!wasLongPress) {
-                            // (A long-press would have disarmed this already, so
-                            // the gesture is a tap:) right click.
-                            lastTapAt = System.nanoTime()
-                            lastTapX = lx.toFloat()
-                            lastTapY = ly.toFloat()
-                            fireRightClick(mouseX, mouseY)
-                        }
-                    } else {
-                        // Remember genuine taps so the next tap can pair with
-                        // them (double-tap = right click).
-                        if (isClick) {
-                            lastTapAt = System.nanoTime()
-                            lastTapX = lx.toFloat()
-                            lastTapY = ly.toFloat()
-                        }
-                        pendingRelease = {
-                            pressQueued = false
-                            buttonsDown[Input.MOUSE_LEFT_BUTTON] = false
-                            iterate(mouseListeners) { it.mouseReleased(Input.MOUSE_LEFT_BUTTON, mouseX, mouseY) }
+                        buttonsDown[Input.MOUSE_LEFT_BUTTON] = false
+                        iterate(mouseListeners) { it.mouseReleased(Input.MOUSE_LEFT_BUTTON, mouseX, mouseY) }
 
-                            if (isClick) {
-                                iterate(mouseListeners) { it.mouseClicked(Input.MOUSE_LEFT_BUTTON, mouseX, mouseY, 1) }
-                            }
+                        if (isClick) {
+                            iterate(mouseListeners) { it.mouseClicked(Input.MOUSE_LEFT_BUTTON, mouseX, mouseY, 1) }
                         }
                     }
                 }
@@ -362,8 +298,6 @@ class AndroidInput : Input {
             MotionEvent.ACTION_CANCEL -> {
                 longPressPending = false
                 longPressFired = false
-                rightTapArmed = false
-                lastTapAt = 0
                 scrollPointerId = -1
                 pendingRelease = null
                 pressQueued = false
@@ -462,7 +396,5 @@ class AndroidInput : Input {
         private const val SCROLL_SCALE = 3.0f
         private const val DRAG_CANCEL_SQ = 12f * 12f
         private const val LONG_PRESS_NANOS = 450_000_000L
-        private const val DOUBLE_TAP_NANOS = 300_000_000L
-        private const val DOUBLE_TAP_SLOP_SQ = 32f * 32f
     }
 }
