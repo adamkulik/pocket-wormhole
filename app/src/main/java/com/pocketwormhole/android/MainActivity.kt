@@ -271,7 +271,8 @@ class GameSurfaceView(
      * emulators, old devices) from rejecting the surface outright.
      */
     private class FallbackConfigChooser : EGLConfigChooser {
-        private val specs = arrayOf(
+        // Colour/depth/stencil combos, tried in decreasing strictness.
+        private val combos = arrayOf(
             intArrayOf(8, 8, 8, 8, 24, 8),
             intArrayOf(8, 8, 8, 8, 24, 0),
             intArrayOf(8, 8, 8, 8, 16, 8),
@@ -281,23 +282,33 @@ class GameSurfaceView(
             intArrayOf(5, 6, 5, 0, 16, 0)
         )
 
+        // Some stacks (API 26 emulator images) only allow creating a GLES 3.0
+        // context on a config that advertises ES3 support, so the ES3
+        // renderable type is tried before the plain ES2 one.
+        private val renderableTypes = intArrayOf(
+            0x40, // EGL_OPENGL_ES3_BIT (not exposed by android.opengl.EGL14)
+            EGL14.EGL_OPENGL_ES2_BIT
+        )
+
         override fun chooseConfig(egl: EGL10, display: EGLDisplay): EGLConfig {
-            for (spec in specs) {
-                val attribs = intArrayOf(
-                    EGL10.EGL_RED_SIZE, spec[0],
-                    EGL10.EGL_GREEN_SIZE, spec[1],
-                    EGL10.EGL_BLUE_SIZE, spec[2],
-                    EGL10.EGL_ALPHA_SIZE, spec[3],
-                    EGL10.EGL_DEPTH_SIZE, spec[4],
-                    EGL10.EGL_STENCIL_SIZE, spec[5],
-                    EGL10.EGL_RENDERABLE_TYPE, EGL14.EGL_OPENGL_ES2_BIT,
-                    EGL10.EGL_NONE
-                )
-                val num = IntArray(1)
-                if (egl.eglChooseConfig(display, attribs, null, 0, num) && num[0] > 0) {
-                    val configs = arrayOfNulls<EGLConfig>(num[0])
-                    if (egl.eglChooseConfig(display, attribs, configs, num[0], num) && num[0] > 0) {
-                        return configs[0]!!
+            for (rt in renderableTypes) {
+                for (c in combos) {
+                    val attribs = intArrayOf(
+                        EGL10.EGL_RED_SIZE, c[0],
+                        EGL10.EGL_GREEN_SIZE, c[1],
+                        EGL10.EGL_BLUE_SIZE, c[2],
+                        EGL10.EGL_ALPHA_SIZE, c[3],
+                        EGL10.EGL_DEPTH_SIZE, c[4],
+                        EGL10.EGL_STENCIL_SIZE, c[5],
+                        EGL10.EGL_RENDERABLE_TYPE, rt,
+                        EGL10.EGL_NONE
+                    )
+                    val num = IntArray(1)
+                    if (egl.eglChooseConfig(display, attribs, null, 0, num) && num[0] > 0) {
+                        val configs = arrayOfNulls<EGLConfig>(num[0])
+                        if (egl.eglChooseConfig(display, attribs, configs, num[0], num) && num[0] > 0) {
+                            return configs[0]!!
+                        }
                     }
                 }
             }
