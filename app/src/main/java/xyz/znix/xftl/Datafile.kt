@@ -160,7 +160,7 @@ open class Datafile(val vanilla: IVanillaDatafile, slipstreamMods: List<Slipstre
     fun getOrNull(name: String): FTLFile? = files[name]
 
     fun read(file: FTLFile): ByteArray {
-        return patcher.files[file.name]!!.open().use { it.readAllBytes() }
+        return patcher.files[file.name]!!.open().use { it.readBytes() }
     }
 
     fun readString(file: FTLFile): String {

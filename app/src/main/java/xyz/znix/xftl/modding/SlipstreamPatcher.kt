@@ -25,6 +25,7 @@ import java.util.regex.Pattern
 import java.util.zip.ZipFile
 import kotlin.io.path.name
 import kotlin.io.path.relativeTo
+import java.util.stream.Collectors
 
 
 /**
@@ -96,7 +97,7 @@ class SlipstreamPatcher(vanilla: IVanillaDatafile) {
                 if (stylesheets.containsKey(filePath)) {
                     log.warning(String.format("Clobbering earlier stylesheet: %s", innerPath))
                 }
-                stylesheets[filePath] = mod.openFile(filePath).use { it.readAllBytes() }
+                stylesheets[filePath] = mod.openFile(filePath).use { it.readBytes() }
                 log.info("Added stylesheet to temporary database: $innerPath")
                 if (!moddedItems.contains(innerPath)) {
                     moddedItems.add(innerPath)
@@ -473,7 +474,7 @@ class SlipstreamZipMod(val file: File) : SlipstreamMod, Closeable {
             // I'm not entirely sure whether this is still needed, but there's
             // no harm in keeping it.
             .map { it.replace('\\', '/') }
-            .toList()
+            .collect(Collectors.toList())
     }
 
     override fun openFile(name: String): InputStream {
@@ -510,7 +511,7 @@ class SlipstreamDirectoryMod(val dir: Path) : SlipstreamMod, Closeable {
         .map { it.relativeTo(dir).toString() }
         // Always use forward strokes, regardless of platform
         .map { it.replace('\\', '/') }
-        .toList()
+        .collect(Collectors.toList())
 
     override fun openFile(name: String): InputStream {
         return Files.newInputStream(dir.resolve(name))

@@ -2,6 +2,7 @@ package xyz.znix.xftl.sys
 
 import xyz.znix.xftl.game.SaveProfile
 import java.nio.file.Path
+import java.nio.file.Paths
 
 sealed interface PlatformSpecific {
     /**
@@ -48,7 +49,7 @@ sealed interface PlatformSpecific {
  * app's private storage, provided by the launcher activity.
  */
 object AndroidPlatform : PlatformSpecific {
-    var baseDir: Path = Path.of(".")
+    var baseDir: Path = Paths.get(".")
 
     override val saveGamePath: Path
         get() = baseDir.resolve("ProjectWormhole")

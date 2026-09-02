@@ -4,6 +4,10 @@ import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Intent
 import android.net.Uri
+import android.opengl.EGL14
+import javax.microedition.khronos.egl.EGL10
+import javax.microedition.khronos.egl.EGLConfig
+import javax.microedition.khronos.egl.EGLDisplay
 import android.opengl.GLSurfaceView
 import android.os.Bundle
 import android.view.View
@@ -253,9 +257,53 @@ class GameSurfaceView(
     init {
         setEGLContextClientVersion(3)
         preserveEGLContextOnPause = true
-        setEGLConfigChooser(8, 8, 8, 8, 24, 8)
+        setEGLConfigChooser(FallbackConfigChooser())
         setRenderer(container.renderer)
         renderMode = RENDERMODE_CONTINUOUSLY
+    }
+
+    /**
+     * Tries increasingly modest EGL configs until the driver provides one.
+     *
+     * The engine renders every frame into its own offscreen FBO with a
+     * guaranteed 24-bit depth + 8-bit stencil attachment, so the window
+     * surface doesn't need them - this keeps older GLES stacks (API 26
+     * emulators, old devices) from rejecting the surface outright.
+     */
+    private class FallbackConfigChooser : EGLConfigChooser {
+        private val specs = arrayOf(
+            intArrayOf(8, 8, 8, 8, 24, 8),
+            intArrayOf(8, 8, 8, 8, 24, 0),
+            intArrayOf(8, 8, 8, 8, 16, 8),
+            intArrayOf(8, 8, 8, 8, 16, 0),
+            intArrayOf(5, 6, 5, 0, 24, 8),
+            intArrayOf(5, 6, 5, 0, 16, 8),
+            intArrayOf(5, 6, 5, 0, 16, 0)
+        )
+
+        override fun chooseConfig(egl: EGL10, display: EGLDisplay): EGLConfig {
+            for (spec in specs) {
+                val attribs = intArrayOf(
+                    EGL10.EGL_RED_SIZE, spec[0],
+                    EGL10.EGL_GREEN_SIZE, spec[1],
+                    EGL10.EGL_BLUE_SIZE, spec[2],
+                    EGL10.EGL_ALPHA_SIZE, spec[3],
+                    EGL10.EGL_DEPTH_SIZE, spec[4],
+                    EGL10.EGL_STENCIL_SIZE, spec[5],
+                    EGL10.EGL_RENDERABLE_TYPE, EGL14.EGL_OPENGL_ES2_BIT,
+                    EGL10.EGL_NONE
+                )
+                val num = IntArray(1)
+                if (egl.eglChooseConfig(display, attribs, null, 0, num) && num[0] > 0) {
+                    val configs = arrayOfNulls<EGLConfig>(num[0])
+                    if (egl.eglChooseConfig(display, attribs, configs, num[0], num) && num[0] > 0) {
+                        return configs[0]!!
+                    }
+                }
+            }
+
+            throw IllegalArgumentException("eglChooseConfig failed: no supported EGL config")
+        }
     }
 
     override fun onTouchEvent(event: android.view.MotionEvent): Boolean {

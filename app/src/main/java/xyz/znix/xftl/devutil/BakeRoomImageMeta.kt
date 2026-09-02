@@ -19,6 +19,7 @@ import xyz.znix.xftl.rendering.Colour
 import java.nio.ByteBuffer
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.Paths
 
 /**
  * This builds an XML file that, for all the interior images, says what
@@ -72,7 +73,7 @@ object BakeRoomImageMeta {
         println(xml)
 
         if (args.contains("--save")) {
-            val path = Path.of("src/main/resources/baked/editor-door-data.xml")
+            val path = Paths.get("src/main/resources/baked/editor-door-data.xml")
             Files.write(path, xml.toByteArray(Charsets.UTF_8))
         }
     }

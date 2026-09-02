@@ -50,7 +50,7 @@ class SILFontLoader {
         val seeking = SeekingInputStream(data)
         val bytes = DataInputStream(seeking)
 
-        check(bytes.readNBytes(4).contentEquals("FONT".toByteArray()))
+        check(ByteArray(4).also { bytes.readFully(it) }.contentEquals("FONT".toByteArray()))
 
         val version = bytes.read()
         lineSpacing = bytes.read()
@@ -100,7 +100,7 @@ class SILFontLoader {
         // Read the texture
 
         seeking.position = textureOffset
-        val magic = bytes.readNBytes(4)
+        val magic = ByteArray(4).also { bytes.readFully(it) }
         check(magic.contentEquals("TEX\u000a".toByteArray()))
 
         val texVersion = bytes.read()

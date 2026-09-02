@@ -50,7 +50,14 @@ class PatchedXMLCache(val dir: Path) {
 
     private fun loadCached(path: Path, expectedHash: ByteArray): Document? {
         BufferedInputStream(Files.newInputStream(path)).use {
-            val oldHash = it.readNBytes(DIGEST_LENGTH)
+            val oldHash = ByteArray(DIGEST_LENGTH).also { buf ->
+                var off = 0
+                while (off < DIGEST_LENGTH) {
+                    val r = it.read(buf, off, DIGEST_LENGTH - off)
+                    if (r <= 0) break
+                    off += r
+                }
+            }
             if (!oldHash.contentEquals(expectedHash))
                 return null
 

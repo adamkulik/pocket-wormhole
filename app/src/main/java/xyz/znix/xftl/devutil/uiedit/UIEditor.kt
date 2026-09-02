@@ -16,6 +16,7 @@ import java.nio.file.StandardWatchEventKinds
 import java.nio.file.WatchService
 import kotlin.math.pow
 import kotlin.math.roundToInt
+import java.nio.file.Paths
 
 /**
  * A simple UI 'editor'.
@@ -48,7 +49,7 @@ class UIEditor(val df: Datafile, val filename: String) : BasicGame("XFTL UI Edit
             updateZoomScale()
         }
 
-    private val filePath = Path.of("src/main/resources/assets/ui/$filename.xml")
+    private val filePath = Paths.get("src/main/resources/assets/ui/$filename.xml")
     private val fileWatcher: WatchService = filePath.fileSystem.newWatchService()
     private var autoReload: Boolean = false
     private var reloaderThread: Thread? = null

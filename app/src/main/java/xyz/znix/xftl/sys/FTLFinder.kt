@@ -5,6 +5,7 @@ import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.regex.Pattern
+import java.nio.file.Paths
 
 /**
  * Searches for FTL installations.
@@ -17,7 +18,7 @@ object FTLFinder {
         "~/Library/Application Support/Steam/steamapps/libraryfolders.vdf",
     )
 
-    private val EPIC_LOCATION = Path.of("C:\\Program Files\\Epic Games\\FasterThanLight\\ftl.dat")
+    private val EPIC_LOCATION = Paths.get("C:\\Program Files\\Epic Games\\FasterThanLight\\ftl.dat")
 
     private val VDF_REGEX = Pattern.compile("\\s*\"path\"\\s+\"([^\"]*)\"\\s*")
 
@@ -42,7 +43,7 @@ object FTLFinder {
         val userDir = System.getProperty("user.home")
         val vdfPaths = STEAM_LOCATIONS
             .map { it.replace("~", userDir) }
-            .map { Path.of(it) }
+            .map { Paths.get(it) }
 
         val result = ArrayList<Path>()
 
@@ -69,7 +70,7 @@ object FTLFinder {
             if (!matcher.matches())
                 continue
 
-            val steamDir = Path.of(matcher.group(1))
+            val steamDir = Paths.get(matcher.group(1))
             val ftlDat = when (Platform.get()) {
                 Platform.MACOSX -> steamDir.resolve("steamapps/common/FTL Faster Than Light/FTL.app/Contents/Resources/ftl.dat")
                 else -> steamDir.resolve("steamapps/common/FTL Faster Than Light/data/ftl.dat")

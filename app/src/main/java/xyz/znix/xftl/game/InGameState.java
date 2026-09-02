@@ -997,7 +997,7 @@ public class InGameState extends MainGame.GameState {
     private void loadSectorMusic(SectorType type) {
         List<MusicSpec> tracks = type.getSoundtracks().stream()
                 .map(name -> getSounds().getTrack(name))
-                .toList();
+                .collect(java.util.stream.Collectors.toList());
         getSounds().switchMusicList(tracks);
     }
 

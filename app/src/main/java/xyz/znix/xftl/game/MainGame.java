@@ -29,6 +29,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 
 public class MainGame implements Game {
@@ -363,11 +364,11 @@ public class MainGame implements Game {
         // Let the user override the path with system properties
         String override = System.getProperty("xftl.datafile-path");
         if (override != null) {
-            return Path.of(override);
+            return Paths.get(override);
         }
         override = System.getenv("XFTL_DATAFILE");
         if (override != null) {
-            return Path.of(override);
+            return Paths.get(override);
         }
 
         // There's a text file which contains the path to the ftl.dat file
@@ -395,7 +396,7 @@ public class MainGame implements Game {
 
         Path path;
         try {
-            path = Path.of(rawPath);
+            path = Paths.get(rawPath);
         } catch (InvalidPathException ignored) {
             System.err.printf("Invalid ftl.dat path (could not parse): '%s'%n", rawPath);
             return null;

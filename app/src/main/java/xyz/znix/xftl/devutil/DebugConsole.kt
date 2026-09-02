@@ -16,6 +16,7 @@ import xyz.znix.xftl.sys.GameContainer
 import xyz.znix.xftl.sys.Input
 import xyz.znix.xftl.weapons.AbstractWeaponBlueprint
 import java.nio.file.Path
+import java.nio.file.Paths
 import java.util.*
 import kotlin.math.max
 import kotlin.math.roundToInt
@@ -1025,6 +1026,6 @@ class DebugConsole(var game: InGameState) {
         // TODO move this to somewhere in appdata (or platform equivalent) when we pick
         //  somewhere to store the regular savegames.
         @JvmField
-        val DEBUG_SAVE_DIR = Path.of("debug-saves")
+        val DEBUG_SAVE_DIR = Paths.get("debug-saves")
     }
 }

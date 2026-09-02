@@ -21,7 +21,7 @@ class AnimationSpec(
     }
 
     fun spriteAt(game: InGameState, i: Int): Image {
-        if (i >= length) throw IndexOutOfBoundsException(i)
+        if (i >= length) throw IndexOutOfBoundsException(i.toString())
         val img = game.getImg(sheet.sheetPath)
         return sheet.getSprite(img, x + i, y)
     }
