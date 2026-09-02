@@ -26,8 +26,7 @@ with or endorsed by them.
 |---------------------|-----------------------------------------------------|
 | Tap                 | Left click                                          |
 | Drag                | Mouse drag                                          |
-| Double-tap          | Right click (move crew, power down systems, cancel) |
-| Long-press (~0.5 s) | Right click (alternative)                           |
+| Long-press (~0.5 s) | Right click (move crew, power down systems, cancel) |
 | Two-finger drag ↕   | Scroll wheel (ship lists, options)                  |
 | Back button         | Escape (opens the pause/escape menu)                |
 | Physical keyboard   | Space/Enter/arrows/Tab/Escape/letters reach the game |
