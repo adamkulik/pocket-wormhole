@@ -77,12 +77,9 @@ public class MainGame implements Game {
 
             loadSavedGame(doc);
         } else {
-            // Resume a run saved by Save+Quit, if there is one
-            if (tryResumeRun()) {
-                return;
-            }
-
-            switchToShipSelect();
+            // Otherwise, open the main menu (issue #2) - which offers to
+            // continue a saved run or start a new one in the hangar.
+            switchToMainMenu();
         }
     }
 
@@ -109,6 +106,45 @@ public class MainGame implements Game {
 
         SelectShipState state = new SelectShipState(datafile, this);
         setCurrentState(state);
+    }
+
+    public void switchToMainMenu() {
+        setCurrentState(new MainMenuState(this, datafile));
+    }
+
+    /**
+     * Is there a run saved by Save+Quit that could be continued?
+     */
+    public boolean hasRunSave() {
+        return Files.exists(getRunSavePath());
+    }
+
+    /**
+     * Continue a run saved by Save+Quit, from the main menu's Continue
+     * button. If the save is missing or corrupt, fall back to the hangar.
+     */
+    public void continueSavedRun() {
+        Document doc = consumeRunSave();
+        if (doc != null) {
+            loadSavedGame(doc);
+        } else {
+            switchToShipSelect();
+        }
+    }
+
+    /**
+     * Quit the game entirely - on Android this closes the app.
+     */
+    public void exitGame() {
+        gameContainer.exit();
+    }
+
+    /**
+     * The game content, for states (like the main menu) that need sounds or
+     * other shared resources without a full InGameState.
+     */
+    public InGameState.GameContent getGameContent() {
+        return content;
     }
 
     public void switchToDatafileSelect() {
@@ -248,7 +284,9 @@ public class MainGame implements Game {
             }
         }
 
-        gameContainer.exit();
+        // With a main menu (issue #2), Save+Quit returns there, where the
+        // player can use Continue to get back into this run.
+        switchToMainMenu();
     }
 
     private Path getRunSavePath() {
@@ -265,15 +303,19 @@ public class MainGame implements Game {
     }
 
     /**
-     * Loads a run saved by Save+Quit, if there is one. Vanilla instead shows
-     * a Continue button on its main menu, which we don't have yet.
+     * Loads a run saved by Save+Quit, if there is one.
      *
-     * @return true if a saved run was restored
+     * The save is consumed (deleted) either way, so a corrupt save can't
+     * trap the player: if restoring it then fails the player falls back to
+     * the hangar rather than crash-looping on every launch.
+     *
+     * @return the saved game's document, or null if there wasn't a valid one
      */
-    private boolean tryResumeRun() {
+    @Nullable
+    private Document consumeRunSave() {
         Path path = getRunSavePath();
         if (!Files.exists(path)) {
-            return false;
+            return null;
         }
 
         Document doc;
@@ -283,28 +325,20 @@ public class MainGame implements Game {
             System.err.println("Saved run is corrupt, discarding it:");
             ex.printStackTrace(System.err);
             deleteRunSave();
-            return false;
+            return null;
         }
 
         if (!doc.getRootElement().getName().equals("xftlSaveGame")) {
             // Not a run save; discard it rather than failing every launch
             deleteRunSave();
-            return false;
+            return null;
         }
 
         // Valid enough to consume - if restoring fails afterwards the player
         // ends up in the hangar instead of crash-looping on every launch.
         deleteRunSave();
 
-        try {
-            loadSavedGame(doc);
-        } catch (Exception ex) {
-            System.err.println("Failed to restore the saved run:");
-            ex.printStackTrace(System.err);
-            switchToShipSelect();
-            return false;
-        }
-        return true;
+        return doc;
     }
 
     private boolean loadDatafile() {

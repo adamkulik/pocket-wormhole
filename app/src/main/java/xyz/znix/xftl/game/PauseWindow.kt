@@ -152,8 +152,9 @@ class PauseWindow(val game: InGameState, val close: () -> Unit) : Window() {
     }
 
     private fun mainMenuClicked() {
-        // TODO implement a main menu
-        game.mainGame.switchToShipSelect()
+        // Save+Quit has already stored the run (see quitClicked), so the
+        // player can use the main menu's Continue button to get back here.
+        game.mainGame.switchToMainMenu()
     }
 
     private fun hangarClicked() {
