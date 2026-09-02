@@ -70,6 +70,10 @@ class SelectShipState(private val datafile: Datafile, private val main: MainGame
 
     val missingImage = getImgOrNull("img/nullResource.png") ?: error("Missing nullResource.png")
 
+    /** The hangar backdrop; vanilla art that is exactly the game's size, so
+     *  it can be drawn 1:1 behind the ship-selection UI. */
+    private val hangarBackground = getImg("img/customizeUI/custom_background.png")
+
     init {
         startGameButton = StartGameButton(this)
         editFileControls = EditFileControls(this)
@@ -129,6 +133,9 @@ class SelectShipState(private val datafile: Datafile, private val main: MainGame
 
     override fun render(container: GameContainer, g: Graphics) {
         g.clear(Colour.darkGray)
+
+        // The hangar art (1280x720, matching the game area exactly).
+        hangarBackground.draw(0f, 0f)
 
         screenSize.x = container.width
         screenSize.y = container.height
