@@ -94,25 +94,7 @@ class AndroidGameContainer(
         override fun onDrawFrame(gl: GL10?) {
             val thisTime = System.nanoTime()
             val deltaSec = (thisTime - lastNanos) / 1_000_000_000f
-
-            // Framerate cap: GLSurfaceView renders vsync-locked at the
-            // display's refresh rate (60/90/120 Hz), which wastes battery on
-            // high-refresh screens - the game is a 60 fps game (vanilla FTL
-            // runs at 60), so skip frames beyond MAX_FPS. Skipped frames
-            // fold into the next processed frame's dt, keeping all dt-scaled
-            // logic and animations time-correct. The old frame simply stays
-            // on screen until the next swap.
-            // Candidate for an in-game options window; until then this is
-            // the single knob (vanilla parity, also removes any high-refresh
-            // framerate advantages).
-            if (deltaSec < 1f / MAX_FPS - 500_000f / 1_000_000_000f)
-                return
-
-            // Clamp after pauses/resumes, so a multi-second gap (e.g. the
-            // process was frozen) doesn't fast-forward every timer at once.
             lastNanos = thisTime
-
-            val appliedDelta = deltaSec.coerceAtMost(MAX_DT_SEC)
 
             try {
                 input.drainEvents()
@@ -124,7 +106,7 @@ class AndroidGameContainer(
             }
 
             try {
-                game.update(this@AndroidGameContainer, appliedDelta)
+                game.update(this@AndroidGameContainer, deltaSec)
             } catch (ex: Exception) {
                 android.util.Log.e(TAG, "Exception during game update", ex)
             }
@@ -295,17 +277,6 @@ class AndroidGameContainer(
     companion object {
         const val GAME_W = 1280
         const val GAME_H = 720
-
-        /**
-         * Update/render rate cap. Vanilla FTL is a 60 fps game; raising
-         * this mostly wastes battery on high-refresh displays. Intended to
-         * become user-configurable if/when an options window exists.
-         */
-        const val MAX_FPS = 60
-
-        /** Upper bound on a single update's delta time (see onDrawFrame). */
-        const val MAX_DT_SEC = 0.1f
-
         private const val TAG = "XFTL"
     }
 }
