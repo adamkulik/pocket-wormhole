@@ -192,6 +192,8 @@ class MainActivity : Activity() {
         if (sv != null) {
             val mapped = when (keyCode) {
                 android.view.KeyEvent.KEYCODE_BACK -> xyz.znix.xftl.sys.Input.KEY_ESCAPE
+                android.view.KeyEvent.KEYCODE_DEL -> xyz.znix.xftl.sys.Input.KEY_BACK
+                android.view.KeyEvent.KEYCODE_FORWARD_DEL -> xyz.znix.xftl.sys.Input.KEY_DELETE
                 android.view.KeyEvent.KEYCODE_ESCAPE -> xyz.znix.xftl.sys.Input.KEY_ESCAPE
                 android.view.KeyEvent.KEYCODE_SPACE -> xyz.znix.xftl.sys.Input.KEY_SPACE
                 android.view.KeyEvent.KEYCODE_ENTER, android.view.KeyEvent.KEYCODE_NUMPAD_ENTER -> xyz.znix.xftl.sys.Input.KEY_ENTER
@@ -203,6 +205,8 @@ class MainActivity : Activity() {
                 android.view.KeyEvent.KEYCODE_GRAVE -> xyz.znix.xftl.sys.Input.KEY_GRAVE
                 in android.view.KeyEvent.KEYCODE_A..android.view.KeyEvent.KEYCODE_Z ->
                     xyz.znix.xftl.sys.Input.KEY_A + (keyCode - android.view.KeyEvent.KEYCODE_A)
+                in android.view.KeyEvent.KEYCODE_0..android.view.KeyEvent.KEYCODE_9 ->
+                    xyz.znix.xftl.sys.Input.KEY_0 + (keyCode - android.view.KeyEvent.KEYCODE_0)
                 else -> -1
             }
             if (mapped != -1) {
@@ -213,6 +217,8 @@ class MainActivity : Activity() {
                     android.view.KeyEvent.KEYCODE_SPACE -> ' '
                     in android.view.KeyEvent.KEYCODE_A..android.view.KeyEvent.KEYCODE_Z ->
                         'a' + (keyCode - android.view.KeyEvent.KEYCODE_A)
+                    in android.view.KeyEvent.KEYCODE_0..android.view.KeyEvent.KEYCODE_9 ->
+                        '0' + (keyCode - android.view.KeyEvent.KEYCODE_0)
                     else -> 0.toChar()
                 }
                 sv.queueEvent { input.injectKeyPress(mapped, typed) }

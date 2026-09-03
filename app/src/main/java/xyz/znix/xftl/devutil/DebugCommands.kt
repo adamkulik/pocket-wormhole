@@ -766,6 +766,22 @@ class DebugCommands(console: DebugConsole) : ConsoleCommandProvider(console) {
         addLine("Applied $amount points of damage to the player ship")
     }
 
+    @ConsoleCommand(name = "hurt")
+    @CmdHelp("Damage all of the player's crewmembers by a given amount (negative heals)")
+    private fun cmdHurt(@ParName("amount") amount: Int) {
+        var count = 0
+
+        for (crew in ship.crew.mapNotNull { it as? LivingCrew }) {
+            if (crew.ownerShip != ship)
+                continue
+
+            crew.health = (crew.health - amount).coerceIn(0f, crew.maxHealth)
+            count++
+        }
+
+        addLine("Applied $amount points of damage to $count crewmembers")
+    }
+
     @ConsoleCommand(name = "force-hack")
     @CmdHelp("Forces the enemy to hack a given player system")
     private fun cmdForceHack(@ParName("system") blueprint: SystemBlueprint) {
