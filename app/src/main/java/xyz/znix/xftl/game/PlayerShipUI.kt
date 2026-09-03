@@ -1665,6 +1665,11 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
             val sector = game.gameMap.generateSector(sectorInfo, game)
             game.currentBeacon = sector.startBeacon
 
+            // Auto-save after jumping to the new sector, like beacon jumps
+            // do (InGameState.update, beginJumpOut) - a force-close should
+            // only cost the current beacon, not the whole run.
+            game.getMainGame().writeRunSave()
+
             // In case we were at a store
             // TODO move this into an on-jump handler function
             updateButtons()

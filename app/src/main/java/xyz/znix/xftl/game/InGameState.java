@@ -377,6 +377,11 @@ public class InGameState extends MainGame.GameState {
                 Beacon target = jumpOutTarget;
                 jumpOutTarget = null;
                 setCurrentBeacon(target);
+
+                // Auto-save on arrival (after the beacon change has fully
+                // resolved), so a force-close can only cost the player the
+                // current beacon, like vanilla FTL.
+                mainGame.writeRunSave();
             }
         }
 
@@ -960,6 +965,7 @@ public class InGameState extends MainGame.GameState {
         // If an animation is still in progress, switch immediately.
         if (playerFlyIn > 0 || playerJumpOut > 0 || enemyJumpOut > 0) {
             setCurrentBeacon(target);
+            mainGame.writeRunSave();
             return;
         }
 

@@ -262,32 +262,52 @@ public class MainGame implements Game {
     public void quitGame() {
         // Save the current run so it can be resumed when the game is reopened.
         // (Upstream never saves here - the comment below is upstream's.)
-        if (currentState instanceof InGameState) {
-            try {
-                Document doc = ((InGameState) currentState).saveGameState();
-
-                Path path = getRunSavePath();
-                Path tempFile = path.resolveSibling("run-save-temp.xml");
-                Files.createDirectories(path.getParent());
-
-                try (BufferedWriter writer = Files.newBufferedWriter(tempFile, StandardCharsets.UTF_8)) {
-                    XMLOutputter xmlOutput = new XMLOutputter(Format.getPrettyFormat());
-                    xmlOutput.output(doc, writer);
-                }
-
-                // Overwrite the run save with the newly-written one; atomic on
-                // most OSes so a crash mid-write can't corrupt the old save.
-                Files.move(tempFile, path, StandardCopyOption.REPLACE_EXISTING);
-            } catch (Exception ex) {
-                // Still quit even if the save failed - but log it loudly.
-                System.err.println("Failed to save run on quit:");
-                ex.printStackTrace(System.err);
-            }
-        }
+        writeRunSave();
 
         // With a main menu (issue #2), Save+Quit returns there, where the
         // player can use Continue to get back into this run.
         switchToMainMenu();
+    }
+
+    /**
+     * Serialises the current run to the run save (temp file + atomic
+     * rename), so it can be resumed from the main menu's Continue button.
+     *
+     * Called by {@link #quitGame()}, and automatically after every sector
+     * jump - Android routinely force-closes backgrounded apps, and without
+     * this a force-close costs the player the whole run instead of just the
+     * current beacon (which is all vanilla FTL loses - it auto-saves on
+     * every jump too).
+     *
+     * Safe to call from any state: outside a run it does nothing, and a
+     * failed save is logged loudly but never fatal - the previous save
+     * stays intact thanks to the rename.
+     */
+    public void writeRunSave() {
+        if (!(currentState instanceof InGameState)) {
+            return;
+        }
+
+        try {
+            Document doc = ((InGameState) currentState).saveGameState();
+
+            Path path = getRunSavePath();
+            Path tempFile = path.resolveSibling("run-save-temp.xml");
+            Files.createDirectories(path.getParent());
+
+            try (BufferedWriter writer = Files.newBufferedWriter(tempFile, StandardCharsets.UTF_8)) {
+                XMLOutputter xmlOutput = new XMLOutputter(Format.getPrettyFormat());
+                xmlOutput.output(doc, writer);
+            }
+
+            // Overwrite the run save with the newly-written one; atomic on
+            // most OSes so a crash mid-write can't corrupt the old save.
+            Files.move(tempFile, path, StandardCopyOption.REPLACE_EXISTING);
+        } catch (Exception ex) {
+            // Keep playing - but log it loudly.
+            System.err.println("Failed to write the run save:");
+            ex.printStackTrace(System.err);
+        }
     }
 
     private Path getRunSavePath() {
