@@ -193,6 +193,43 @@ abstract class AbstractCrew(
     private var currentFireSlot: Int = -1
     private var currentBreachSlot: Int = -1
 
+    /**
+     * True while something (normally a medbay) is actively healing this
+     * crewmember.
+     *
+     * The healing system calls [markBeingHealed] every update in which it's
+     * healing us. While the flag is set the green healing sparkles are drawn
+     * above the crewmember.
+     *
+     * This isn't saved, as it's recomputed every update.
+     */
+    var isBeingHealed: Boolean = false
+        private set
+
+    /** The healing sparkles animation, created on first use. */
+    private var healingAnimation: FTLAnimation? = null
+
+    /**
+     * Set by [markBeingHealed] this frame, and adopted into
+     * [isBeingHealed] at the start of our update.
+     *
+     * This two-stage dance is needed because systems update before crewmembers
+     * (see [xyz.znix.xftl.Ship.update], which updates rooms then crew) - the
+     * medbay sets the flag, then a few lines later our update runs. Adopting
+     * the flag there (instead of clearing it) keeps it visible for this
+     * frame's render, and it's dropped on the next update if nobody re-marks
+     * us.
+     */
+    private var healingRequestedThisFrame: Boolean = false
+
+    /**
+     * Called by whatever is healing this crewmember (normally the medbay)
+     * every update in which the healing is actually happening.
+     */
+    fun markBeingHealed() {
+        healingRequestedThisFrame = true
+    }
+
     val screenX: Int get() = pixelPosition.x
     val screenY: Int
         get() {
@@ -252,6 +289,14 @@ abstract class AbstractCrew(
 
     open fun update(dt: Float) {
         icon.update(dt)
+
+        // Adopt whatever the medbay (or another healer) requested earlier
+        // this frame - systems update before crew. Also keep the healing
+        // animation running (if we have one) so it doesn't visibly jump when
+        // healing resumes.
+        isBeingHealed = healingRequestedThisFrame
+        healingRequestedThisFrame = false
+        healingAnimation?.update(dt)
 
         // If we're moving we shouldn't be vertically offset to match
         // the enemy, if not this will be updated later on.
@@ -747,6 +792,19 @@ abstract class AbstractCrew(
             val width = ceil(25f * health / maxHealth).toInt()
             g.colour = if (friendly) Colour.green else Colour.red
             g.fillRect(screenX + 4f, screenY + 3f, width.f, 3f)
+        }
+
+        // Draw the healing sparkles centred above the crewmember's head.
+        // Note drawForeground has already returned if we're dying.
+        if (isBeingHealed) {
+            if (healingAnimation == null)
+                healingAnimation = HEALING_ANIM.startLooping(game)
+
+            val anim = healingAnimation!!
+            anim.draw(
+                screenX.f + (icon.currentFrame.width - anim.width) / 2f,
+                screenY.f - anim.height / 2f
+            )
         }
     }
 
@@ -1531,6 +1589,21 @@ abstract class AbstractCrew(
     }
 
     companion object {
+        // The per-frame time; a full loop of the healing animation takes
+        // 11 * this many seconds.
+        private const val HEALING_ANIM_FRAME_TIME = 0.15f
+
+        /**
+         * The green sparkles vanilla FTL draws above crewmembers being healed
+         * in a medbay. Vanilla hardcodes this effect - it isn't listed in
+         * animations.xml - so the animation is defined here instead.
+         * The strip is 11 frames of 32x32.
+         */
+        private val HEALING_ANIM = AnimationSpec(
+            Animations.SpriteSheetSpec("img/people/healing_strip11.png", 32, 32, 352, 32),
+            "healing", 0, 0, 11, HEALING_ANIM_FRAME_TIME
+        )
+
         const val TELEPORT_ANIMATION_TIME: Float = 0.5f
         const val TELEPORT_IMAGE_STRETCH: Float = 0.1f
 

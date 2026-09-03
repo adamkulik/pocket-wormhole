@@ -6,6 +6,7 @@ import xyz.znix.xftl.Translator
 import xyz.znix.xftl.crew.AbstractCrew
 import xyz.znix.xftl.crew.LivingCrew
 import xyz.znix.xftl.crew.MedbayHealing
+import xyz.znix.xftl.game.LoopHandle
 import xyz.znix.xftl.game.UIUtils
 import xyz.znix.xftl.replaceArg
 import xyz.znix.xftl.savegame.ObjectRefs
@@ -14,6 +15,9 @@ import kotlin.math.roundToInt
 
 class Medbay(blueprint: SystemBlueprint) : MainSystem(blueprint) {
     override val sortingType: SortingType get() = SortingType.MEDBAY
+
+    // The soft looped sound FTL plays while crew are being healed.
+    private val healingSound by onInit { it.sounds.getLoop("healing") }
 
     override fun update(dt: Float) {
         super.update(dt)
@@ -44,6 +48,16 @@ class Medbay(blueprint: SystemBlueprint) : MainSystem(blueprint) {
                 continue
 
             crew.dealDamage(MedbayHealing(-healing))
+
+            // If this crewmember is actually being healed - they're not at
+            // full health and the medbay isn't hacking them - show the
+            // healing sparkles over them and contribute to the healing
+            // sound loop. Like fire, the loop's volume scales with the
+            // number of things triggering it.
+            if (healthPerSec > 0 && crew.health < crew.maxHealth) {
+                crew.markBeingHealed()
+                healingSound.continueLoopPlayerOnly(ship)
+            }
         }
     }
 
