@@ -797,18 +797,12 @@ public class InGameState extends MainGame.GameState {
 
             Float escapeTimer = enemy.getEscapeTimer();
             if (escapeTimer != null && escapeTimer <= 0f) {
-                // TODO play the jumping away animation
-
-                // Note we have to fetch this now, before we null
-                // out the enemy ship.
-                IEvent jumpEvent = enemy.getSpec() == null ? null : enemy.getSpec().getGotaway();
-
-                setEnemy(null);
-                currentBeacon.setShip(null);
-
-                if (jumpEvent != null) {
-                    showEventDialogue(jumpEvent.resolve(), Random.Default.nextInt());
-                }
+                // Play the jump-away animation; the update() enemyJumpOut
+                // machine removes the ship (and shows the got-away event)
+                // once it finishes (issue #4).
+                hostileShipUI.startFlyOut();
+                enemyJumpEvent = enemy.getSpec() == null ? null : enemy.getSpec().getGotaway();
+                enemyJumpOut = 1f;
 
                 return;
             }
@@ -952,6 +946,13 @@ public class InGameState extends MainGame.GameState {
         // (this includes the first beacon of a run and loading a game).
         if (beaconChanged) {
             playerFlyIn = 1f;
+
+            // Arrival chime (issue #16), timed with the arrival animation.
+            FTLSound arrive = getSounds().getSampleOrWarn("jumpArrive");
+            if (arrive != null) {
+                arrive.play();
+            }
+
             arrivalEventsPending = arrivalShowBeaconEvent || arrivalEliteEvent != null;
         }
     }
@@ -971,6 +972,12 @@ public class InGameState extends MainGame.GameState {
 
         jumpOutTarget = target;
         playerJumpOut = 1f;
+
+        // The jump-away whoosh (issue #16).
+        FTLSound leave = getSounds().getSampleOrWarn("jumpLeave");
+        if (leave != null) {
+            leave.play();
+        }
     }
 
     private void trySpawnBoss() {

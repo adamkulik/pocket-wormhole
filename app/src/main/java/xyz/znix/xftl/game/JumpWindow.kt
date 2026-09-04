@@ -574,7 +574,6 @@ class JumpWindow(val game: InGameState, showSectorMap: () -> Unit, val jump: (Be
 
         // Can't hover over beacons while out of fuel
         if (outOfFuel) {
-            org.newdawn.slick.util.Log.info("JumpWindow.updateUI at ($x,$y): out of fuel")
             return
         }
 

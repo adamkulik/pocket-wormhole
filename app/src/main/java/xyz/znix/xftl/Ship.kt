@@ -885,6 +885,7 @@ class Ship(
 
         // This FTL charge logic is for the player; enemies have a completely
         // separate charge time stored in ShipAI.
+        val wasFtlCharged = isFtlCharged
         if (canChargeFTL) {
             var rate = engines?.chargeRate ?: 0f
 
@@ -898,6 +899,10 @@ class Ship(
         }
         if (ftlChargeProgress > 1f) {
             ftlChargeProgress = 1f
+        }
+        if (isFtlCharged && !wasFtlCharged) {
+            // Ring the bell when the drive finishes charging (issue #16)
+            sys.sounds.getSampleOrWarn("jumpReady")?.play()
         }
 
         for ((augment, totalValue) in augmentValues) {
