@@ -225,9 +225,15 @@ class DebugCommands(console: DebugConsole) : ConsoleCommandProvider(console) {
         cmdCrewImpl(race, enemy)
     }
 
-    private fun cmdCrewImpl(race: CrewBlueprint, targetShip: Ship) {
+    private fun cmdCrewImpl(race: CrewBlueprint, targetShip: Ship, isIntruder: Boolean = false) {
         val info = LivingCrewInfo.generateRandom(race, game)
-        targetShip.addCrewMember(info, false)
+        targetShip.addCrewMember(info, false, isIntruder)
+    }
+
+    @ConsoleCommand(name = "boarder")
+    @CmdHelp("Spawn a hostile intruder on the player ship, same args as 'crew'")
+    private fun cmdBoarder(@ParName("race") race: CrewBlueprint) {
+        cmdCrewImpl(race, ship, isIntruder = true)
     }
 
     @ConsoleCommand(name = "skills")

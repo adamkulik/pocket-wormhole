@@ -161,6 +161,10 @@ class Ship(
     val inboundBeams: MutableList<BeamBlueprint.BeamInstance> = ArrayList()
     val animations: MutableList<FloatingAnimation> = ArrayList()
 
+    // Cosmetic laser bolts fired between fighting crewmembers.
+    // Transient on purpose - not saved, the longest flight is ~0.3s.
+    val crewShots: MutableList<CrewShot> = ArrayList()
+
     private val damageNumbers = ArrayList<DamageNumber>()
 
     /**
@@ -810,6 +814,14 @@ class Ship(
             }
         }
 
+        // Draw laser bolts from fighting crew over the crew, under health bars.
+        // Same visibility rule as the crew themselves.
+        for (shot in crewShots) {
+            if (shot.room.playerHasVision) {
+                shot.render(g)
+            }
+        }
+
         // Draw the health bars on top of all the other crew, so two
         // fighting crewmembers can't block one of their health bars.
         for (crew in crew) {
@@ -1027,6 +1039,9 @@ class Ship(
         for (a in animations) {
             a.update(dt)
         }
+
+        // Update the cosmetic crew combat laser bolts.
+        crewShots.removeAll { !it.update(dt) }
 
         // update returns false if the number should be removed
         damageNumbers.removeIf { !it.update(dt) }
@@ -1628,6 +1643,12 @@ class Ship(
             engines?.addSkillPoint(Skill.ENGINES)
         }
         return missed
+    }
+
+    fun spawnCrewShot(start: IPoint, end: IPoint, room: Room) {
+        if (start == end)
+            return
+        crewShots += CrewShot(room, start, end)
     }
 
     fun playCentredAnimation(animation: AnimationSpec, centre: IPoint): FloatingAnimation {

@@ -851,7 +851,15 @@ abstract class AbstractCrew(
 
             dealDamage()
 
-            // TODO if shooting, play the little laser graphic animation
+            // When shooting (rather than punching), play the little laser graphic.
+            // Purely cosmetic - the damage has already been applied.
+            if (!isPunching) {
+                enemyToAttack?.let { target ->
+                    // Fire from gun height (slightly above the sprite centre).
+                    val muzzle = Point(getPixelPositionCentre().x, getPixelPositionCentre().y - 6)
+                    room.ship.spawnCrewShot(muzzle, target.getPixelPositionCentre(), room)
+                }
+            }
         }
 
         if (attackTimer == null || attackTimer!! <= 0f) {
