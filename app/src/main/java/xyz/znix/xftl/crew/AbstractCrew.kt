@@ -832,8 +832,25 @@ abstract class AbstractCrew(
         if (currentAction == Action.DYING || health == 0f)
             return
 
+        val oldHealth = health
+
         // Clamp max health to avoid over-healing with the heal burst
         health = (health - damage.amount).coerceIn(0f, maxHealth)
+
+        // Vanilla plays a warning beep when one of the player's crew is
+        // damaged down to 25 HP or below (sounds.xml: lowCrewHealth ->
+        // ship/bp_SFX_HealthWarning.ogg). It's edge-triggered - vanilla
+        // compares the int-truncated health before and after the damage -
+        // so it doesn't repeat while they stay low; healing back above the
+        // threshold re-arms it. Only real crew (vanilla IsCrew()) belonging
+        // to the player (vanilla iShipId == 0) beep: intruders, defenders
+        // and boarding-drone pawns are silent. Ref: vanilla
+        // CrewMember::DirectModifyHealth via the FTL-Hyperspace hook.
+        if (damage.amount > 0f && this is LivingCrew && ownerShip?.isPlayerShip == true) {
+            if (health.toInt() <= LOW_HEALTH_WARNING_HP && oldHealth.toInt() > LOW_HEALTH_WARNING_HP) {
+                game.sounds.getSampleOrWarn("lowCrewHealth")?.play()
+            }
+        }
 
         // Dying is handled in the update loop
     }
@@ -1632,6 +1649,14 @@ abstract class AbstractCrew(
     }
 
     companion object {
+        /**
+         * When one of the player's crew is damaged across this many HP
+         * (int-truncated, vanilla semantics), the lowCrewHealth warning
+         * sound plays. Vanilla uses a flat 25 HP for every race - not a
+         * fraction of max health.
+         */
+        const val LOW_HEALTH_WARNING_HP = 25
+
         // The per-frame time; a full loop of the healing animation takes
         // 11 * this many seconds.
         private const val HEALING_ANIM_FRAME_TIME = 0.15f

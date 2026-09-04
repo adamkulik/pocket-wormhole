@@ -781,7 +781,10 @@ class DebugCommands(console: DebugConsole) : ConsoleCommandProvider(console) {
             if (crew.ownerShip != ship)
                 continue
 
-            crew.health = (crew.health - amount).coerceIn(0f, crew.maxHealth)
+            // Route through the engine's real damage entry point rather
+            // than writing health directly, so debug damage behaves like
+            // gameplay damage (low-health warning, death guard, etc).
+            crew.dealDamage(FireDamage(amount.f))
             count++
         }
 
