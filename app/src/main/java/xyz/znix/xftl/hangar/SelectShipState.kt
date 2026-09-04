@@ -86,7 +86,7 @@ class SelectShipState(private val datafile: Datafile, private val main: MainGame
         // TODO load this via the usual asset system, so mods can override it
         // TODO de-duplicate with InGameState
         val builder = com.pocketwormhole.android.SafeXML.builder()
-                try {
+        try {
             val doc = builder.build(XftlResources.open("assets/data/xftl_ships.xml"))
             shipFamilies = ShipFamily.FamilyTable(doc)
         } catch (e: IOException) {

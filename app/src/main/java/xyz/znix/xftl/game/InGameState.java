@@ -2023,7 +2023,7 @@ public class InGameState extends MainGame.GameState {
 
             // TODO load this via the usual asset system, so mods can override it
             SAXBuilder builder = com.pocketwormhole.android.SafeXML.builder();
-                        try {
+            try {
                 Document doc = builder.build(xyz.znix.xftl.sys.XftlResources.open("assets/data/xftl_ships.xml"));
                 shipFamilies = new ShipFamily.FamilyTable(doc);
             } catch (JDOMException | IOException e) {
