@@ -202,6 +202,17 @@ abstract class LivingCrew(blueprint: CrewBlueprint, anims: Animations, room: Roo
         val oldProgress = info.skills.getValue(skill)
         val newProgress = (oldProgress + skill.amountPerAction).coerceIn(0f..1f)
         info.skills[skill] = newProgress
+
+        // Play the level-up sound when this crewmember reaches a new skill
+        // milestone (green at 0.5 progress, yellow at 1.0). Only for the
+        // player's crew - you shouldn't hear enemy boarders levelling up.
+        val ship = ownerShip
+        if (ship != null && ship.isPlayerShip) {
+            val crossedMilestone = (oldProgress < 0.5f && newProgress >= 0.5f) ||
+                    (oldProgress < 1f && newProgress >= 1f)
+            if (crossedMilestone)
+                ship.sys.sounds.getSampleOrWarn("levelup")?.play()
+        }
     }
 
     // Helper function

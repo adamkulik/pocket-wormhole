@@ -268,7 +268,19 @@ data class Door(val position: ConstPoint, val left: Room?, val right: Room?, val
             open || crewOpenDemand -> 1
             else -> -1
         }
+        val prevState = stateAnimation
         stateAnimation = (stateAnimation + animationDir * ship.sys.renderingDeltaTime / ANIMATION_TIME).coerceIn(0f..1f)
+
+        // Play the door open/close sounds (issue #18) as the door finishes
+        // its animation. Only the player's ship is audible - you shouldn't
+        // hear the doors on the enemy ship.
+        if (ship.isPlayerShip && !ship.sys.isPaused() && prevState != stateAnimation) {
+            if (stateAnimation == 1f) {
+                ship.sys.sounds.getSampleOrWarn("doorOpen")?.play()
+            } else if (stateAnimation == 0f) {
+                ship.sys.sounds.getSampleOrWarn("doorClose")?.play()
+            }
+        }
 
         val doorSheet = ship.sys.getImg("img/effects/door_sheet.png")
         val highlight = ship.sys.getImg("img/effects/door_highlight.png")

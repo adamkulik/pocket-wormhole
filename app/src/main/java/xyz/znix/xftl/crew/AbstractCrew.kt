@@ -4,6 +4,7 @@ import org.jdom2.Element
 import xyz.znix.xftl.*
 import xyz.znix.xftl.Constants.*
 import xyz.znix.xftl.game.InGameState
+import xyz.znix.xftl.game.LoopHandle
 import xyz.znix.xftl.layout.Door
 import xyz.znix.xftl.layout.Room
 import xyz.znix.xftl.math.*
@@ -229,6 +230,12 @@ abstract class AbstractCrew(
     fun markBeingHealed() {
         healingRequestedThisFrame = true
     }
+
+    // Vanilla plays soft loops while crew work or fight. Like fire, their
+    // volume scales with the number of crew contributing to the same loop.
+    private val repairLoop by lazy { game.sounds.getLoop("repair") }
+    private val extinguishLoop by lazy { game.sounds.getLoop("extinguish") }
+    private val brawlingLoop by lazy { game.sounds.getLoop("brawling") }
 
     val screenX: Int get() = pixelPosition.x
     val screenY: Int
@@ -607,6 +614,7 @@ abstract class AbstractCrew(
         currentFireSlot = selectFireOrBreach(currentFireSlot, room.fires)
         if (currentFireSlot != -1) {
             currentAction = Action.FIRE_FIGHTING
+            extinguishLoop.continueLoopAnyShip()
 
             // See doc/fires. We include the 1.2x multiplier here, rather
             // than in the fire speed multiplier.
@@ -628,6 +636,7 @@ abstract class AbstractCrew(
         currentBreachSlot = selectFireOrBreach(currentBreachSlot, room.breaches)
         if (currentBreachSlot != -1) {
             currentAction = Action.REPAIRING_BREACH
+            repairLoop.continueLoopAnyShip()
 
             val currentBreach = room.breaches[currentBreachSlot]!!
             currentBreach.health -= 0.08f * repairSpeed * dt
@@ -644,6 +653,7 @@ abstract class AbstractCrew(
         system?.let { sys ->
             if (sys.damaged && canRepair) {
                 currentAction = Action.REPAIRING
+                repairLoop.continueLoopAnyShip()
                 // The base repair speed is 8% per second, or 12.5 seconds to
                 // repair one bar of damage.
                 val didRepair = sys.repair(repairSpeed * 0.08f * dt)
@@ -842,6 +852,11 @@ abstract class AbstractCrew(
         }
         currentAction = action
 
+        // Melee fights play the brawling loop while punches fly - vanilla
+        // behaviour, the volume scales with the number of fighting crew.
+        if (action == Action.FIGHTING && isPunching)
+            brawlingLoop.continueLoopAnyShip()
+
         if (attackTimer != null) {
             attackTimer = attackTimer!! - dt
         }
@@ -858,6 +873,10 @@ abstract class AbstractCrew(
                     // Fire from gun height (slightly above the sprite centre).
                     val muzzle = Point(getPixelPositionCentre().x, getPixelPositionCentre().y - 6)
                     room.ship.spawnCrewShot(muzzle, target.getPixelPositionCentre(), room)
+
+                    // Vanilla plays one of three small-arms shots per attack
+                    // (issue #17).
+                    game.sounds.getSampleOrWarn("crewLaser${(1..3).random()}")?.play()
                 }
             }
         }
@@ -1246,6 +1265,22 @@ abstract class AbstractCrew(
     }
 
     open fun onStartedDying() {
+        // Vanilla plays a race-specific (or, for humans, gendered) death
+        // sound as the crewmember starts dying.
+        val deathSound = when (codename) {
+            "engi" -> "engiDeath"
+            "mantis" -> "mantisDeath"
+            "rock" -> "rockDeath"
+            "zoltan" -> "energyDeath"
+            "crystal" -> "crystalDeath"
+            "slug" -> "shrikeDeath"
+            "human" -> if ((this as? LivingCrew)?.info?.isFemale == true)
+                "femaleDeath${(1..3).random()}"
+            else
+                "death${(1..2).random()}"
+            else -> return
+        }
+        game.sounds.getSampleOrWarn(deathSound)?.play()
     }
 
     open fun onFinishedDying() {

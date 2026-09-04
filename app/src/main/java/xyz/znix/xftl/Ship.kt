@@ -853,6 +853,9 @@ class Ship(
         return null
     }
 
+    // Set once the destruction explosion has played, so it only happens once.
+    private var destructionSoundPlayed = false
+
     fun update(dt: Float) {
         // Update the power, in case a Zoltan has moved between rooms.
         updateAvailablePower()
@@ -860,6 +863,14 @@ class Ship(
         updateExterior(dt)
 
         if (isDead) {
+            if (!destructionSoundPlayed) {
+                destructionSoundPlayed = true
+
+                // Vanilla plays one of the large explosion sounds when a
+                // ship is blown up.
+                sys.sounds.getSampleOrWarn("explosion${(1..4).random()}")?.play()
+            }
+
             for (gib in gibs)
                 gib.update(dt)
             return

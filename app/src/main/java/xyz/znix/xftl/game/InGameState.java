@@ -1683,8 +1683,14 @@ public class InGameState extends MainGame.GameState {
             intruder.jumpTo(slot);
         }
 
-        // Apply the hull damage
-        // TODO play the damage sound effect
+        // Apply the hull damage. Vanilla plays its eventDamage explosion
+        // (a large explosion sample) once for the damage an event deals.
+        if (!resources.getDamage().isEmpty()) {
+            FTLSound eventDamage = getSounds().getSampleOrWarn("eventDamage");
+            if (eventDamage != null) {
+                eventDamage.play();
+            }
+        }
         for (EventHullDamage damage : resources.getDamage()) {
             String system = damage.getSystem();
             if (system == null) {
