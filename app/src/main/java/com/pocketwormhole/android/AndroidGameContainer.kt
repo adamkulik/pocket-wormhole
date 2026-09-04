@@ -127,6 +127,10 @@ class AndroidGameContainer(
                 game.render(this@AndroidGameContainer, g)
             } catch (ex: Exception) {
                 android.util.Log.e(TAG, "Exception during game render", ex)
+                // The exception skipped whatever popTransform calls were
+                // pending; clear the stack or every future frame fails the
+                // engine's checkNoPushedTransforms (stale-frame flicker).
+                g.recoverFromAbortedRender()
             }
 
             // Blit the finished frame to the default (window) framebuffer

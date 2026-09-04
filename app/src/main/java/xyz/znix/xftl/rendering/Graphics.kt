@@ -311,6 +311,16 @@ class Graphics {
         require(transformStack.size == 0)
     }
 
+    /**
+     * Drop any transforms left pushed by an aborted render pass: an exception
+     * caught mid-render skips the matching popTransform calls, and without
+     * this every subsequent frame fails checkNoPushedTransforms.
+     */
+    fun recoverFromAbortedRender() {
+        transformStack.clear()
+        loadIdentityMatrix()
+    }
+
     fun loadIdentityMatrix() {
         transform = Matrix3f()
     }

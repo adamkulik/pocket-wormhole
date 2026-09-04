@@ -86,6 +86,11 @@ public class WaveData {
                             .order(java.nio.ByteOrder.LITTLE_ENDIAN)
                             .put(bytes);
                     pcm.flip();
+                    // We have everything we need (fmt always precedes data).
+                    // Some FTL wavs (e.g. bp_door_open.wav) have trailing
+                    // garbage bytes after the data chunk that would send this
+                    // walk past the end of the stream.
+                    break;
                 } else {
                     skipFully(dis, len);
                 }

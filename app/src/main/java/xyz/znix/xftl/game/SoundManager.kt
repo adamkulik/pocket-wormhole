@@ -417,7 +417,16 @@ class RealSoundManager(private val df: Datafile, context: ResourceContext) : Sou
                 }
             }
         } catch (e: Exception) {
-            throw RuntimeException("Failed to load sound from path '$path'", e)
+            // A broken sound file must never take the game down - a play()
+            // call from inside render (e.g. Door.render's open/close sounds)
+            // used to abort the frame mid-draw, leak a pushed transform and
+            // make every subsequent frame fail checkNoPushedTransforms.
+            // Log once (rawBuffers caching prevents retry spam) and play
+            // silence instead - RealSoundInstance handles NO_SOUND_BUFFER.
+            android.util.Log.e("XFTL", "Failed to load sound from path '$path' - playing silence", e)
+            val silence = RealSoundInstance.NO_SOUND_BUFFER
+            rawBuffers[path] = silence
+            return silence
         }
 
         rawBuffers[path] = buffer
