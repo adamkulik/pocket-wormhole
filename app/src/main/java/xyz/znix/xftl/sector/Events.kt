@@ -147,7 +147,11 @@ class Event(
 
         val killCrew = elem.getChild("removeCrew")
         if (killCrew != null) {
-            val race = killCrew.getChildText("class")
+            // The race is an ATTRIBUTE of <removeCrew>, e.g.
+            // <removeCrew class="engi"> (ENGI_VIRUS, QUEST_CONSTRUCTIONYARD).
+            // Fall back to a child element for mods using that format.
+            val race = killCrew.getAttributeValue("class")
+                ?: killCrew.getChildText("class")
             val clone = killCrew.getChildText("clone")!!.toBoolean()
             val cloneText = loadText(killCrew.getChild("text"))
             removedCrew.add(RemoveCrew(clone, cloneText, race, false, this))
