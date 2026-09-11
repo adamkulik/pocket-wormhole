@@ -83,6 +83,10 @@ public class Constants {
     public static final Colour CREW_SELECTED_BG = SYS_ENERGY_ACTIVE;
     public static final Colour CREW_HOSTILE_BG = SYS_ENERGY_BROKEN;
 
+    // Slug telepathy: the filter enemy crew are drawn with when their
+    // position is revealed on a ship the player has no vision of.
+    public static final Colour CREW_TELEPATHY = new Colour(255, 60, 60, 200);
+
     // Note: divide the colours by 4 if they're greyed-out because another
     // sector is hovered.
     public static final Colour SECTOR_CIVILIAN = new Colour(135, 199, 74);

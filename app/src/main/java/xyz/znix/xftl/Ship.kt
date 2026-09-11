@@ -805,12 +805,18 @@ class Ship(
         }
 
         // Draw the crew
+        // Slug telepathy: while a living Slug is aboard the player's ship,
+        // the crew of enemy ships show up as red-tinted silhouettes even in
+        // rooms the player has no vision of.
+        val telepathy = !isPlayerShip && sys.player?.crew?.any { it is CrewSlug } == true
         for (crew in crew) {
             // If the crew provides vision, that works if playerHasVision
             // isn't set. This prevents flickering as the crew walks between
             // rooms without sensors.
             if (crew.room.playerHasVision || crew.providesPlayerVision) {
                 crew.draw(g)
+            } else if (telepathy && crew is LivingCrew) {
+                crew.drawTelepathy(g)
             }
         }
 

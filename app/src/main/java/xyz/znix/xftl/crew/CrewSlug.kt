@@ -8,5 +8,6 @@ class CrewSlug(blueprint: CrewBlueprint, animations: Animations, room: Room, mod
 
     override val isMindControlResistant: Boolean get() = true
 
-    // TODO implement
+    // Telepathy is implemented in Ship.drawInterior (red-tinted crew
+    // silhouettes via AbstractCrew.drawTelepathy) - NOT as room vision.
 }

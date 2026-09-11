@@ -685,6 +685,33 @@ abstract class AbstractCrew(
     }
 
     open fun draw(g: Graphics) {
+        val sprite = computeSpriteDraw()
+
+        drawBackground(sprite.frame, sprite.x0, sprite.y0, sprite.x1, sprite.y1, sprite.opacity)
+
+        // Draw the actual image
+        // This is moved into its own function so that living crew with layered
+        // rendering can apply their different colour filters.
+        drawImage(sprite.x0, sprite.y0, sprite.x1, sprite.y1, sprite.frame, sprite.opacity)
+    }
+
+    /**
+     * Draw a red-tinted silhouette of this crewmember. This is how Slug
+     * telepathy shows the crew aboard enemy ships: their positions are
+     * visible even in rooms the player has no vision of, without revealing
+     * the room's contents.
+     */
+    open fun drawTelepathy(g: Graphics) {
+        val sprite = computeSpriteDraw()
+        sprite.frame.draw(
+            sprite.x0, sprite.y0, sprite.x1, sprite.y1,
+            0f, 0f, sprite.frame.width.f, sprite.frame.height.f,
+            sprite.opacity, Constants.CREW_TELEPATHY
+        )
+    }
+
+    // The shared sprite position/bounds maths for draw() and drawTelepathy().
+    private fun computeSpriteDraw(): SpriteDraw {
         val cf = icon.currentFrame
 
         var spriteY = screenY
@@ -725,13 +752,17 @@ abstract class AbstractCrew(
         val x1 = x0 + cf.width
         val y1 = y0 + height
 
-        drawBackground(cf, x0, y0, x1, y1, opacity)
-
-        // Draw the actual image
-        // This is moved into its own function so that living crew with layered
-        // rendering can apply their different colour filters.
-        drawImage(x0, y0, x1, y1, cf, opacity)
+        return SpriteDraw(cf, x0, y0, x1, y1, opacity)
     }
+
+    private class SpriteDraw(
+        val frame: Image,
+        val x0: Float,
+        val y0: Float,
+        val x1: Float,
+        val y1: Float,
+        val opacity: Float
+    )
 
     fun drawPortrait(x: Int, y: Int, backgroundHighlight: Boolean, scale: Float = 1f) {
         val x1 = x.f + portraitImage.width * scale
