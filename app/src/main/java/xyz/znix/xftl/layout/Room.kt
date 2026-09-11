@@ -193,23 +193,28 @@ data class Room(val ship: Ship, val id: Int, val x: Int, val y: Int, val width: 
             }
         }
 
-        // Draw the pathing-to boxes, if required
-        reservedPlayerSlots.forEachIndexed draw@{ i, crew ->
-            if (crew == null)
-                return@draw
+        // Draw the pathing-to boxes, if required. These are a UI affordance
+        // for the player's own ship: the slots are keyed by mode, not
+        // ownership, so on an enemy ship they'd mark where their crew are
+        // (and are heading) - a giveaway even with no vision of the ship.
+        if (ship.isPlayerShip) {
+            reservedPlayerSlots.forEachIndexed draw@{ i, crew ->
+                if (crew == null)
+                    return@draw
 
-            val slot = slotToPoint(i)
+                val slot = slotToPoint(i)
 
-            // If the crewmember is in their assigned position, don't draw the box
-            if (crew.standingPosition?.posEq(slot) == true && crew.room == this)
-                return@draw
+                // If the crewmember is in their assigned position, don't draw the box
+                if (crew.standingPosition?.posEq(slot) == true && crew.room == this)
+                    return@draw
 
-            val point = Point(slot)
-            point *= ROOM_SIZE
-            point.x += offsetX
-            point.y += offsetY
+                val point = Point(slot)
+                point *= ROOM_SIZE
+                point.x += offsetX
+                point.y += offsetY
 
-            ship.sys.getImg("img/people/green_destination.png").draw(point.x.f, point.y.f)
+                ship.sys.getImg("img/people/green_destination.png").draw(point.x.f, point.y.f)
+            }
         }
 
         // Draw any fires

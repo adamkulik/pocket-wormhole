@@ -103,7 +103,13 @@ class FireInstance(val room: Room, val slot: Int) {
     private fun extinguish() {
         room.fires[slot] = null
 
-        // Play the smoke animation
+        // Play the smoke animation - but only if the player can see this
+        // room. The puff is drawn as a ship-level animation, which renders
+        // regardless of room vision, so without this check it would reveal
+        // where fires were on ships the player has no vision of.
+        if (!room.playerHasVision)
+            return
+
         val centreOffset = ConstPoint(
             pos.offsetX + Constants.ROOM_SIZE / 2,
             pos.offsetY + Constants.ROOM_SIZE / 2

@@ -614,7 +614,7 @@ abstract class AbstractCrew(
         currentFireSlot = selectFireOrBreach(currentFireSlot, room.fires)
         if (currentFireSlot != -1) {
             currentAction = Action.FIRE_FIGHTING
-            extinguishLoop.continueLoopAnyShip()
+            extinguishLoop.continueLoopPlayerOnly(room.ship)
 
             // See doc/fires. We include the 1.2x multiplier here, rather
             // than in the fire speed multiplier.
@@ -636,7 +636,7 @@ abstract class AbstractCrew(
         currentBreachSlot = selectFireOrBreach(currentBreachSlot, room.breaches)
         if (currentBreachSlot != -1) {
             currentAction = Action.REPAIRING_BREACH
-            repairLoop.continueLoopAnyShip()
+            repairLoop.continueLoopPlayerOnly(room.ship)
 
             val currentBreach = room.breaches[currentBreachSlot]!!
             currentBreach.health -= 0.08f * repairSpeed * dt
@@ -653,7 +653,7 @@ abstract class AbstractCrew(
         system?.let { sys ->
             if (sys.damaged && canRepair) {
                 currentAction = Action.REPAIRING
-                repairLoop.continueLoopAnyShip()
+                repairLoop.continueLoopPlayerOnly(room.ship)
                 // The base repair speed is 8% per second, or 12.5 seconds to
                 // repair one bar of damage.
                 val didRepair = sys.repair(repairSpeed * 0.08f * dt)
