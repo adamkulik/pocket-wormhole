@@ -314,7 +314,12 @@ public class MainGame implements Game {
         return PlatformSpecific.INSTANCE.getSaveGamePath().resolve("run-save.xml");
     }
 
-    private void deleteRunSave() {
+    /**
+     * Deletes the run save, if there is one. Used when a new run starts
+     * (so an old save can't leak into it) and when the player is defeated
+     * (so Continue can't resurrect a dead run).
+     */
+    public void deleteRunSave() {
         try {
             Files.deleteIfExists(getRunSavePath());
         } catch (IOException ex) {

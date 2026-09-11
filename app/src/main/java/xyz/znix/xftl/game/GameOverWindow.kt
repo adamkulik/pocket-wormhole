@@ -100,8 +100,9 @@ class GameOverWindow(private val game: InGameState, val outcome: Outcome) : Wind
     }
 
     private fun mainMenuClicked() {
-        // TODO implement a main menu
-        game.mainGame.switchToShipSelect()
+        // The run save was deleted when this screen appeared, so Continue
+        // won't offer the dead run.
+        game.mainGame.switchToMainMenu()
     }
 
     private fun hangarClicked() {

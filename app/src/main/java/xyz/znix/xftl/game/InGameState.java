@@ -759,6 +759,8 @@ public class InGameState extends MainGame.GameState {
 
         updatePlayerCrew();
 
+        checkForGameOver();
+
         if (enemy != null) {
             enemy.update(dt);
 
@@ -1861,6 +1863,47 @@ public class InGameState extends MainGame.GameState {
     /**
      * Update the list of player-owned crew, to account for crew being added or removed.
      */
+    /**
+     * Show the game-over screen when the player has lost: either their ship
+     * has been destroyed (shown once its explosion animation has finished)
+     * or their last crewmember has died (once the death animation finishes).
+     *
+     * Crew being rebuilt by a clonebay don't count as lost - if it's powered
+     * (or backup DNA is preserving them) they can still come back. If the
+     * clonebay is unpowered they'll die in short order and we'll end up here.
+     *
+     * The defeat is final: the run save is deleted as the screen appears,
+     * so the main menu's Continue can't resurrect a dead run (vanilla
+     * semantics). Winning keeps the save - the flagship fight isn't
+     * implemented yet, so this only covers the loss outcomes in practice.
+     */
+    private void checkForGameOver() {
+        if (shipUI == null || shipUI.isWindowOpen())
+            return;
+
+        if (player.isGone()) {
+            mainGame.deleteRunSave();
+            shipUI.showGameOverScreen(GameOverWindow.Outcome.LOOSE_HULL);
+            return;
+        }
+
+        // Do we still have living crew, either aboard us or on a ship we've
+        // boarded? Ownership is checked so mid-teleport and mind-controlled
+        // crew are handled.
+        if (player.hasCrewOwnedByShip(player))
+            return;
+        if (enemy != null && enemy.hasCrewOwnedByShip(player))
+            return;
+
+        // Anyone in the cloning queue isn't lost yet.
+        Clonebay clonebay = player.getClonebay();
+        if (clonebay != null && !clonebay.getQueue().isEmpty())
+            return;
+
+        mainGame.deleteRunSave();
+        shipUI.showGameOverScreen(GameOverWindow.Outcome.LOOSE_CREW);
+    }
+
     public void updatePlayerCrew() {
         // Ignore calls during deserialisation
         if (isCurrentlyLoadingSave)
