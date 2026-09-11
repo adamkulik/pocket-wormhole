@@ -168,6 +168,7 @@ class BlueprintManager {
             AugmentBlueprint.BATTERY_CHARGER -> AugmentBlueprint(elem)
             AugmentBlueprint.SHIELD_CHARGE_BOOSTER -> AugmentBlueprint(elem)
             AugmentBlueprint.STEALTH_WEAPONS -> AugmentBlueprint(elem)
+            AugmentBlueprint.ROCK_ARMOR -> AugmentBlueprint(elem)
 
             else -> {
                 println("WARNING: Adding unknown augment '$name'")

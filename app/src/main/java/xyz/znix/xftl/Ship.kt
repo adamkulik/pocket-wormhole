@@ -1161,13 +1161,26 @@ class Ship(
 
         val hullDamage = damage.hullDamage * hullMult
 
-        showDamageText(target, hullDamage, damage.effectiveSysDamage, damage.ionDamage, textPos)
+        // Rock Plating (ROCK_ARMOR): a chance to negate the incoming hull
+        // damage. Only the hull is protected - system damage, crew damage,
+        // fires and breaches all still apply. On a proc vanilla shows a
+        // 'RESIST' popup (img/numbers/text_resist.png) instead of any
+        // damage numbers.
+        val rockArmorChance = getAugmentValue(AugmentBlueprint.ROCK_ARMOR)
+        val rockNegates = hullDamage > 0 && rockArmorChance > 0f &&
+                Random.rollChance((rockArmorChance * 100).toInt())
+
+        if (rockNegates)
+            target.showDamageText("text_resist", Colour.white, textPos)
+        else
+            showDamageText(target, hullDamage, damage.effectiveSysDamage, damage.ionDamage, textPos)
         crewWeaponDamage(target, damage.effectiveCrewDamage.f, damage)
 
         if (sys.debugFlags.noDmg.set)
             return
 
-        health -= hullDamage
+        if (!rockNegates)
+            health -= hullDamage
         target.system?.dealDamage(damage.effectiveSysDamage, damage.ionDamage)
 
         // Fire and breach are mutually exclusive, if a fire spawns then a breach cannot.
