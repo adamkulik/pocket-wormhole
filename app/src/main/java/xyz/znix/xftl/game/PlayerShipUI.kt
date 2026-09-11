@@ -71,6 +71,13 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
         private set
 
     /**
+     * True while the touch power popup is open: manipulating power
+     * auto-pauses the game until the popup is closed.
+     */
+    val powerPopupOpen: Boolean
+        get() = powerPopup != null
+
+    /**
      * How much selected crew are scaled up by while [roomSelectionMode] is
      * active (1 = normal size). Used by Ship.drawInterior.
      */
@@ -95,6 +102,216 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
         // Engage whenever crew are selected otherwise - selecting a
         // crewmember is always the start of a move gesture on touch.
         roomSelectionMode = true
+    }
+
+    /**
+     * The touch power popup (iPad-style): tap a system icon and a small
+     * panel opens next to it with big +/- power buttons (and, for weapons
+     * and drones, a per-item on/off toggle row). Built from the iPad UI
+     * kit art that ships in ftl.dat (img/ipad/systemUI/...).
+     */
+    private var powerPopup: PowerPopup? = null
+
+    /**
+     * The buttons of the systems strip (system icons, weapon/drone boxes
+     * and their extra buttons). These live in the strip's own coordinate
+     * space, which is scaled up on touch (see [systemsBarScale]) - input
+     * for them must go through [toBarSpace].
+     */
+    private val systemsBarButtons = ArrayList<Button>()
+
+    /**
+     * How much the systems strip is scaled up. 1 on desktop; on touch the
+     * strip grows as far as the widest ship layout allows (see
+     * [computeSystemsBarScale]) so the buttons are easier to tap.
+     */
+    private var systemsBarScale = 1f
+
+    private fun computeSystemsBarScale() {
+        if (!PlatformSpecific.INSTANCE.isTouchUi) {
+            systemsBarScale = 1f
+            return
+        }
+
+        // Replicate the strip walk's advances to find its natural width,
+        // then scale up as far as it fits the screen.
+        var px = 58
+        for (system in ship.mainSystems) {
+            px += when {
+                system is Weapons -> 48 + ship.weaponSlots!! * 97
+                system is Drones -> 48 + ship.droneSlots!! * 97
+                system.insertButtonSpace -> 54
+                else -> 36
+            }
+        }
+
+        systemsBarScale = 1.5f.coerceAtMost(1250f / px).coerceAtLeast(1f)
+    }
+
+    private fun toBarSpace(x: Int, y: Int): Pair<Int, Int> = Pair(
+        (x / systemsBarScale).toInt(),
+        ((y - height * (1 - systemsBarScale)) / systemsBarScale).toInt()
+    )
+
+    private fun barToScreen(x: Int, y: Int): Pair<Int, Int> = Pair(
+        (x * systemsBarScale).toInt(),
+        (height * (1 - systemsBarScale) + y * systemsBarScale).toInt()
+    )
+
+    private fun togglePowerPopup(system: MainSystem, anchor: IPoint) {
+        powerPopup = when {
+            powerPopup?.system === system -> null
+            else -> {
+                // The button's position is in the scaled bar space; the
+                // popup draws in screen space.
+                val (sx, sy) = barToScreen(anchor.x, anchor.y)
+                PowerPopup(system, ConstPoint(sx, sy))
+            }
+        }
+    }
+
+    private fun updatePowerPopup() {
+        // An armed weapon's room-tap listener also lives in game.clickEvent,
+        // but it must NOT dismiss the popup - otherwise the popup closes
+        // instantly whenever a weapon is armed. The popup is modal while
+        // open, so the weapon simply can't fire until it's closed.
+        val weaponArmedClickEvent =
+            game.clickEvent != null && game.clickEvent === selectWeaponClickEvent
+
+        if (powerPopup != null && (pauseWindow != null || currentWindow != null ||
+            (game.clickEvent != null && !weaponArmedClickEvent) || beamTargeting != null)
+        ) {
+            powerPopup = null
+        }
+    }
+
+    /**
+     * Route a mouse click to the open popup. Returns false if no popup is
+     * open. Any click while a popup is open is consumed: inside it hits
+     * the +/- or item toggle buttons, outside it just closes the popup.
+     */
+    private fun popupClick(button: Int, x: Int, y: Int): Boolean {
+        val popup = powerPopup ?: return false
+
+        if (!popup.contains(x, y)) {
+            powerPopup = null
+            return true
+        }
+
+        popup.clickAt(button, x, y)
+        return true
+    }
+
+    private data class PopupRect(val x: Int, val y: Int, val w: Int, val h: Int) {
+        fun contains(px: Int, py: Int) = x <= px && px < x + w && y <= py && py < y + h
+    }
+
+    private inner class PowerPopup(val system: MainSystem, anchor: IPoint) {
+        private val scale = 1.5f
+        private val pad = (8 * scale).toInt()
+        private val bigButton = (56 * scale).toInt()
+        private val barScale = 1f
+        private val barSize = (26 * barScale).toInt()
+        private val toggleSize = (48 * scale).toInt()
+        private val itemGap = (6 * scale).toInt()
+        private val rowGap = (8 * scale).toInt()
+
+        private val itemButtons: List<WeaponDroneButton> =
+            buttons.filterIsInstance<WeaponDroneButton>()
+                .filter { it.ownerSystem === system && !it.empty }
+                .sortedBy { it.pos.x }
+
+        private val hasItems = system is Weapons || system is Drones
+
+        // Layout, top to bottom: the +/- buttons, then the energy bar at
+        // 2x, then (weapons/drones only) the per-item power toggles.
+        //
+        // drawIconAndPower draws its icon from (x-19, y-19) and stacks the
+        // power bars UPWARD from (x+5, y-5) at ~9px per bar, so the row is
+        // sized for the system's full bar stack and the draw call is offset
+        // to land everything inside the panel.
+        private val barStack = system.energyLevels * 10
+        private val barContentH = 39 + barStack
+        private val barRowHeight = barContentH * 2
+        private val barRowWidth = 80
+        private val buttonsWidth = bigButton * 2 + (8 * scale).toInt()
+        private val itemsWidth =
+            if (hasItems) itemButtons.size * (toggleSize + itemGap) - itemGap else 0
+        private val contentWidth = maxOf(buttonsWidth, barRowWidth, itemsWidth)
+        private val width = contentWidth + pad * 2
+        private val height = pad + bigButton + rowGap + barRowHeight +
+                (if (hasItems) rowGap + toggleSize else 0) + pad
+
+        private val x = (anchor.x + 26 + 10).coerceAtMost(1280 - width - 4)
+        private val y = anchor.y.coerceIn(4, 720 - height - 4)
+
+        private val buttonsStartX = x + (width - buttonsWidth) / 2
+        private val downRect = PopupRect(buttonsStartX, y + pad, bigButton, bigButton)
+        private val upRect = PopupRect(buttonsStartX + bigButton + (8 * scale).toInt(), y + pad, bigButton, bigButton)
+        private val barX = x + (width - barRowWidth) / 2
+        private val barY = y + pad + bigButton + rowGap
+        private val itemRects = itemButtons.mapIndexed { i, _ ->
+            PopupRect(
+                x + (width - itemsWidth) / 2 + i * (toggleSize + itemGap),
+                barY + barRowHeight + rowGap, toggleSize, toggleSize
+            )
+        }
+
+        fun contains(px: Int, py: Int) =
+            x <= px && px < x + width && y <= py && py < y + height
+
+        fun clickAt(button: Int, px: Int, py: Int) {
+            when {
+                upRect.contains(px, py) -> changeSystemPower(system, true)
+                downRect.contains(px, py) -> changeSystemPower(system, false)
+                else -> itemRects.forEachIndexed { i, rect ->
+                    if (!rect.contains(px, py))
+                        return@forEachIndexed
+
+                    // Tap toggles: powered items switch off, off items on.
+                    itemButtons.getOrNull(i)?.popupTogglePower()
+                }
+            }
+        }
+
+        fun draw(g: Graphics) {
+            // Panel background + border (tooltip style)
+            g.colour = Colour(0f, 0f, 0f, 0.85f)
+            g.fillRect(x.f, y.f, width.f, height.f)
+            g.colour = Colour(1f, 1f, 1f, 0.5f)
+            g.drawRect(x.f, y.f, width.f, height.f)
+
+            // +/- buttons from the iPad UI kit; dimmed at the limits
+            val upImg = game.getImg(
+                if (system.powerSelected < system.powerAvailable) "img/ipad/systemUI/button_tele_up_on.png"
+                else "img/ipad/systemUI/button_tele_up_off.png"
+            )
+            val downImg = game.getImg(
+                if (system.powerSelected > 0) "img/ipad/systemUI/button_tele_down_on.png"
+                else "img/ipad/systemUI/button_tele_down_off.png"
+            )
+            upImg.draw(upRect.x.f, upRect.y.f, upRect.w.f, upRect.h.f)
+            downImg.draw(downRect.x.f, downRect.y.f, downRect.w.f, downRect.h.f)
+
+            // The system's own icon + power bars, scaled up 2x. The draw
+            // call is offset so the icon (drawn from x-19,y-19) and the
+            // upward-stacking bars land inside the row.
+            g.pushTransform()
+            g.translate(barX.f, barY.f)
+            g.scale(barScale, barScale)
+            system.drawIconAndPower(game, g, true, true, false, 19, barStack + 24)
+            g.popTransform()
+
+            // Per-item power toggles for weapons/drones
+            itemRects.forEachIndexed { i, rect ->
+                val item = itemButtons.getOrNull(i) ?: return@forEachIndexed
+                val img = game.getImg(
+                    if (item.isPowered) "img/ipad/systemUI/button_weaponpower_on.png"
+                    else "img/ipad/systemUI/button_weaponpower_off.png"
+                )
+                img.draw(rect.x.f, rect.y.f, rect.w.f, rect.h.f)
+            }
+        }
     }
     private val hoveredCrew: MutableList<AbstractCrew> = ArrayList()
     private var skillsHoveredCrew: AbstractCrew? = null
@@ -230,6 +447,8 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
 
     fun updateButtons() {
         buttons.clear()
+        systemsBarButtons.clear()
+        computeSystemsBarScale()
         updatingButtons = true
 
         var nextPos = ConstPoint(531, 29)
@@ -287,9 +506,23 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
             return
         }
 
+        // The touch power popup floats above the systems strip and is modal
+        // while open: every tap is consumed by it - taps on the +/- or item
+        // toggles act, taps anywhere else close it. This must run BEFORE the
+        // button loops below, otherwise the strip buttons underneath the
+        // panel would swallow its taps.
+        if (popupClick(button, x, y))
+            return
+
+        // System-strip buttons are in the scaled bar space on touch; hit
+        // them first (they're drawn on top of the strip art).
+        for (btn in systemsBarButtons) {
+            val (bx, by) = toBarSpace(x, y)
+            if (btn.mouseDown(button, bx, by)) return
+        }
+
         for (btn in buttons) {
-            val hit = btn.mouseDown(button, x, y)
-            if (hit) return
+            if (btn.mouseDown(button, x, y)) return
         }
 
         // Check if we're clicking on a door
@@ -627,7 +860,30 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
         }
 
         drawTopBar(g)
+
+        // The systems strip draws in its own coordinate space, anchored to
+        // the bottom-left, scaled up on touch so its buttons are easier to
+        // tap. Input for its buttons is mapped back through toBarSpace.
+        g.pushTransform()
+        g.translate(0f, height * (1 - systemsBarScale))
+        g.scale(systemsBarScale, systemsBarScale)
         drawSystems(g)
+        for (button in systemsBarButtons) {
+            button.draw(g)
+        }
+        g.popTransform()
+
+        // Draw the crew selection rectangle, if appropriate - in screen
+        // space (ie NOT under the systems-strip transform), since its
+        // corners are recorded from raw input positions.
+        val csr = crewSelectionRectangle
+        if (csr != null && !isCrewSelectionPoint) {
+            g.colour = Colour.white
+            val size = csr.second - csr.first
+            g.drawRect(csr.first.x.f, csr.first.y.f, size.x.f, size.y.f)
+            g.drawRect(csr.first.x + 1f, csr.first.y + 1f, size.x - 2f, size.y - 2f)
+        }
+
         drawSubSystems(gc)
 
         // Draw the buttons last, so they don't disappear for a frame
@@ -709,9 +965,9 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
 
             if (updatingButtons) {
                 val powerPos = ConstPoint(powerX + 19, powerY + 19)
-                buttons += SystemPowerButton(powerPos, system)
+                systemsBarButtons += SystemPowerButton(powerPos, system)
 
-                buttons += system.makeExtraButtons(powerPos)
+                systemsBarButtons += system.makeExtraButtons(powerPos)
             }
 
             powerX += when {
@@ -787,7 +1043,8 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
 
                 val weapon = ship.hardpoints[i].weapon
 
-                buttons += object : WeaponDroneButton(ConstPoint(wx, wy), i, ConstPoint(87, 39)) {
+                systemsBarButtons += object : WeaponDroneButton(ConstPoint(wx, wy), i, ConstPoint(87, 39)) {
+                    override val ownerSystem: MainSystem? get() = ship.weapons
                     override val empty: Boolean get() = weapon == null
                     override val name: String get() = weapon!!.type.translateShort(game)
                     override val requiredPower: Int get() = weapon!!.type.power
@@ -898,7 +1155,8 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
                     weaponBoxY + 12 + 4
                 )
 
-                buttons += object : WeaponDroneButton(pos, i, ConstPoint(95, 39)) {
+                systemsBarButtons += object : WeaponDroneButton(pos, i, ConstPoint(95, 39)) {
+                    override val ownerSystem: MainSystem? get() = ship.drones
                     override val empty: Boolean get() = drone == null
                     override val name: String get() = drone!!.translateShort(game)
                     override val requiredPower: Int get() = drone!!.power
@@ -944,14 +1202,6 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
             }
         }
 
-        // Draw the crew selection rectangle, if appropriate
-        val csr = crewSelectionRectangle
-        if (csr != null && !isCrewSelectionPoint) {
-            g.colour = Colour.white
-            val size = csr.second - csr.first
-            g.drawRect(csr.first.x.f, csr.first.y.f, size.x.f, size.y.f)
-            g.drawRect(csr.first.x + 1f, csr.first.y + 1f, size.x - 2f, size.y - 2f)
-        }
     }
 
     private fun drawSubSystems(gc: GameContainer) {
@@ -1037,6 +1287,19 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
     }
 
     fun renderMenus(container: GameContainer, g: Graphics) {
+        // The power popup sits above the ship UI but under any windows.
+        // Manipulating power auto-pauses the game, so show the AUTO-PAUSED
+        // banner (the iPad port's own art) while it's open.
+        powerPopup?.let { popup ->
+            popup.draw(g)
+
+            val autoPause = game.getImg("img/autopause.png")
+            autoPause.draw(
+                (container.width - autoPause.width) / 2,
+                container.height - 16 - autoPause.height
+            )
+        }
+
         currentWindow?.let { renderSingleMenu(container, g, it) }
         pauseWindow?.let { renderSingleMenu(container, g, it) }
 
@@ -1579,6 +1842,7 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
 
     fun updateUI(x: Int, y: Int, playerShipPosition: IPoint) {
         updateRoomSelectionMode()
+        updatePowerPopup()
 
         mousePos.set(x, y)
 
@@ -1590,6 +1854,11 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
         currentWindow?.let { win ->
             win.updateUI(x, y)
             return
+        }
+
+        for (button in systemsBarButtons) {
+            val (bx, by) = toBarSpace(x, y)
+            button.update(bx, by)
         }
 
         for (button in buttons) {
@@ -2047,6 +2316,12 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
     private abstract inner class WeaponDroneButton(pos: IPoint, slotNumber: Int, size: ConstPoint) :
         Button(game, pos, size) {
 
+        /**
+         * The system this item belongs to (weapons or drones), used by the
+         * touch power popup to find the item toggles for the tapped system.
+         */
+        open val ownerSystem: MainSystem? = null
+
         abstract val empty: Boolean
         abstract val name: String
         abstract val chargeTime: Float
@@ -2063,6 +2338,18 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
         abstract val tooltip: ITooltipProvider?
 
         override val disabled: Boolean get() = empty
+
+        /**
+         * Toggle this item's power for the touch power popup - tap the
+         * weaponpower toggle to switch it on/off. [click] is protected, so
+         * the popup goes through this wrapper.
+         */
+        fun popupTogglePower() {
+            click(
+                if (isPowered) Input.MOUSE_RIGHT_BUTTON
+                else Input.MOUSE_LEFT_BUTTON
+            )
+        }
 
         protected val mainColour: Colour
             get() = when {
@@ -2258,6 +2545,14 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
                 return
 
             if (button == Input.MOUSE_LEFT_BUTTON) {
+                // Touch UI: tapping a system opens the iPad-style power
+                // popup instead of directly adding a power bar. Weapons are
+                // excluded - their individual boxes are already directly
+                // tappable, which is the better way to manage them.
+                if (PlatformSpecific.INSTANCE.isTouchUi && system !is Weapons) {
+                    togglePowerPopup(system, pos)
+                    return
+                }
                 changeSystemPower(system, true)
             } else if (button == Input.MOUSE_RIGHT_BUTTON) {
                 changeSystemPower(system, false)

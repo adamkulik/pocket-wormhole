@@ -734,11 +734,23 @@ public class InGameState extends MainGame.GameState {
         ITooltipProvider tooltip = g.getTooltip();
         if (tooltip != null) {
             Input in = container.getInput();
-            tooltip.drawTooltip(g,
-                    in.getMouseX(), in.getMouseY(),
-                    tooltip != lastFameTooltip,
-                    container.getWidth(), container.getHeight()
-            );
+
+            if (shipUI != null && shipUI.getPowerPopupOpen()) {
+                // While the touch power popup is open, the tooltip would
+                // otherwise draw at the tap position and cover the +/-
+                // buttons - put it at the right-middle of the screen.
+                tooltip.drawTooltip(g,
+                        container.getWidth() - 220, container.getHeight() / 2,
+                        tooltip != lastFameTooltip,
+                        container.getWidth(), container.getHeight()
+                );
+            } else {
+                tooltip.drawTooltip(g,
+                        in.getMouseX(), in.getMouseY(),
+                        tooltip != lastFameTooltip,
+                        container.getWidth(), container.getHeight()
+                );
+            }
         }
         lastFameTooltip = tooltip;
     }
@@ -1446,9 +1458,11 @@ public class InGameState extends MainGame.GameState {
 
     public boolean isPaused() {
         // The touch UI's room-selection mode (iPad-style auto-pause while
-        // crew are selected) also freezes the game.
+        // crew are selected) and the power popup (while power is being
+        // manipulated) also freeze the game.
         return paused || shipUI.isWindowOpen() ||
-                (shipUI != null && shipUI.getRoomSelectionMode());
+                (shipUI != null && shipUI.getRoomSelectionMode()) ||
+                (shipUI != null && shipUI.getPowerPopupOpen());
     }
 
     /**
