@@ -261,9 +261,15 @@ class AndroidGameContainer(
         GLES30.glViewport(viewX, viewY, viewW, viewH)
 
         val scale = if (surfaceAspect > gameAspect) GAME_H.toFloat() / viewH else GAME_W.toFloat() / viewW
+        // The input transform is the exact inverse of the viewport mapping:
+        // a touch at screen (x, y) corresponds to canvas
+        // ((x - viewX) * scale, (y - viewYbottom) * scale). The offsets must
+        // be in SCREEN pixels - scaling them (the old form) put every tap
+        // systematically off-target by viewX * (1 - scale) canvas pixels,
+        // which the scaled systems strip made unmissable.
         input.viewTransform = AndroidInput.TouchTransform(
-            viewX * (GAME_W.toFloat() / viewW),
-            (surfaceH - viewY - viewH) * (GAME_H.toFloat() / viewH),
+            viewX.toFloat(),
+            (surfaceH - viewY - viewH).toFloat(),
             GAME_W.toFloat() / viewW,
             GAME_H.toFloat() / viewH
         )
