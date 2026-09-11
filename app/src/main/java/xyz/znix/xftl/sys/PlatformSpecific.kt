@@ -30,6 +30,13 @@ sealed interface PlatformSpecific {
      */
     fun findRunningInstanceDat(): Path?
 
+    /**
+     * True when the game is driven by a touch screen, so the UI should
+     * offer touch-friendly affordances (eg the iPad port's auto-pause +
+     * room-selection mode when crew are selected).
+     */
+    val isTouchUi: Boolean get() = false
+
     companion object {
         @JvmField
         val INSTANCE: PlatformSpecific = AndroidPlatform
@@ -50,6 +57,8 @@ sealed interface PlatformSpecific {
  */
 object AndroidPlatform : PlatformSpecific {
     var baseDir: Path = Paths.get(".")
+
+    override val isTouchUi: Boolean get() = true
 
     override val saveGamePath: Path
         get() = baseDir.resolve("ProjectWormhole")

@@ -814,7 +814,11 @@ class Ship(
             // isn't set. This prevents flickering as the crew walks between
             // rooms without sensors.
             if (crew.room.playerHasVision || crew.providesPlayerVision) {
-                crew.draw(g)
+                val scale = sys.shipUI.crewEnlargeScale(crew)
+                if (scale == 1f)
+                    crew.draw(g)
+                else
+                    crew.drawScaledBody(g, scale)
             } else if (telepathy && crew is LivingCrew) {
                 crew.drawTelepathy(g)
             }
@@ -832,7 +836,11 @@ class Ship(
         // fighting crewmembers can't block one of their health bars.
         for (crew in crew) {
             if (crew.room.playerHasVision || crew.providesPlayerVision) {
-                crew.drawForeground(g)
+                val scale = sys.shipUI.crewEnlargeScale(crew)
+                if (scale == 1f)
+                    crew.drawForeground(g)
+                else
+                    crew.drawScaledForeground(g, scale)
             }
         }
 

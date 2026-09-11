@@ -710,6 +710,40 @@ abstract class AbstractCrew(
         )
     }
 
+    /**
+     * Draw this crewmember's sprite scaled up around its centre. Used by
+     * the touch UI's room-selection mode, which enlarges the selected
+     * crew. The health bar is drawn separately via [drawScaledForeground]
+     * (the engine draws all health bars in a second, on-top pass).
+     */
+    fun drawScaledBody(g: Graphics, scale: Float) {
+        g.pushTransform()
+        scaleAboutSpriteCentre(g, scale)
+        draw(g)
+        g.popTransform()
+    }
+
+    /**
+     * The [drawScaledBody] counterpart for the foreground pass (health
+     * bars, mind-control and healing animations).
+     */
+    fun drawScaledForeground(g: Graphics, scale: Float) {
+        g.pushTransform()
+        scaleAboutSpriteCentre(g, scale)
+        drawForeground(g)
+        g.popTransform()
+    }
+
+    private fun scaleAboutSpriteCentre(g: Graphics, scale: Float) {
+        val sprite = computeSpriteDraw()
+        val centreX = sprite.x0 + sprite.frame.width / 2f
+        val centreY = sprite.y0 + sprite.frame.height / 2f
+
+        g.translate(centreX, centreY)
+        g.scale(scale, scale)
+        g.translate(-centreX, -centreY)
+    }
+
     // The shared sprite position/bounds maths for draw() and drawTelepathy().
     private fun computeSpriteDraw(): SpriteDraw {
         val cf = icon.currentFrame

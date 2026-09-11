@@ -1445,7 +1445,22 @@ public class InGameState extends MainGame.GameState {
     }
 
     public boolean isPaused() {
-        return paused || shipUI.isWindowOpen();
+        // The touch UI's room-selection mode (iPad-style auto-pause while
+        // crew are selected) also freezes the game.
+        return paused || shipUI.isWindowOpen() ||
+                (shipUI != null && shipUI.getRoomSelectionMode());
+    }
+
+    /**
+     * The screen position of the enemy ship, for UI code that needs to
+     * hit-test rooms on it. Only valid while an enemy is present.
+     */
+    @Nullable
+    public IPoint getEnemyShipPos() {
+        if (hostileShipUI == null) {
+            return null;
+        }
+        return hostileShipUI.getShipPos();
     }
 
     /**

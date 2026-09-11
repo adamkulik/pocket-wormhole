@@ -22,6 +22,7 @@ import xyz.znix.xftl.savegame.RefLoader
 import xyz.znix.xftl.sector.Event
 import xyz.znix.xftl.sys.GameContainer
 import xyz.znix.xftl.sys.Input
+import xyz.znix.xftl.sys.PlatformSpecific
 import xyz.znix.xftl.systems.*
 import xyz.znix.xftl.weapons.AbstractWeaponBlueprint
 import xyz.znix.xftl.weapons.BeamBlueprint
@@ -59,6 +60,42 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
     private var targetingSelectedWeapon: Int? = null
 
     private val selectedCrew: MutableList<AbstractCrew> = ArrayList()
+
+    /**
+     * The iPad port's touch affordance: while crew are selected the game
+     * auto-pauses and shows the ROOM SELECTION prompt; tapping a room then
+     * sends the selected crew there and unpauses. Only active on touch
+     * platforms (PlatformSpecific.isTouchUi).
+     */
+    var roomSelectionMode: Boolean = false
+        private set
+
+    /**
+     * How much selected crew are scaled up by while [roomSelectionMode] is
+     * active (1 = normal size). Used by Ship.drawInterior.
+     */
+    fun crewEnlargeScale(crew: AbstractCrew): Float {
+        return if (roomSelectionMode && crew in selectedCrew) ENLARGED_CREW_SCALE else 1f
+    }
+
+    private fun updateRoomSelectionMode() {
+        if (!PlatformSpecific.INSTANCE.isTouchUi)
+            return
+
+        // Leave the mode when there's nothing left to move, or when
+        // something else takes over the input (windows, weapon targeting,
+        // the teleporter's room picker). Crew stay selected in that case.
+        if (selectedCrew.isEmpty() || pauseWindow != null || currentWindow != null ||
+            game.clickEvent != null || beamTargeting != null
+        ) {
+            roomSelectionMode = false
+            return
+        }
+
+        // Engage whenever crew are selected otherwise - selecting a
+        // crewmember is always the start of a move gesture on touch.
+        roomSelectionMode = true
+    }
     private val hoveredCrew: MutableList<AbstractCrew> = ArrayList()
     private var skillsHoveredCrew: AbstractCrew? = null
 
@@ -320,6 +357,21 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
             return
         }
 
+        // Touch room-selection mode: a tap on a room sends the selected
+        // crew there and unpauses. Taps that don't land on a room fall
+        // through to the normal select/deselect handling below (tap a
+        // crewmember to re-select and stay in the mode, tap empty space
+        // to deselect and leave it).
+        if (roomSelectionMode && button == Input.MOUSE_LEFT_BUTTON) {
+            if (handleRoomSelectionTap(x, y, playerShipPosition)) {
+                // The move action is complete: deselect and unpause.
+                selectedCrew.clear()
+                roomSelectionMode = false
+                crewSelectionRectangle = null
+                return
+            }
+        }
+
         crewSelectionRectangle?.let {
             if (button != Input.MOUSE_LEFT_BUTTON) return@let
 
@@ -330,6 +382,49 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
 
             crewSelectionRectangle = null
         }
+    }
+
+    /**
+     * Handle a tap in room-selection mode: if it lands on a room (on
+     * either ship), send every selected crewmember that can walk there
+     * and return true. Walking only - boarding is done through the
+     * teleporter UI, as on desktop.
+     */
+    private fun handleRoomSelectionTap(x: Int, y: Int, playerShipPosition: IPoint): Boolean {
+        // Rooms on our own ship
+        val shipMousePos = Point(x, y)
+        shipMousePos -= playerShipPosition
+
+        val roomPoint = Point(shipMousePos)
+        roomPoint.divideFloor(ROOM_SIZE)
+        roomPoint -= ship.offset
+        for (room in ship.rooms) {
+            if (!room.containsAbsolute(roomPoint))
+                continue
+
+            for (crew in selectedCrew) {
+                if (!crew.playerControllable)
+                    continue
+
+                // Crew boarding the enemy ship can't walk home.
+                if (crew.room.ship == ship)
+                    crew.setTargetRoom(room)
+            }
+
+            return true
+        }
+
+        // Rooms on the enemy ship - these move crew already boarding.
+        val enemy = game.enemy ?: return false
+        val enemyPos = game.enemyShipPos ?: return false
+
+        val enemyPoint = Point(x, y)
+        enemyPoint -= enemyPos
+        enemy.screenPosToShipPos(enemyPoint)
+        val roomPos = enemy.shipToRoomPos(enemyPoint) ?: return false
+
+        enemyRoomRightClicked(roomPos.room, enemy)
+        return true
     }
 
     fun mouseScroll(change: Int) {
@@ -944,6 +1039,24 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
     fun renderMenus(container: GameContainer, g: Graphics) {
         currentWindow?.let { renderSingleMenu(container, g, it) }
         pauseWindow?.let { renderSingleMenu(container, g, it) }
+
+        // The touch UI's room-selection overlay. Uses the iPad port's own
+        // banner art from ftl.dat (img/autopause.png, img/
+        // pause_roomselection.png), drawn centred like the vanilla pause
+        // banner (img/Text_pause2.png) is in InGameState.render.
+        if (roomSelectionMode) {
+            val autoPause = game.getImg("img/autopause.png")
+            val roomSelection = game.getImg("img/pause_roomselection.png")
+            val centreX = container.width / 2
+
+            // Anchored to the bottom of the screen (above the vanilla
+            // pause banner's spot), AUTO-PAUSED block above ROOM SELECTION.
+            val roomSelY = container.height - 16 - roomSelection.height
+            val autoPauseY = roomSelY - 20 - autoPause.height
+
+            autoPause.draw(centreX - autoPause.width / 2, autoPauseY)
+            roomSelection.draw(centreX - roomSelection.width / 2, roomSelY)
+        }
     }
 
     private fun renderSingleMenu(container: GameContainer, g: Graphics, window: Window) {
@@ -1465,6 +1578,8 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
     }
 
     fun updateUI(x: Int, y: Int, playerShipPosition: IPoint) {
+        updateRoomSelectionMode()
+
         mousePos.set(x, y)
 
         pauseWindow?.let { win ->
@@ -2236,6 +2351,12 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
     }
 
     companion object {
+        /**
+         * How much selected crew are enlarged by in the touch UI's
+         * room-selection mode (see [crewEnlargeScale]).
+         */
+        const val ENLARGED_CREW_SCALE = 2f
+
         /**
          * The diagonal distance (squared) that the crew selection box has to be before it appears. If the
          * player drags out an area smaller than this, it'll be treated as a click and select whoever is
