@@ -1228,7 +1228,7 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
 
         val reactorBars = ship.purchasedReactorPower +
                 (ship.backupBattery?.contributedPower ?: 0)
-        val boxX = if (reactorBars >= 10) 110 else 16
+        val boxX = if (reactorBars >= 12) 100 else 16
         val boxY = height - (119f * systemsBarScale).toInt() - 54
         return Pair(boxX, boxY)
     }
