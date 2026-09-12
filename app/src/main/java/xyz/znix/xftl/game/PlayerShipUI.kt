@@ -127,6 +127,11 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
      */
     private var systemsBarScale = 1f
 
+    // The subsystems panel's last drawn position - functional state: a
+    // change triggers a button rebuild (see render).
+    private var lastSubSysBoxX = -1
+    private var lastSubSysBoxY = -1
+
     private fun computeSystemsBarScale() {
         if (!PlatformSpecific.INSTANCE.isTouchUi) {
             systemsBarScale = 1f
@@ -859,6 +864,19 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
             lastCrewCount = game.playerCrew.size
         }
 
+        // The subsystems panel pops responsively (flush left vs right of
+        // the reactor column); when it moves, its power buttons must be
+        // rebuilt at the new spot. This has to happen BEFORE any drawing:
+        // updateButtons() clears BOTH button lists, and
+        // drawSystems/drawSubSystems only repopulate them while
+        // updatingButtons is true (ie during this same frame).
+        val (subBoxX, subBoxY) = computeSubSysBox(gc)
+        if (subBoxX != lastSubSysBoxX || subBoxY != lastSubSysBoxY) {
+            lastSubSysBoxX = subBoxX
+            lastSubSysBoxY = subBoxY
+            updateButtons()
+        }
+
         drawTopBar(g)
 
         // The systems strip draws in its own coordinate space, anchored to
@@ -1204,10 +1222,19 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
 
     }
 
+    private fun computeSubSysBox(gc: GameContainer): Pair<Int, Int> {
+        if (!PlatformSpecific.INSTANCE.isTouchUi)
+            return Pair(gc.width - 252, gc.height - 47)
+
+        val reactorBars = ship.purchasedReactorPower +
+                (ship.backupBattery?.contributedPower ?: 0)
+        val boxX = if (reactorBars >= 10) 110 else 16
+        val boxY = height - (119f * systemsBarScale).toInt() - 54
+        return Pair(boxX, boxY)
+    }
+
     private fun drawSubSystems(gc: GameContainer) {
-        // The box position, not including the glow.
-        val boxX = gc.width - 252
-        val boxY = gc.height - 47
+        val (boxX, boxY) = computeSubSysBox(gc)
 
         game.getImg("img/box_subsystems4.png").draw(boxX - 6, boxY - 6)
 

@@ -7,6 +7,7 @@ import xyz.znix.xftl.math.Point
 import xyz.znix.xftl.rendering.Colour
 import xyz.znix.xftl.rendering.Graphics
 import xyz.znix.xftl.sys.GameContainer
+import xyz.znix.xftl.sys.PlatformSpecific
 
 class HostileShipUI(private val game: InGameState, private val enemy: Ship) {
     companion object {
@@ -94,7 +95,13 @@ class HostileShipUI(private val game: InGameState, private val enemy: Ship) {
             topGlow = 9
             bottomGlow = 17
             boxX = gc.width - (box.width - rightGlow) - 18 + leftGlow
-            boxY = 54
+            // On touch the scaled systems strip's weapon/drone boxes
+            // reach y~541 and would cover this box's bottom-left corner
+            // (content bottom is y=583 at the vanilla position). Lift the
+            // box into the unused top margin: content bottom drops to
+            // y=539, just above the strip. Boss frame can't clear this
+            // way (too tall) - see touch-strip-scaling-plan.md.
+            boxY = if (PlatformSpecific.INSTANCE.isTouchUi) 10 else 54
         }
 
         // The position of the image
