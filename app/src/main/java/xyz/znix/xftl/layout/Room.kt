@@ -4,6 +4,7 @@ import org.jdom2.Element
 import xyz.znix.xftl.*
 import xyz.znix.xftl.Constants.*
 import xyz.znix.xftl.crew.AbstractCrew
+import xyz.znix.xftl.crew.CrewSlug
 import xyz.znix.xftl.game.UIUtils
 import xyz.znix.xftl.math.*
 import xyz.znix.xftl.rendering.Colour
@@ -126,6 +127,24 @@ data class Room(val ship: Ship, val id: Int, val x: Int, val y: Int, val width: 
         if (playerSensors != null && playerSensors == ship.sensors && playerSensors.providesPlayerVision) {
             // View the player's own ship via L1 sensors
             playerHasVision = true
+        }
+
+        // Slug telepathy works defensively too: a Slug based on this (player)
+        // ship reveals its room and the rooms connected to it by a door, as
+        // though they had sensors - so intruders can be found even with no
+        // sensors installed, unpowered, hacked or nebula-blocked.
+        if (ship.isPlayerShip) {
+            if (crew.any { it is CrewSlug && it.ownerShip === ship }) {
+                playerHasVision = true
+            } else {
+                for (door in doors) {
+                    val neighbour = door.other(this) ?: continue
+                    if (neighbour.crew.any { it is CrewSlug && it.ownerShip === ship }) {
+                        playerHasVision = true
+                        break
+                    }
+                }
+            }
         }
 
         if (ship.sys.debugFlags.showEverything.set) {
