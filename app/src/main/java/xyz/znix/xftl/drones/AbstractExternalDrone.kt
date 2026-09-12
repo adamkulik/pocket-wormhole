@@ -383,7 +383,7 @@ class OrbitFlightController(drone: AbstractExternalDrone) : DroneFlightControlle
         shieldBounds = drone.targetShip.shieldHalfSize
 
         val shieldSemiMajor = max(shieldBounds.x, shieldBounds.y)
-        typeSpeed = shieldSemiMajor * drone.type.speed!! / 21.875f
+        typeSpeed = shieldSemiMajor * drone.type.speed!! / 21.875f * drone.getSpeedMult()
 
         // Initialise our position
         update(0f)
@@ -549,7 +549,7 @@ class CombatFlightController(drone: AbstractExternalDrone) : DroneFlightControll
 
         // See doc/combat-drone for the speed information.
         val shieldSemiMajor = max(shieldSize.x, shieldSize.y)
-        typeSpeed = shieldSemiMajor * drone.type.speed!! / 21.875f
+        typeSpeed = shieldSemiMajor * drone.type.speed!! / 21.875f * drone.getSpeedMult()
 
         // Face in the direction of the centre of the ship, since
         // we don't know our actual target yet.

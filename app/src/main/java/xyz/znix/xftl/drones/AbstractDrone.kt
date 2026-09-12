@@ -3,6 +3,7 @@ package xyz.znix.xftl.drones
 import org.jdom2.Element
 import xyz.znix.xftl.AnimationSpec
 import xyz.znix.xftl.Ship
+import xyz.znix.xftl.augments.AugmentBlueprint
 import xyz.znix.xftl.game.FTLSound
 import xyz.znix.xftl.rollChance
 import xyz.znix.xftl.savegame.ObjectRefs
@@ -35,6 +36,18 @@ abstract class AbstractDrone(val type: DroneBlueprint) {
     protected lateinit var explodeSound: FTLSound
 
     open val isStunned: Boolean get() = ownerShip.drones!!.isHackActive
+
+    /**
+     * Movement speed multiplier from ship augments (Drone Reactor
+     * Booster, DRONE_SPEED). Applies to flight controllers and
+     * indoors-drone walking.
+     */
+    fun getSpeedMult(): Float {
+        if (!::ownerShip.isInitialized)
+            return 1f
+
+        return 1f + ownerShip.getAugmentValue(AugmentBlueprint.DRONE_SPEED)
+    }
 
     private var stunTotalTimer: Float = 0f
     private var stunDestroyTimer: Float = 0f

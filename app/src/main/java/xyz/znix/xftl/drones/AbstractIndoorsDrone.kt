@@ -156,6 +156,10 @@ abstract class AbstractIndoorsDrone(type: DroneBlueprint) : AbstractDrone(type) 
 
         override val providesPlayerVision: Boolean get() = isPowered && ownerShip.isPlayerShip
 
+        // Drone Reactor Booster (DRONE_SPEED): the pawn walks faster.
+        override val augmentSpeedMult: Float
+            get() = drone.getSpeedMult()
+
         override fun update(dt: Float) {
             // If the ship powering this drone has jumped away, destroy it.
             // Also self-destruct if the pawn field no longer points to this

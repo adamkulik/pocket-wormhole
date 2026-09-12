@@ -174,6 +174,7 @@ class BlueprintManager {
             AugmentBlueprint.CREW_STIMS -> AugmentBlueprint(elem)
             AugmentBlueprint.SYSTEM_CASING -> AugmentBlueprint(elem)
             AugmentBlueprint.CRYSTAL_SHARDS -> AugmentBlueprint(elem)
+            AugmentBlueprint.DRONE_SPEED -> AugmentBlueprint(elem)
 
             else -> {
                 println("WARNING: Adding unknown augment '$name'")
