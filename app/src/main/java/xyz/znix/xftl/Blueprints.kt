@@ -4,6 +4,7 @@ import org.jdom2.Document
 import org.jdom2.Element
 import xyz.znix.xftl.augments.AugEngiMedbots
 import xyz.znix.xftl.augments.AugPreigniter
+import xyz.znix.xftl.augments.AugSlugGel
 import xyz.znix.xftl.augments.AugZoltanShield
 import xyz.znix.xftl.augments.AugmentBlueprint
 import xyz.znix.xftl.crew.CrewBlueprint
@@ -169,6 +170,7 @@ class BlueprintManager {
             AugmentBlueprint.SHIELD_CHARGE_BOOSTER -> AugmentBlueprint(elem)
             AugmentBlueprint.STEALTH_WEAPONS -> AugmentBlueprint(elem)
             AugmentBlueprint.ROCK_ARMOR -> AugmentBlueprint(elem)
+            AugmentBlueprint.SLUG_GEL -> AugSlugGel(elem)
 
             else -> {
                 println("WARNING: Adding unknown augment '$name'")

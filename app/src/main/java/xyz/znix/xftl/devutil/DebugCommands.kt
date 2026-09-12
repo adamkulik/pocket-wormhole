@@ -772,6 +772,15 @@ class DebugCommands(console: DebugConsole) : ConsoleCommandProvider(console) {
         addLine("Applied $amount points of damage to the player ship")
     }
 
+    @ConsoleCommand(name = "breach")
+    @CmdHelp("Spawn a hull breach in a random room of the player ship")
+    private fun cmdBreach() {
+        val room = ship.rooms.random()
+        room.spawnBreach()
+
+        addLine("Breached room ${ship.rooms.indexOf(room)} (${room.system?.codename ?: "no system"})")
+    }
+
     @ConsoleCommand(name = "hurt")
     @CmdHelp("Damage all of the player's crewmembers by a given amount (negative heals)")
     private fun cmdHurt(@ParName("amount") amount: Int) {

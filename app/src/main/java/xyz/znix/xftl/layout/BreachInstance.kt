@@ -17,6 +17,12 @@ class BreachInstance(val room: Room, val slot: Int) {
             field = value.coerceIn(0f..1f)
         }
 
+    companion object {
+        // Crew repair a breach at 8% per second (12.5s total). AugSlugGel
+        // scales this by the augment's value.
+        const val CREW_REPAIR_RATE = 0.08f
+    }
+
     private val animation: AnimationSpec = ship.sys.animations["breach"]
 
     fun draw() {

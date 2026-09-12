@@ -5,6 +5,7 @@ import xyz.znix.xftl.*
 import xyz.znix.xftl.Constants.*
 import xyz.znix.xftl.game.InGameState
 import xyz.znix.xftl.game.LoopHandle
+import xyz.znix.xftl.layout.BreachInstance
 import xyz.znix.xftl.layout.Door
 import xyz.znix.xftl.layout.Room
 import xyz.znix.xftl.math.*
@@ -639,7 +640,7 @@ abstract class AbstractCrew(
             repairLoop.continueLoopPlayerOnly(room.ship)
 
             val currentBreach = room.breaches[currentBreachSlot]!!
-            currentBreach.health -= 0.08f * repairSpeed * dt
+            currentBreach.health -= BreachInstance.CREW_REPAIR_RATE * repairSpeed * dt
 
             if (currentBreach.health == 0f) {
                 onFinishedBreachRepair()

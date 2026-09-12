@@ -5,6 +5,7 @@ import xyz.znix.xftl.Blueprint
 import xyz.znix.xftl.Ship
 import xyz.znix.xftl.crew.LivingCrew
 import xyz.znix.xftl.crew.MedbayHealing
+import xyz.znix.xftl.layout.BreachInstance
 
 /**
  * The base augment class, which is suitable for augments which are
@@ -39,6 +40,7 @@ open class AugmentBlueprint(elem: Element) : Blueprint(elem) {
         const val SHIELD_CHARGE_BOOSTER: String = "SHIELD_RECHARGE"
         const val STEALTH_WEAPONS: String = "CLOAK_FIRE"
         const val ROCK_ARMOR: String = "ROCK_ARMOR"
+        const val SLUG_GEL: String = "SLUG_GEL"
     }
 }
 
@@ -103,5 +105,40 @@ class AugZoltanShield(elem: Element) : AugmentBlueprint(elem) {
 
     companion object {
         const val NAME: String = "ENERGY_SHIELD"
+    }
+}
+
+class AugSlugGel(elem: Element) : AugmentBlueprint(elem) {
+    override fun update(ship: Ship, dt: Float, totalValue: Float) {
+        super.update(ship, dt, totalValue)
+
+        // Slug Repair Gel: "Slug ships excrete a thick gel that
+        // automatically repairs any hull breaches." The wiki's measured
+        // vanilla behaviour: ALL breaches seal simultaneously at 75% of
+        // a crewmember's repair speed, stacking with crew repairs. (The
+        // dat's value of 0.25 does not map to that fraction - the exe's
+        // formula is unknown - so the documented rate is used here.)
+        val rate = GEL_CREW_SPEED_FRACTION * BreachInstance.CREW_REPAIR_RATE * dt
+        if (rate <= 0f)
+            return
+
+        for (room in ship.rooms) {
+            for ((slot, breach) in room.breaches.withIndex()) {
+                val b = breach ?: continue
+                b.health -= rate
+
+                // Note: no onFinishedBreachRepair here - that rewards the
+                // CREW that do the repairing, and the gel has none.
+                if (b.health == 0f)
+                    room.breaches[slot] = null
+            }
+        }
+    }
+
+    companion object {
+        const val NAME: String = "SLUG_GEL"
+
+        // Vanilla gel speed as a fraction of crew breach repair.
+        const val GEL_CREW_SPEED_FRACTION = 0.75f
     }
 }
