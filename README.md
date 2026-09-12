@@ -10,10 +10,20 @@ the exact file that ships with your Steam/GOG copy of FTL.
 FTL: Faster Than Light is © Subset Games; this project is not affiliated
 with or endorsed by them.
 
+<p align="center">
+  <img src="docs/images/screenshot-beacon.jpg" width="90%"
+       alt="FTL running on Android — the Kestrel at a beacon, FTL drive ready to jump" />
+  <br /><br />
+  <img src="docs/images/screenshot-combat.jpg" width="90%"
+       alt="Combat against a pirate scout in an asteroid field, touch power UI at the bottom" />
+</p>
+
 ## Installing
 
-1. Copy `FTL-Android.apk` (or build it — see below) to your phone and install
-   it (allow "install from unknown sources").
+1. Grab the latest APK from
+   [GitHub Releases](https://github.com/adamkulik/pocket-wormhole/releases)
+   (or build it — see below), copy it to your phone and install it (allow
+   "install from unknown sources").
 2. Copy `ftl.dat` from your PC's FTL install
    (`FTL Faster Than Light\ftl.dat`, ~280 MB) to the phone — anywhere you like.
 3. Launch the app. On first run it asks you to pick `ftl.dat` with the system
@@ -30,6 +40,8 @@ with or endorsed by them.
 | Two-finger drag ↕   | Scroll wheel (ship lists, options)                  |
 | Back button         | Escape (opens the pause/escape menu)                |
 | Physical keyboard   | Space/Enter/arrows/Tab/Escape/letters reach the game |
+| Tap a crewmember    | Selects them and auto-pauses in room-selection mode — tap a room to send them there, tap empty space to cancel |
+| Tap a system icon   | Opens a power panel with big +/− buttons (drones get on/off toggles); the game auto-pauses |
 
 ## Saves & data
 
@@ -52,8 +64,7 @@ or dying discards the saved one, as in vanilla FTL.
   vanilla data and most Slipstream mods work fine.
 - Requires Android 8.0+ (API 26) and a GLES 3.0 GPU (everything from ~2014 on).
 - The hangar ship editor UI is mouse-centric; it works with touch but is fiddly.
-- There is no main menu yet — launching the app resumes your saved run or
-  goes to the hangar.
+- Hover-dependent desktop UI (tooltips) only shows while you're touching.
 
 ## Building from source
 
