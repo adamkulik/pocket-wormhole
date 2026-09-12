@@ -172,6 +172,7 @@ class BlueprintManager {
             AugmentBlueprint.ROCK_ARMOR -> AugmentBlueprint(elem)
             AugmentBlueprint.SLUG_GEL -> AugSlugGel(elem)
             AugmentBlueprint.CREW_STIMS -> AugmentBlueprint(elem)
+            AugmentBlueprint.SYSTEM_CASING -> AugmentBlueprint(elem)
 
             else -> {
                 println("WARNING: Adding unknown augment '$name'")

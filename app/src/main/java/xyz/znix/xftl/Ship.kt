@@ -1182,10 +1182,21 @@ class Ship(
         val rockNegates = hullDamage > 0 && rockArmorChance > 0f &&
                 Random.rollChance((rockArmorChance * 100).toInt())
 
+        // Titanium System Casing (SYSTEM_CASING): a chance to negate the
+        // incoming system damage - the hull still takes its damage, and ion
+        // damage, crew damage, fires and breaches all still apply. Like Rock
+        // Plating this doesn't protect from event-scripted damage (which
+        // doesn't route through here), and per the wiki it also doesn't
+        // affect solar flares, fires or sabotage - which don't route through
+        // here either.
+        val systemCasingChance = getAugmentValue(AugmentBlueprint.SYSTEM_CASING)
+        val casingNegates = target.system != null && damage.effectiveSysDamage > 0 &&
+                systemCasingChance > 0f && Random.rollChance((systemCasingChance * 100).toInt())
+
         if (rockNegates)
             target.showDamageText("text_resist", Colour.white, textPos)
         else
-            showDamageText(target, hullDamage, damage.effectiveSysDamage, damage.ionDamage, textPos)
+            showDamageText(target, hullDamage, if (casingNegates) 0 else damage.effectiveSysDamage, damage.ionDamage, textPos)
         crewWeaponDamage(target, damage.effectiveCrewDamage.f, damage)
 
         if (sys.debugFlags.noDmg.set)
@@ -1193,7 +1204,7 @@ class Ship(
 
         if (!rockNegates)
             health -= hullDamage
-        target.system?.dealDamage(damage.effectiveSysDamage, damage.ionDamage)
+        target.system?.dealDamage(if (casingNegates) 0 else damage.effectiveSysDamage, damage.ionDamage)
 
         // Fire and breach are mutually exclusive, if a fire spawns then a breach cannot.
         if (Random.rollChance(damage.fireChance)) {
