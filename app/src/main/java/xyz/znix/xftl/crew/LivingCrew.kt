@@ -64,6 +64,12 @@ abstract class LivingCrew(blueprint: CrewBlueprint, anims: Animations, room: Roo
     override val providesPlayerVision: Boolean
         get() = ownerShip?.isPlayerShip == true || mindControlledBy != null
 
+    // Mantis Pheromones (CREW_STIMS): +value movement speed for this
+    // crewmember's home-ship crew, applying both on their own ship and
+    // while boarding (per the vanilla wiki).
+    override val augmentSpeedMult: Float
+        get() = 1f + (ownerShip?.getAugmentValue(AugmentBlueprint.CREW_STIMS) ?: 0f)
+
     @Suppress("SENSELESS_COMPARISON")
     override val backImg: Image?
         get() = when {

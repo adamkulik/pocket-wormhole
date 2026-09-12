@@ -133,6 +133,13 @@ abstract class AbstractCrew(
     open val movementSpeed: Float get() = BASE_MOVEMENT_SPEED
 
     /**
+     * Movement speed multiplier from ship augments (Mantis Pheromones,
+     * CREW_STIMS). Living crew get it from their home ship, so the buff
+     * follows them when boarding; boarding drones don't benefit.
+     */
+    open val augmentSpeedMult: Float get() = 1f
+
+    /**
      * The amount of oxygen to drain per second from this crew's room, and
      * all surrounding rooms with open doors, via the hull breach oxygen
      * draining logic.
@@ -461,7 +468,7 @@ abstract class AbstractCrew(
                 val directionY = deltaY / distance
 
                 // Move closer towards our position
-                val movement = min(distance, dt * movementSpeed)
+                val movement = min(distance, dt * movementSpeed * augmentSpeedMult)
                 pixelSpaceX += directionX * movement
                 pixelSpaceY += directionY * movement
             }

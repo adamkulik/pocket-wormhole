@@ -41,6 +41,7 @@ open class AugmentBlueprint(elem: Element) : Blueprint(elem) {
         const val STEALTH_WEAPONS: String = "CLOAK_FIRE"
         const val ROCK_ARMOR: String = "ROCK_ARMOR"
         const val SLUG_GEL: String = "SLUG_GEL"
+        const val CREW_STIMS: String = "CREW_STIMS"
     }
 }
 
