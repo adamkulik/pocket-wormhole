@@ -1215,6 +1215,29 @@ class Ship(
             // Spawns two fires (or possibly only one, if they both roll on the same cell).
             target.spawnBreach()
         }
+
+        // Crystal Vengeance (CRYSTAL_SHARDS): when the ship takes damage,
+        // a chance to break off a shard that flies at the enemy. The shard
+        // is a neutral projectile: 1 damage, 10% breach, 20% stun, ignores
+        // regular shields, affected by evasion, and shootable by ANY
+        // defence drone (including ours - a vanilla quirk).
+        val enemy = sys.getEnemyOf(this)
+        val damageTaken = !rockNegates || damage.effectiveSysDamage > 0
+        if (enemy != null && !enemy.isGone && damageTaken) {
+            val shardChance = getAugmentValue(AugmentBlueprint.CRYSTAL_SHARDS)
+            if (shardChance > 0f && Random.rollChance((shardChance * 100).toInt())) {
+                val shard = VengeanceShardProjectile(enemy.rooms.random())
+                val spawnPos = target.pixelCentre
+
+                // Launch like a weapon does: aim far past the ±800 ship
+                // space boundary (in the enemy-facing direction), so the
+                // shard crosses it and switches into the enemy's space
+                // before reaching its intermediate target.
+                val endPos = spawnPos + weaponFireDirection * 5000
+                shard.setInitialPath(spawnPos, endPos)
+                projectiles.add(shard)
+            }
+        }
     }
 
     fun playDamageEffect(type: AbstractWeaponBlueprint, position: IPoint): FloatingAnimation {
