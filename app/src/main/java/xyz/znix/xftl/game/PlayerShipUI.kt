@@ -456,23 +456,47 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
         computeSystemsBarScale()
         updatingButtons = true
 
-        var nextPos = ConstPoint(531, 29)
+        // On touch layouts the top-bar buttons (JUMP / ship / store /
+        // menu) are shifted right and scaled up, anchored at each
+        // button's position, so they're easier to tap. The row still has
+        // to end left of the enemy ship box (its art edge is at x~911 on
+        // touch), so the scale is reduced from 1.25 until the whole row
+        // - including the store button, when this beacon has one - fits.
+        var startX = 531
+        var buttonScale = 1f
+        if (PlatformSpecific.INSTANCE.isTouchUi) {
+            startX = 531 + 40
+            val hasStore = game.currentBeacon?.hasStore == true
+            val widths = if (hasStore) 74 + 60 + 88 + 41 else 74 + 60 + 41
+            val gaps = if (hasStore) 27 + 17 + 17 else 27 + 17
+            buttonScale = min(
+                1.25f,
+                (905 - startX - gaps).toFloat() / widths
+            ).coerceAtLeast(1f)
+        }
+
+        // Vanilla increments: the gap after each button is 101-74, 77-60
+        // and 105-88; with a scale factor the WIDTH grows but the gaps
+        // stay vanilla.
+        fun step(width: Int, gap: Int) = (width * buttonScale).roundToInt() + gap
+
+        var nextPos = ConstPoint(startX, 29)
 
         val jump = Buttons.JumpButton(nextPos, ship, game) {
             openJumpMap()
-        }
-        nextPos += ConstPoint(101, 0)
+        }.apply { renderScale = buttonScale }
+        nextPos += ConstPoint(step(74, 27), 0)
 
         val ship = Buttons.ShipButton(nextPos, game) {
             showShipWindow(ShipWindow.Tab.UPGRADES)
-        }
-        nextPos += ConstPoint(ship.size.x + 17, 0)
+        }.apply { renderScale = buttonScale }
+        nextPos += ConstPoint(step(60, 17), 0)
 
         if (game.currentBeacon?.hasStore == true) {
             val store = Buttons.StoreButton(nextPos, game) {
                 showStoreWindow()
-            }
-            nextPos += ConstPoint(store.size.x + 17, 0)
+            }.apply { renderScale = buttonScale }
+            nextPos += ConstPoint(step(88, 17), 0)
             buttons += store
         }
 
@@ -484,6 +508,7 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
         ) {
             showPauseWindow()
         }
+        settings.renderScale = buttonScale
 
         buttons += jump
         buttons += ship
@@ -955,7 +980,21 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
         // Draw the buttons last, so they don't disappear for a frame
         // when they're updated.
         for (button in buttons) {
+            val s = button.renderScale
+            if (s == 1f) {
+                button.draw(g)
+                continue
+            }
+
+            // Touch-scaled buttons draw larger than vanilla, anchored at
+            // their position - Button.contains() converts hit-testing to
+            // match.
+            g.pushTransform()
+            g.translate(button.pos.x.f, button.pos.y.f)
+            g.scale(s, s)
+            g.translate(-button.pos.x.f, -button.pos.y.f)
             button.draw(g)
+            g.popTransform()
         }
 
         // Draw the floating numbers that show a change in a resource

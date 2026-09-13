@@ -24,6 +24,15 @@ abstract class Button(protected val game: InGameState, pos: IPoint, size: IPoint
         private set
     val size = size.const
 
+    /**
+     * Touch ergonomics: buttons can be drawn larger than vanilla, scaled
+     * by this factor about [pos] (which stays the clickable area's
+     * top-left anchor). contains() converts hit-test points to match, so
+     * the scaled drawing and the hit-testing line up. 1 on vanilla
+     * layouts.
+     */
+    var renderScale: Float = 1f
+
     var hovered: Boolean = false
         private set
 
@@ -70,7 +79,13 @@ abstract class Button(protected val game: InGameState, pos: IPoint, size: IPoint
     fun contains(point: IPoint) = contains(point.x, point.y)
 
     open fun contains(x: Int, y: Int): Boolean {
-        return pos.x <= x && x < pos.x + size.x && pos.y <= y && y < pos.y + size.y
+        // Convert the query point into the button's unscaled space (a
+        // no-op at renderScale 1).
+        val sx = if (renderScale == 1f) x
+            else pos.x + ((x - pos.x) / renderScale).roundToInt()
+        val sy = if (renderScale == 1f) y
+            else pos.y + ((y - pos.y) / renderScale).roundToInt()
+        return pos.x <= sx && sx < pos.x + size.x && pos.y <= sy && sy < pos.y + size.y
     }
 
     open fun update(x: Int, y: Int, blockHover: Boolean = false) {
@@ -331,8 +346,12 @@ object Buttons {
 
         // Apply an offset to make the hoverable area the big yellow centre region - by default the hoverable
         // section starts at the button's 0,0, and the main region is offset. Thus translate the mouse coordinates
-        // back so 0,0 becomes the origin of the yellow area.
-        override fun contains(x: Int, y: Int) = super.contains(x - 5, y - 7)
+        // back so 0,0 becomes the origin of the yellow area. The offset is in the button's (scaled) screen space,
+        // so it grows with renderScale.
+        override fun contains(x: Int, y: Int) = super.contains(
+            x - (5 * renderScale).roundToInt(),
+            y - (7 * renderScale).roundToInt()
+        )
     }
 
     open class BasicButton(
