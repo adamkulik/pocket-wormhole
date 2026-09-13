@@ -36,13 +36,6 @@ class ShipWindow(val game: InGameState, val ship: Ship, initialTab: Tab, private
 
     override val renderScale = if (PlatformSpecific.INSTANCE.isTouchUi) 1.2f else 1f
 
-    // Tap-to-arm: first tap on a control highlights it (and shows its
-    // description panel), second tap confirms (runtime-gated on
-    // isTouchUi). Note equipment dragging already works as
-    // click-pickup/click-drop; the drop happens on mouseReleased, which
-    // the gate never sees, so drag flows are unaffected.
-    override val tapToArm = true
-
     override val appliesSelfTint: Boolean get() = crewToDismiss != null
 
     private val acceptButtonImage = game.getImg("img/upgradeUI/buttons_accept_base.png")
@@ -708,18 +701,9 @@ class ShipWindow(val game: InGameState, val ship: Ship, initialTab: Tab, private
         equipmentPanel.drawInfoPanel(infoPanel)
     }
 
-    override fun clickTargetAt(x: Int, y: Int): Any? {
-        super.clickTargetAt(x, y)?.let { return it }
-
-        // The equipment tab's items live in the panel's own button list.
-        if (tab == Tab.EQUIPMENT)
-            return equipmentPanel.buttonAt(x, y)
-        return null
-    }
-
     override fun mouseClick(button: Int, x: Int, y: Int) {
-        // The dismiss popup is already a confirmation - keep it single-tap.
-        // (It must also stay ahead of the tap-to-arm gate.)
+        // The dismiss popup is a confirmation widget: it intercepts
+        // clicks before everything else and blocks them while up.
         if (crewToDismiss != null) {
             val p = scaleWindowPoint(x, y)
             for (btn in crewDismissWidgetButtons) {
@@ -731,9 +715,8 @@ class ShipWindow(val game: InGameState, val ship: Ship, initialTab: Tab, private
         // If we were renaming a crewmember, we're not any more
         renamingCrew = null
 
-        if (!tapArmGate(button, x, y))
-            return
-
+        // Deliberately NO tap-to-arm here (user decision): upgrades are
+        // single-click on touch too - the UNDO button is the safety net.
         super.mouseClick(button, x, y)
 
         if (tab == Tab.EQUIPMENT) {

@@ -92,6 +92,14 @@ abstract class Window {
 
         val p = scaleWindowPoint(x, y)
         val target = clickTargetAt(p.x, p.y)
+
+        // Navigation-style buttons (store tabs/pages) click through
+        // immediately and clear any arm in progress.
+        if (target is Button && target.skipTapToArm) {
+            armedTapTarget = null
+            return true
+        }
+
         val armed = armedTapTarget
         val confirmed = target != null && armed != null &&
                 (target === armed || (armed is Button && armed.contains(p.x, p.y)))

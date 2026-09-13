@@ -33,6 +33,15 @@ abstract class Button(protected val game: InGameState, pos: IPoint, size: IPoint
      */
     var renderScale: Float = 1f
 
+    /**
+     * Touch ergonomics: when the tap-to-arm gate is active (Window
+     * .tapToArm + isTouchUi), buttons with this set dispatch their clicks
+     * immediately instead of requiring a second confirming tap - for
+     * navigation-style controls (store tabs, page flippers) where arming
+     * would only add friction. No effect on vanilla layouts.
+     */
+    var skipTapToArm: Boolean = false
+
     var hovered: Boolean = false
         private set
 

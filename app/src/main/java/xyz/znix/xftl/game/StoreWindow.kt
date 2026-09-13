@@ -124,6 +124,14 @@ class StoreWindow(val game: InGameState, val ship: Ship, val store: StoreData, p
         }
 
     init {
+        // Tab/page navigation buttons stay single-click even when the
+        // tap-to-arm gate is active - arming a page flipper is pure
+        // friction (and would leave an item armed across a page flip).
+        buyTabButton.skipTapToArm = true
+        sellTabButton.skipTapToArm = true
+        buySubTab1Button.skipTapToArm = true
+        buySubTab2Button.skipTapToArm = true
+
         updateButtons()
     }
 

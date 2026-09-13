@@ -9,6 +9,7 @@ import xyz.znix.xftl.math.ConstPoint
 import xyz.znix.xftl.math.IPoint
 import xyz.znix.xftl.rendering.Graphics
 import xyz.znix.xftl.systems.Drones
+import xyz.znix.xftl.sys.PlatformSpecific
 import xyz.znix.xftl.ui.ImageView
 import xyz.znix.xftl.ui.Label
 import xyz.znix.xftl.ui.WidgetContainer
@@ -21,6 +22,15 @@ import kotlin.math.min
  * of the player ship UI, and in the sell tab of the store.
  */
 class ShipEquipmentPanel(private val game: InGameState, val ship: Ship) {
+
+    private companion object {
+        // Touch-layout sell box position (window-space; see the sellUI
+        // branch of updateButtons). Provisional Y pending on-screen
+        // measurement of the laid-out widget height.
+        const val SELL_BOX_TOUCH_X = 600
+        const val SELL_BOX_TOUCH_Y = 390
+    }
+
     var position: IPoint = ConstPoint.ZERO
         set(value) {
             if (field == value)
@@ -271,10 +281,25 @@ class ShipEquipmentPanel(private val game: InGameState, val ship: Ship) {
         // equipment but your cargo is full) UIs are similar.
         sellButton = null
         if (sellUI) {
+            // Vanilla floats the sell box to the left of the window; the
+            // touch store layout pulls the whole window group left to
+            // make room for the info panel, which throws that spot about
+            // 250px off-screen. On touch, park it in the lower-right
+            // instead: in the info panel's column (x = size.x + 13, same
+            // as infoPanel.position), which is guaranteed empty while a
+            // blueprint is being dragged - exactly when the box matters.
+            // Y: with scale 1.2 and the store window's touch top at 78
+            // (canvas 720), window-space y 390 puts the box's lower area
+            // near the screen bottom without clipping.
+            val sellBoxPos = if (PlatformSpecific.INSTANCE.isTouchUi)
+                ConstPoint(SELL_BOX_TOUCH_X, SELL_BOX_TOUCH_Y)
+            else
+                ConstPoint(-275, 107)
+
             sellButton = SellDropBox.create(
                 game,
                 SellDropBox.Type.SELL_EQUIPMENT,
-                ConstPoint(-275, 107)
+                sellBoxPos
             ) { draggingBlueprint?.blueprint }
 
             buttons += sellButton!!
