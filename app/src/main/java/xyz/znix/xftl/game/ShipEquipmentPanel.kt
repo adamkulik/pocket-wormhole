@@ -23,14 +23,6 @@ import kotlin.math.min
  */
 class ShipEquipmentPanel(private val game: InGameState, val ship: Ship) {
 
-    private companion object {
-        // Touch-layout sell box position (window-space; see the sellUI
-        // branch of updateButtons). Provisional Y pending on-screen
-        // measurement of the laid-out widget height.
-        const val SELL_BOX_TOUCH_X = 600
-        const val SELL_BOX_TOUCH_Y = 390
-    }
-
     var position: IPoint = ConstPoint.ZERO
         set(value) {
             if (field == value)
@@ -40,6 +32,19 @@ class ShipEquipmentPanel(private val game: InGameState, val ship: Ship) {
         }
 
     var sellUI: Boolean = false
+
+    /**
+     * Optional placement override for the sell drop box (sell UI only).
+     * Called with the box's measured size once it's laid out; returns its
+     * window-space position. Null (or a null return) keeps the vanilla
+     * spot left of the window. The touch store uses this because the
+     * vanilla spot is thrown off-screen by the window group's leftward
+     * shift.
+     */
+    var sellBoxPlacer: ((IPoint) -> IPoint?)? = null
+
+    /** Where [sellButton] sits, in panel-local coordinates. */
+    private var sellBoxLocalPos: IPoint = ConstPoint(-275, 107)
 
     private val sectionFont = game.getFont("HL2", 2f)
     private val missingSystemFont = game.getFont("HL2", 3f)
@@ -281,26 +286,17 @@ class ShipEquipmentPanel(private val game: InGameState, val ship: Ship) {
         // equipment but your cargo is full) UIs are similar.
         sellButton = null
         if (sellUI) {
-            // Vanilla floats the sell box to the left of the window; the
-            // touch store layout pulls the whole window group left to
-            // make room for the info panel, which throws that spot about
-            // 250px off-screen. On touch, park it in the lower-right
-            // instead: in the info panel's column (x = size.x + 13, same
-            // as infoPanel.position), which is guaranteed empty while a
-            // blueprint is being dragged - exactly when the box matters.
-            // Y: with scale 1.2 and the store window's touch top at 78
-            // (canvas 720), window-space y 390 puts the box's lower area
-            // near the screen bottom without clipping.
-            val sellBoxPos = if (PlatformSpecific.INSTANCE.isTouchUi)
-                ConstPoint(SELL_BOX_TOUCH_X, SELL_BOX_TOUCH_Y)
-            else
-                ConstPoint(-275, 107)
-
+            // Created at local (0,0): the laid-out widget's size is only
+            // known after construction, and the placer positions it from
+            // that size. Re-anchored after the generic windowOffset loop
+            // below.
             sellButton = SellDropBox.create(
                 game,
                 SellDropBox.Type.SELL_EQUIPMENT,
-                sellBoxPos
+                ConstPoint(0, 0)
             ) { draggingBlueprint?.blueprint }
+
+            sellBoxLocalPos = sellBoxPlacer?.invoke(sellButton!!.size) ?: ConstPoint(-275, 107)
 
             buttons += sellButton!!
         }
@@ -308,6 +304,11 @@ class ShipEquipmentPanel(private val game: InGameState, val ship: Ship) {
         for (button in buttons) {
             button.windowOffset = position
         }
+
+        // Re-anchor the sell box after the generic loop above: it was
+        // created at local (0,0), so its offset is position + local pos.
+        if (sellUI)
+            sellButton!!.windowOffset = position + sellBoxLocalPos
     }
 
     fun updateUI(x: Int, y: Int) {
@@ -573,7 +574,20 @@ class ShipEquipmentPanel(private val game: InGameState, val ship: Ship) {
                 }
 
                 (widget.byId["title"] as Label).text = game.translator[titleKey]
-                (widget.byId["message"] as Label).text = game.translator[messageKey]
+                val message = widget.byId["message"] as Label
+                message.text = game.translator[messageKey]
+
+                // Touch layouts have no vertical room to spare (user):
+                // collapse the vanilla 4-line message to 3 by merging its
+                // last two lines. The box auto-widens horizontally to fit
+                // the longer line, trading width for height. Generic -
+                // works for any language's line breaks.
+                if (PlatformSpecific.INSTANCE.isTouchUi) {
+                    val t = message.text
+                    val lastBreak = t.lastIndexOf('\n')
+                    if (lastBreak >= 0)
+                        message.text = t.substring(0, lastBreak) + " " + t.substring(lastBreak + 1)
+                }
 
                 widget.updateLayout()
 

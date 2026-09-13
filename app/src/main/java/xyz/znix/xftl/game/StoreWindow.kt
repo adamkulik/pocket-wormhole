@@ -11,9 +11,11 @@ import xyz.znix.xftl.rendering.Graphics
 import xyz.znix.xftl.rendering.HotkeyDelayedTooltip
 import xyz.znix.xftl.sys.Input
 import xyz.znix.xftl.sys.PlatformSpecific
+import kotlin.math.roundToInt
 
 class StoreWindow(val game: InGameState, val ship: Ship, val store: StoreData, private val close: () -> Unit) :
     Window() {
+
 
     override val size = ConstPoint(587, 423)
 
@@ -49,7 +51,26 @@ class StoreWindow(val game: InGameState, val ship: Ship, val store: StoreData, p
 
     private val buySound = game.sounds.getSample("buy")
 
-    private val sellPanel = ShipEquipmentPanel(game, ship).apply { sellUI = true }
+    private val sellPanel = ShipEquipmentPanel(game, ship).apply {
+        sellUI = true
+        // Touch placement for the sell drop box: vanilla floats it left
+        // of the window, which the touch group shift throws off-screen.
+        // There's no spare VERTICAL room around the window (user), but
+        // the info panel's column is free - park the box there, anchored
+        // ~16px above the screen bottom. The info panel is empty while a
+        // blueprint is being dragged, which is exactly when the box
+        // matters; while hovering (not dragging) the description may
+        // overlap the box's top briefly. Null on desktop = vanilla spot.
+        sellBoxPlacer = { boxSize ->
+            if (!PlatformSpecific.INSTANCE.isTouchUi) {
+                null
+            } else {
+                val top = (CANVAS_H - size.y) / 2 + windowCentreOffset.y
+                val maxBottomLocal = ((CANVAS_H - 16) - top) / renderScale
+                ConstPoint(this@StoreWindow.size.x + 13, maxBottomLocal.roundToInt() - boxSize.y)
+            }
+        }
+    }
     private val infoPanel = InfoPanel(game)
 
     private val buyTabButton = SimpleButton(
@@ -876,6 +897,10 @@ class StoreWindow(val game: InGameState, val ship: Ship, val store: StoreData, p
     }
 
     companion object {
+        // The engine's virtual canvas is fixed at 1280x720; the touch
+        // sell-box placement below is computed against its height.
+        const val CANVAS_H: Int = 720
+
         const val GLOW_WIDTH: Int = 7
 
         private fun resourceTextureName(resource: Resource): String {
