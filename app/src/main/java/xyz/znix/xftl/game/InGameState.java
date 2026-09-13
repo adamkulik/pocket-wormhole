@@ -502,7 +502,7 @@ public class InGameState extends MainGame.GameState {
         if (rightClicked && enemy != null) {
             tempPoint.setX(container.getInput().getMouseX());
             tempPoint.setY(container.getInput().getMouseY());
-            tempPoint.minusAssign(hostileShipUI.getShipPos());
+            convertScreenToEnemyShip(tempPoint);
             enemy.screenPosToShipPos(tempPoint);
 
             RoomPoint rp = enemy.shipToRoomPos(tempPoint);
@@ -537,7 +537,7 @@ public class InGameState extends MainGame.GameState {
         if (enemy != null && enemyInteriorVisible) {
             tempPoint.setX(container.getInput().getMouseX());
             tempPoint.setY(container.getInput().getMouseY());
-            tempPoint.minusAssign(hostileShipUI.getShipPos());
+            convertScreenToEnemyShip(tempPoint);
             enemy.screenPosToShipPos(tempPoint);
 
             RoomPoint rp = enemy.shipToRoomPos(tempPoint);
@@ -1543,6 +1543,28 @@ public class InGameState extends MainGame.GameState {
      */
     public IPoint getEnemyPosition() {
         return hostileShipUI.getShipPos();
+    }
+
+    /**
+     * Convert a screen-space position to the enemy ship's render space,
+     * for hit-testing rooms/crew on it. Accounts for the touch layout's
+     * scaled enemy box (a no-op otherwise). Only valid while an enemy is
+     * present.
+     */
+    public void convertScreenToEnemyShip(Point point) {
+        if (hostileShipUI == null) {
+            return;
+        }
+        hostileShipUI.convertScreenToShipRender(point);
+    }
+
+    /**
+     * Convert a position in the enemy ship's render space to screen
+     * space - the inverse of {@link #convertScreenToEnemyShip}. Only
+     * valid while an enemy is present.
+     */
+    public IPoint enemyShipRenderToScreen(int x, int y) {
+        return hostileShipUI.shipRenderToScreen(x, y);
     }
 
     public LootPool getLootPool() {

@@ -654,10 +654,9 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
 
         // Rooms on the enemy ship - these move crew already boarding.
         val enemy = game.enemy ?: return false
-        val enemyPos = game.enemyShipPos ?: return false
 
         val enemyPoint = Point(x, y)
-        enemyPoint -= enemyPos
+        game.convertScreenToEnemyShip(enemyPoint)
         enemy.screenPosToShipPos(enemyPoint)
         val roomPos = enemy.shipToRoomPos(enemyPoint) ?: return false
 
@@ -682,8 +681,9 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
             return ConstPoint(crew.screenX, crew.screenY) + playerShipPosition
         }
 
-        // The crewmember must be on the enemy ship, add that position on
-        return ConstPoint(crew.screenX, crew.screenY) + game.enemyPosition
+        // The crewmember must be on the enemy ship, convert their
+        // position over (the touch layout draws the enemy box scaled).
+        return game.enemyShipRenderToScreen(crew.screenX, crew.screenY)
     }
 
     fun isCrewHovered(crew: AbstractCrew, mouseX: Int, mouseY: Int, crewPos: IPoint): Boolean {
@@ -772,7 +772,8 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
                 weapons.selectedTargets.targetRoom(id, room)
             } else if (weapon is BeamBlueprint.BeamInstance) {
                 val mousePos = ConstPoint(gc.input.mouseX, gc.input.mouseY)
-                val shipPos = mousePos - game.enemyPosition
+                val shipPos = Point(mousePos.x, mousePos.y)
+                game.convertScreenToEnemyShip(shipPos)
                 beamTargeting = SelectedTarget.BeamAim(weapon, id, game.enemy, shipPos)
                 beamTargetingStartPos.set(mousePos)
             }

@@ -8,16 +8,35 @@ import xyz.znix.xftl.rendering.Colour
 import xyz.znix.xftl.rendering.Graphics
 import xyz.znix.xftl.sys.GameContainer
 import xyz.znix.xftl.sys.PlatformSpecific
+import kotlin.math.roundToInt
 
 class HostileShipUI(private val game: InGameState, private val enemy: Ship) {
     companion object {
         private const val FLY_OUT_TIME = 1.2f
         private const val FLY_OUT_SCALE_END = 0.35f
+
+        /**
+         * How much smaller than vanilla the enemy ship box is drawn on
+         * touch layouts - see [boxScale].
+         */
+        private const val TOUCH_BOX_SCALE = 0.9f
     }
 
 
     private val mutableShipPos = Point(0, 0)
     val shipPos: IPoint get() = mutableShipPos
+
+    /**
+     * The scale the enemy's box - frame, labels, bars and the ship drawn
+     * inside it - is rendered at. Vanilla is 1; on touch layouts the box
+     * is drawn slightly smaller ([TOUCH_BOX_SCALE]) and anchored to the
+     * vanilla content top/right edges, so it clears the scaled systems
+     * strip while leaving the FTL escape warning (drawn above the box)
+     * its vanilla headroom. Hit-testing code must convert through
+     * [convertScreenToShipRender] / [shipRenderToScreen].
+     */
+    private val boxScale: Float =
+        if (!enemy.isUsingBossUI && PlatformSpecific.INSTANCE.isTouchUi) TOUCH_BOX_SCALE else 1f
 
     // Issue #4: the jump-away animation state (goes from 1 to 0). Started
     // by [startFlyOut] when the ship's escape timer expires; InGameState
@@ -28,6 +47,27 @@ class HostileShipUI(private val game: InGameState, private val enemy: Ship) {
     fun startFlyOut() {
         flyOut = 1f
     }
+
+    /**
+     * Convert a screen-space position to the enemy ship's render space
+     * (what (mouse - shipPos) used to be), accounting for the touch
+     * layout's scaled box. Complements [getShipPos]. Only valid while
+     * the enemy ship is displayed.
+     */
+    fun convertScreenToShipRender(point: Point) {
+        point.x = ((point.x - mutableShipPos.x) / boxScale).roundToInt()
+        point.y = ((point.y - mutableShipPos.y) / boxScale).roundToInt()
+    }
+
+    /**
+     * Convert a position in the enemy ship's render space (e.g. a
+     * crewmember's screenX/screenY) to screen space, for hit-testing
+     * things on the enemy ship - your boarding party, mainly.
+     */
+    fun shipRenderToScreen(x: Int, y: Int): IPoint = Point(
+        (mutableShipPos.x + boxScale * x).roundToInt(),
+        (mutableShipPos.y + boxScale * y).roundToInt()
+    )
 
     private val font = game.getFont("HL2")
     private val titleFont = game.getFont("HL2", 2f)
@@ -74,55 +114,77 @@ class HostileShipUI(private val game: InGameState, private val enemy: Ship) {
             false -> Constants.SHIP_BOX_TEXT_NEUTRAL
         }
 
-        // The position of the box, when you remove the glow padding
-        val boxX: Int
-        val boxY: Int
-
         val leftGlow: Int
         val rightGlow: Int
         val topGlow: Int
         val bottomGlow: Int
+        // The vanilla gap between the box's content edge and the screen's
+        // right edge, and the vanilla y of the content box's top.
+        val rightMargin: Int
+        val vanillaBoxY: Int
         if (enemy.isUsingBossUI) {
             leftGlow = 4
             rightGlow = 4
             topGlow = 4
             bottomGlow = 4
-            boxX = gc.width - (box.width - rightGlow) - 10 + leftGlow
-            boxY = 11
+            rightMargin = 10
+            vanillaBoxY = 11
         } else {
             leftGlow = 10
             rightGlow = 20
             topGlow = 9
             bottomGlow = 17
-            boxX = gc.width - (box.width - rightGlow) - 18 + leftGlow
-            // On touch the scaled systems strip's weapon/drone boxes
-            // reach y~541 and would cover this box's bottom-left corner
-            // (content bottom is y=583 at the vanilla position). Lift the
-            // box into the unused top margin: content bottom drops to
-            // y=539, just above the strip. Boss frame can't clear this
-            // way (too tall) - see touch-strip-scaling-plan.md.
-            boxY = if (PlatformSpecific.INSTANCE.isTouchUi) 10 else 54
+            rightMargin = 18
+            vanillaBoxY = 54
         }
 
-        // The position of the image
-        val rawBoxX = boxX - leftGlow
-        val rawBoxY = boxY - topGlow
+        // On touch layouts the whole box - frame, text, bars and the ship
+        // inside it - is drawn scaled down by [boxScale], anchored to the
+        // vanilla content top/right position. The full-size box's bottom
+        // (content bottom y = 583) collides with the scaled systems
+        // strip's weapon/drone boxes (y~541), and the previous fix of
+        // lifting the box pushed the FTL escape warning - drawn at
+        // boxY - 10 - off the top of the screen. Drawing everything
+        // slightly smaller keeps the warning's vanilla headroom while
+        // the content bottom rises to ~530, clearing the strip. The boss
+        // frame stays full-size: even scaled it can't clear the strip,
+        // and it rarely overlaps one that long
+        // (touch-strip-scaling-plan.md).
+        val scale = boxScale
 
-        val boxRightX = rawBoxX + box.width - rightGlow
-        val boxBottomY = rawBoxY + box.height - bottomGlow
+        // The screen-space position of the box image's top-left corner,
+        // keeping the vanilla content top and right edges.
+        val anchorX = gc.width - (box.width - rightGlow) - rightMargin +
+                ((box.width - rightGlow) * (1 - scale)).roundToInt()
+        val anchorY = vanillaBoxY - (topGlow * scale).roundToInt()
+
+        // Everything from here to the escape warning is drawn through a
+        // translate+scale transform, in coordinates local to the box
+        // image (the vanilla layout with the image's top-left corner at
+        // the origin). At a scale of 1 every element lands exactly where
+        // vanilla draws it.
+        val boxX = leftGlow
+        val boxY = topGlow
+        val boxRightX = box.width - rightGlow
+        val boxBottomY = box.height - bottomGlow
 
         // It's not quite the same as FTL, but works well enough for now
-        mutableShipPos.x = boxX + (box.width - enemy.hullImage.width) / 2
-        mutableShipPos.y = boxY + (box.height - enemy.hullImage.height) / 2
-        mutableShipPos -= enemy.hullOffset
+        val localShipX = boxX + (box.width - enemy.hullImage.width) / 2
+        val localShipY = boxY + (box.height - enemy.hullImage.height) / 2
+        mutableShipPos.x = (anchorX + scale * (localShipX - enemy.hullOffset.x)).roundToInt()
+        mutableShipPos.y = (anchorY + scale * (localShipY - enemy.hullOffset.y)).roundToInt()
 
-        box.draw(rawBoxX, rawBoxY, filter)
+        g.pushTransform()
+        g.translate(anchorX.f, anchorY.f)
+        g.scale(scale, scale)
+
+        box.draw(0, 0, filter)
 
         Utils.drawStenciled(Utils.StencilMode.MASKING, {
-            mask.draw(rawBoxX, rawBoxY)
+            mask.draw(0, 0)
         }) {
             g.pushTransform()
-            g.translate(shipPos.x.f, shipPos.y.f)
+            g.translate(localShipX.f - enemy.hullOffset.x, localShipY.f - enemy.hullOffset.y)
 
             // Issue #4: jumping away - scale down, then the glowing star
             // sweeps from stern to bow (right to left for the mirrored
@@ -197,10 +259,6 @@ class HostileShipUI(private val game: InGameState, private val enemy: Ship) {
         val classY = boxY + 38
         drawStatus(statusTextX, classY, isHostile)
 
-        // Draw the FTL charging warning, if relevant.
-        val centreX = rawBoxX + box.width / 2
-        drawEscapeWarning(centreX, boxY)
-
         // Draw the hull level
         val hullY = boxY + 20 + 4
         renderSmallbar(textX, hullY, "status_hull", filter, textColour)
@@ -273,6 +331,15 @@ class HostileShipUI(private val game: InGameState, private val enemy: Ship) {
 
             sys.drawIconAndPower(game, g, false, roomPowerVisible, false, x, y)
         }
+
+        g.popTransform()
+
+        // Draw the FTL charging warning, if relevant. It sits above the
+        // box and is drawn in screen space at the vanilla position, so
+        // it keeps its full size and headroom even when the box itself
+        // is scaled down on touch layouts.
+        val centreX = (anchorX + scale * box.width / 2).roundToInt()
+        drawEscapeWarning(centreX, vanillaBoxY - 10)
     }
 
     private fun drawStatus(x: Int, classY: Int, isHostile: Boolean) {
@@ -297,7 +364,7 @@ class HostileShipUI(private val game: InGameState, private val enemy: Ship) {
         statusFont.drawStringLeftAligned(x.f, relationY.f, relationStr, relationColour)
     }
 
-    private fun drawEscapeWarning(centreX: Int, boxY: Int) {
+    private fun drawEscapeWarning(centreX: Int, y: Int) {
         val timeRemaining = enemy.escapeTimer ?: return
 
         val warningKey = when {
@@ -329,7 +396,7 @@ class HostileShipUI(private val game: InGameState, private val enemy: Ship) {
         val message = game.translator[warningKey]
 
         val leftX = centreX - jumpWarningFont.getWidth(message) / 2
-        UIUtils.drawStringWithGlow(game, jumpWarningFont, message, leftX, boxY - 10, GlowColour.RED, alpha)
+        UIUtils.drawStringWithGlow(game, jumpWarningFont, message, leftX, y, GlowColour.RED, alpha)
     }
 
     private fun renderSmallbar(x: Int, y: Int, key: String, filter: Colour, textColour: Colour) {
