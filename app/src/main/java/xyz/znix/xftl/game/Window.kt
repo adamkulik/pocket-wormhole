@@ -4,6 +4,8 @@ import xyz.znix.xftl.math.ConstPoint
 import xyz.znix.xftl.math.IPoint
 import xyz.znix.xftl.math.Point
 import xyz.znix.xftl.rendering.Graphics
+import xyz.znix.xftl.sys.Input
+import xyz.znix.xftl.sys.PlatformSpecific
 import kotlin.math.roundToInt
 
 abstract class Window {
@@ -50,6 +52,51 @@ abstract class Window {
             (centreX + (x - centreX) / renderScale).roundToInt(),
             (centreY + (y - centreY) / renderScale).roundToInt()
         )
+    }
+
+    /**
+     * Touch ergonomics: when true, a tap on an element first acts as a
+     * mouse hover ("arming" it - showing its highlight/tooltip), and only
+     * a second tap on the SAME element actually clicks it. Tapping a
+     * different element switches the arm/hover across; tapping empty
+     * space disarms. Desktop layouts are unaffected: [tapArmGate] passes
+     * every click through unless [PlatformSpecific.isTouchUi] is set and
+     * this window opts in.
+     */
+    open val tapToArm: Boolean get() = false
+
+    /** The element armed by the last tap - a [clickTargetAt] result, or null. */
+    private var armedTapTarget: Any? = null
+
+    /**
+     * Identify the clickable element (button, map beacon, ...) under a
+     * window-space point, for [tapArmGate] matching. Buttons are looked
+     * up in the CURRENT list so store-style button rebuilds can't break
+     * matching; an armed Button reference keeps working after a rebuild
+     * because [tapArmGate] compares its (unchanged) rect via contains().
+     */
+    protected open fun clickTargetAt(x: Int, y: Int): Any? =
+        buttons.firstOrNull { it.contains(x, y) }
+
+    /**
+     * The tap-to-arm gate for [tapToArm] windows: returns true if this
+     * click should proceed, false if it was consumed to (re)arm the
+     * element under the tap or to clear the arm. Takes the same raw
+     * mouse coordinates as [mouseClick].
+     */
+    protected fun tapArmGate(button: Int, x: Int, y: Int): Boolean {
+        if (!tapToArm || button != Input.MOUSE_LEFT_BUTTON)
+            return true
+        if (!PlatformSpecific.INSTANCE.isTouchUi)
+            return true
+
+        val p = scaleWindowPoint(x, y)
+        val target = clickTargetAt(p.x, p.y)
+        val armed = armedTapTarget
+        val confirmed = target != null && armed != null &&
+                (target === armed || (armed is Button && armed.contains(p.x, p.y)))
+        armedTapTarget = if (confirmed) null else target
+        return confirmed
     }
 
     /**

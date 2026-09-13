@@ -294,6 +294,15 @@ class ShipEquipmentPanel(private val game: InGameState, val ship: Ship) {
         draggingBlueprint?.dragPosition = ConstPoint(x, y)
     }
 
+    /**
+     * The panel button under a window-space point, for the touch
+     * tap-to-arm gate (Window.clickTargetAt). Identity of the returned
+     * instance is irrelevant - the gate only needs to know a target
+     * exists here; the armed check is done against the armed button's
+     * own (stable) rect.
+     */
+    fun buttonAt(x: Int, y: Int): Button? = buttons.firstOrNull { it.contains(x, y) }
+
     fun mouseClick(button: Int, x: Int, y: Int) {
         // Copied from Window.
         // Mouse clicking may change the buttons array (eg in the store

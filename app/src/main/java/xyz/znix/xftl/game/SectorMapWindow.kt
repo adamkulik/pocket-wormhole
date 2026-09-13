@@ -22,6 +22,9 @@ class SectorMapWindow(private val game: InGameState, private val selectedCallbac
     override val windowCentreOffset: IPoint =
         ConstPoint(0, if (PlatformSpecific.INSTANCE.isTouchUi) -15 else 0)
 
+    // Tap-to-arm, as JumpWindow (runtime-gated on isTouchUi).
+    override val tapToArm = true
+
     private val titleFont = game.getFont("HL2", 3f)
     private val sectorColourFont = game.getFont("HL1", 2f)
     private val sectorNameFont = game.getFont("JustinFont8")
@@ -324,7 +327,17 @@ class SectorMapWindow(private val game: InGameState, private val selectedCallbac
         }
     }
 
+    override fun clickTargetAt(x: Int, y: Int): Any? {
+        super.clickTargetAt(x, y)?.let { return it }
+
+        // Sectors aren't buttons - match the updateUI hit-test.
+        return hoveredSector
+    }
+
     override fun mouseClick(button: Int, x: Int, y: Int) {
+        if (!tapArmGate(button, x, y))
+            return
+
         super.mouseClick(button, x, y)
 
         // If a sector is hovered, jump to it.

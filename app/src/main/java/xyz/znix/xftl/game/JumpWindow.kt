@@ -33,6 +33,10 @@ class JumpWindow(val game: InGameState, showSectorMap: () -> Unit, val jump: (Be
     override val windowCentreOffset: IPoint =
         ConstPoint(0, if (PlatformSpecific.INSTANCE.isTouchUi) -75 else 0)
 
+    // Tap-to-arm: first tap on a beacon/button highlights it, second tap
+    // confirms (see Window.tapToArm). Runtime-gated on isTouchUi.
+    override val tapToArm = true
+
     private val sectorInfoTab = game.getImg("img/map/side_sector.png")
     private val titleTab = game.getImg("img/map/side_beaconmap.png")
     private val nextSectorTab = game.getImg("img/map/side_nextsector.png")
@@ -601,6 +605,15 @@ class JumpWindow(val game: InGameState, showSectorMap: () -> Unit, val jump: (Be
         hovered = closest.first
     }
 
+    override fun clickTargetAt(x: Int, y: Int): Any? {
+        super.clickTargetAt(x, y)?.let { return it }
+
+        // Beacons aren't buttons - match the updateUI proximity hit-test
+        // (hovered is already computed from the cursor position, which
+        // sits at the tap point).
+        return hovered
+    }
+
     /**
      * True if the player has the Adv. FTL Navigation augment, which lets
      * them jump to any beacon they've previously visited in this sector.
@@ -632,6 +645,9 @@ class JumpWindow(val game: InGameState, showSectorMap: () -> Unit, val jump: (Be
     }
 
     override fun mouseClick(button: Int, x: Int, y: Int) {
+        if (!tapArmGate(button, x, y))
+            return
+
         super.mouseClick(button, x, y)
 
         if (button != Input.MOUSE_LEFT_BUTTON)

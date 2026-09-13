@@ -31,6 +31,11 @@ class StoreWindow(val game: InGameState, val ship: Ship, val store: StoreData, p
 
     override val renderScale = if (PlatformSpecific.INSTANCE.isTouchUi) 1.2f else 1f
 
+    // Tap-to-arm: first tap highlights (and shows the item description),
+    // second tap confirms (runtime-gated on isTouchUi). Selling already
+    // happens via mouseReleased (drop), which the gate never sees.
+    override val tapToArm = true
+
     private val buyImage = game.getImg("img/storeUI/store_buy_main.png")
     private val sellImage = game.getImg("img/storeUI/store_sell_main.png")
     private val closeButtonOutline = game.getImg("img/storeUI/store_close_base.png")
@@ -662,7 +667,19 @@ class StoreWindow(val game: InGameState, val ship: Ship, val store: StoreData, p
         close()
     }
 
+    override fun clickTargetAt(x: Int, y: Int): Any? {
+        super.clickTargetAt(x, y)?.let { return it }
+
+        // The sell tab's items live in the sell panel's own button list.
+        if (sellTab)
+            return sellPanel.buttonAt(x, y)
+        return null
+    }
+
     override fun mouseClick(button: Int, x: Int, y: Int) {
+        if (!tapArmGate(button, x, y))
+            return
+
         super.mouseClick(button, x, y)
 
         if (sellTab) {
