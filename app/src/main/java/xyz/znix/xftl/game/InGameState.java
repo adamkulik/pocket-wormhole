@@ -11,6 +11,7 @@ import org.newdawn.slick.SlickException;
 import org.newdawn.slick.util.InputAdapter;
 import xyz.znix.xftl.*;
 import xyz.znix.xftl.ai.ShipAI;
+import xyz.znix.xftl.augments.AugmentBlueprint;
 import xyz.znix.xftl.crew.*;
 import xyz.znix.xftl.devutil.DebugConsole;
 import xyz.znix.xftl.devutil.DebugFlagManager;
@@ -1664,11 +1665,26 @@ public class InGameState extends MainGame.GameState {
         return content.windowRenderer;
     }
 
+    /**
+     * Scrap Recovery Arm (SCRAP_COLLECTOR): +10% scrap per arm, from any
+     * source. Arms stack additively (dat: stackable, value 0.1) and the
+     * result rounds down against the player (vanilla: 19 scrap -> +1, two
+     * arms on 15 scrap -> +3). Vanilla does NOT boost store sales - those
+     * never route through here, and resource purchases never carry scrap.
+     */
+    private int applyScrapCollector(int scrap) {
+        if (scrap <= 0)
+            return scrap;
+
+        float augment = player.getAugmentValue(AugmentBlueprint.SCRAP_COLLECTOR);
+        return scrap + (int) (scrap * augment);
+    }
+
     public void givePlayerResources(@NotNull ResourceSet resources) {
         player.setFuelCount(player.getFuelCount() + resources.getFuel());
         player.setDronesCount(player.getDronesCount() + resources.getDroneParts());
         player.setMissilesCount(player.getMissilesCount() + resources.getMissiles());
-        player.setScrap(player.getScrap() + resources.getScrap());
+        player.setScrap(player.getScrap() + applyScrapCollector(resources.getScrap()));
 
         for (Blueprint item : resources.getItems()) {
             player.addBlueprint(item, true);
