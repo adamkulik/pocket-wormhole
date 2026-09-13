@@ -25,12 +25,13 @@ import kotlin.random.Random
 class JumpWindow(val game: InGameState, showSectorMap: () -> Unit, val jump: (Beacon?) -> Unit) : Window() {
     override val size = ConstPoint(752, 534)
 
-    // Touch ergonomics: the map windows are scaled up and nudged up a
-    // bit - the beacon diamonds are small tap targets, and the vanilla
-    // centred placement sits low over the systems strip.
+    // Touch ergonomics: the map window is scaled up 1.2x and moved up.
+    // The CANCEL button hangs below the declared window rect (local y
+    // 541..577 vs height 534), so at 1.2x the window must sit high
+    // enough to keep it on-screen: centreY <= 348 with 10px margin.
     override val renderScale = if (PlatformSpecific.INSTANCE.isTouchUi) 1.2f else 1f
     override val windowCentreOffset: IPoint =
-        ConstPoint(0, if (PlatformSpecific.INSTANCE.isTouchUi) -15 else 0)
+        ConstPoint(0, if (PlatformSpecific.INSTANCE.isTouchUi) -75 else 0)
 
     private val sectorInfoTab = game.getImg("img/map/side_sector.png")
     private val titleTab = game.getImg("img/map/side_beaconmap.png")
