@@ -42,6 +42,8 @@ with or endorsed by them.
 | Physical keyboard   | Space/Enter/arrows/Tab/Escape/letters reach the game |
 | Tap a crewmember    | Selects them and auto-pauses in room-selection mode — tap a room to send them there, tap empty space to cancel |
 | Tap a system icon   | Opens a power panel with big +/− buttons (drones get on/off toggles); the game auto-pauses |
+| Tap a weapon to fire | Auto-pauses in targeting mode — your ship shrinks out of the way and the enemy ship goes full-size; tap rooms to target (drag for beams), long-press to cancel |
+| In the store, maps & upgrades | First tap on an item just inspects it (highlights + shows its description); tap the same item again to buy/sell/jump/confirm. Tapping a different item moves the highlight, tapping empty space clears it. Event choices and the pause menu stay single-tap |
 
 ## Saves & data
 
@@ -64,7 +66,9 @@ or dying discards the saved one, as in vanilla FTL.
   vanilla data and most Slipstream mods work fine.
 - Requires Android 8.0+ (API 26) and a GLES 3.0 GPU (everything from ~2014 on).
 - The hangar ship editor UI is mouse-centric; it works with touch but is fiddly.
-- Hover-dependent desktop UI (tooltips) only shows while you're touching.
+- Hover-dependent desktop UI (tooltips) only shows while you're touching —
+  except in the store, maps and upgrades, where a tap keeps the info up
+  (see tap-to-confirm above).
 
 ## Building from source
 
