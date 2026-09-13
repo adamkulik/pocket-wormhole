@@ -32,11 +32,19 @@ class HostileShipUI(private val game: InGameState, private val enemy: Ship) {
      * is drawn slightly smaller ([TOUCH_BOX_SCALE]) and anchored to the
      * vanilla content top/right edges, so it clears the scaled systems
      * strip while leaving the FTL escape warning (drawn above the box)
-     * its vanilla headroom. Hit-testing code must convert through
-     * [convertScreenToShipRender] / [shipRenderToScreen].
+     * its vanilla headroom. While the touch weapon-targeting mode is
+     * active it returns to full size ("scaled slightly up" from the
+     * shrunken default), making the rooms easier to tap. Hit-testing
+     * code must convert through [convertScreenToShipRender] /
+     * [shipRenderToScreen].
      */
-    private val boxScale: Float =
-        if (!enemy.isUsingBossUI && PlatformSpecific.INSTANCE.isTouchUi) TOUCH_BOX_SCALE else 1f
+    private val boxScale: Float
+        get() = when {
+            enemy.isUsingBossUI -> 1f
+            game.isWeaponTargeting() -> 1f
+            PlatformSpecific.INSTANCE.isTouchUi -> TOUCH_BOX_SCALE
+            else -> 1f
+        }
 
     // Issue #4: the jump-away animation state (goes from 1 to 0). Started
     // by [startFlyOut] when the ship's escape timer expires; InGameState

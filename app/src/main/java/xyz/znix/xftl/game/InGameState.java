@@ -548,7 +548,7 @@ public class InGameState extends MainGame.GameState {
         // Hovering over the player
         tempPoint.setX(container.getInput().getMouseX());
         tempPoint.setY(container.getInput().getMouseY());
-        tempPoint.minusAssign(playerShipOffset);
+        convertScreenToPlayerShip(tempPoint);
         player.screenPosToShipPos(tempPoint);
 
         RoomPoint rp = player.shipToRoomPos(tempPoint);
@@ -602,6 +602,15 @@ public class InGameState extends MainGame.GameState {
         // Get the player's ship away from the top UI
         g.pushTransform();
         g.translate(playerShipOffset.getX(), playerShipOffset.getY());
+
+        // Touch weapon-targeting mode: shrink the player's ship about its
+        // render origin (playerShipOffset) so the full-size enemy ship is
+        // easier to aim at. Screen->ship conversions must divide by the
+        // same scale - see convertScreenToPlayerShip().
+        float playerShipScale = getPlayerShipRenderScale();
+        if (playerShipScale != 1f) {
+            g.scale(playerShipScale, playerShipScale);
+        }
 
         // Issue #4: beacon arrival, like vanilla. Phase 1 - the ship is
         // small and mostly transparent while a glowing star sweeps the hull
@@ -882,6 +891,12 @@ public class InGameState extends MainGame.GameState {
     // Fraction of the animation spent on the star sweep + fade-in; the
     // remainder is the ship's scale-up.
     private static final float ARRIVAL_SWEEP_END = 0.65f;
+
+    /**
+     * How much the player's ship is drawn shrunken by while the touch
+     * weapon-targeting mode is active (see getPlayerShipRenderScale).
+     */
+    private static final float TARGETING_SHIP_SCALE = 0.7f;
 
     public void setCurrentBeacon(Beacon currentBeacon) {
         boolean beaconChanged = this.currentBeacon == null || this.currentBeacon != currentBeacon;
@@ -1459,11 +1474,13 @@ public class InGameState extends MainGame.GameState {
 
     public boolean isPaused() {
         // The touch UI's room-selection mode (iPad-style auto-pause while
-        // crew are selected) and the power popup (while power is being
-        // manipulated) also freeze the game.
+        // crew are selected), the power popup (while power is being
+        // manipulated) and the weapon-targeting mode (while aiming)
+        // also freeze the game.
         return paused || shipUI.isWindowOpen() ||
                 (shipUI != null && shipUI.getRoomSelectionMode()) ||
-                (shipUI != null && shipUI.getPowerPopupOpen());
+                (shipUI != null && shipUI.getPowerPopupOpen()) ||
+                isWeaponTargeting();
     }
 
     /**
@@ -1565,6 +1582,38 @@ public class InGameState extends MainGame.GameState {
      */
     public IPoint enemyShipRenderToScreen(int x, int y) {
         return hostileShipUI.shipRenderToScreen(x, y);
+    }
+
+    /**
+     * True while the touch weapon-targeting mode is active: a weapon is
+     * armed and waiting for its target room (or a beam is being drawn).
+     */
+    public boolean isWeaponTargeting() {
+        return shipUI != null && shipUI.getWeaponTargetingMode();
+    }
+
+    /**
+     * The scale the player's ship is rendered at: 1 normally; on touch
+     * layouts it shrinks while the weapon-targeting mode is active, so
+     * the (full-size) enemy ship is easier to aim at. playerShipOffset
+     * stays the ship render space's screen anchor, so screen positions
+     * convert with (mouse - offset) / scale - see
+     * {@link #convertScreenToPlayerShip(Point)}.
+     */
+    public float getPlayerShipRenderScale() {
+        return isWeaponTargeting() ? TARGETING_SHIP_SCALE : 1f;
+    }
+
+    /**
+     * Convert a screen-space position to the player ship's render space
+     * (scaling by {@link #getPlayerShipRenderScale()} about
+     * playerShipOffset inverted), for hit-testing rooms/doors/crew on
+     * the player ship.
+     */
+    public void convertScreenToPlayerShip(Point point) {
+        float scale = getPlayerShipRenderScale();
+        point.setX(Math.round((point.getX() - playerShipOffset.getX()) / scale));
+        point.setY(Math.round((point.getY() - playerShipOffset.getY()) / scale));
     }
 
     public LootPool getLootPool() {

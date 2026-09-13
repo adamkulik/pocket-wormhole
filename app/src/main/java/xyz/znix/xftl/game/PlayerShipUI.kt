@@ -490,6 +490,46 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
         buttons += settings
     }
 
+    /**
+     * The touch weapon-targeting mode (iPad-style): while a weapon is
+     * armed and waiting for a room to be clicked (or a beam is being
+     * drawn), the game auto-pauses, the player's ship is drawn shrunken
+     * (see InGameState.getPlayerShipRenderScale) and the enemy ship box
+     * returns to full size, making its rooms easier to tap. Picking a
+     * target (or cancelling) returns everything to normal.
+     */
+    var weaponTargetingMode: Boolean = false
+        private set
+
+    private fun updateWeaponTargetingMode() {
+        if (!PlatformSpecific.INSTANCE.isTouchUi) {
+            weaponTargetingMode = false
+            return
+        }
+
+        // Only while a weapon is armed and waiting for a target - the
+        // teleporter/hacking/mind-control room pickers keep the UI as-is.
+        // The null guard matters: clickEvent is null most of the time,
+        // and null === null would engage the mode permanently.
+        weaponTargetingMode = beamTargeting != null ||
+                (selectWeaponClickEvent != null &&
+                        game.clickEvent === selectWeaponClickEvent)
+    }
+
+    /**
+     * Convert a screen-space position to the player ship's render space.
+     * While the touch weapon-targeting mode is active the ship is drawn
+     * shrunken (InGameState.getPlayerShipRenderScale), so the plain
+     * subtraction of [playerShipPosition] is only right at scale 1.
+     */
+    private fun screenToShipRender(x: Int, y: Int, playerShipPosition: IPoint): Point {
+        val s = game.playerShipRenderScale
+        return Point(
+            ((x - playerShipPosition.x) / s).roundToInt(),
+            ((y - playerShipPosition.y) / s).roundToInt()
+        )
+    }
+
     fun mouseClick(button: Int, x: Int, y: Int, playerShipPosition: IPoint) {
         pauseWindow?.let { win ->
             win.mouseClick(button, x, y)
@@ -532,8 +572,9 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
 
         // Check if we're clicking on a door
         if (button == Input.MOUSE_LEFT_BUTTON) {
+            val doorPos = screenToShipRender(x, y, playerShipPosition)
             for (door in ship.doors) {
-                val hit = door.click(x - playerShipPosition.x, y - playerShipPosition.y)
+                val hit = door.click(doorPos.x, doorPos.y)
                 if (hit)
                     return
             }
@@ -545,8 +586,7 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
         }
 
         // Move players if they're right-clicking somewhere
-        val shipMousePos = Point(x, y)
-        shipMousePos -= playerShipPosition
+        val shipMousePos = screenToShipRender(x, y, playerShipPosition)
 
         val roomPoint = Point(shipMousePos)
         roomPoint.divideFloor(ROOM_SIZE)
@@ -678,7 +718,14 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
 
     fun crewScreenPos(crew: AbstractCrew, playerShipPosition: IPoint): IPoint {
         if (crew.room.ship == ship) {
-            return ConstPoint(crew.screenX, crew.screenY) + playerShipPosition
+            // Scale the crew's position too - the touch weapon-targeting
+            // mode draws the ship shrunken (InGameState
+            // .getPlayerShipRenderScale).
+            val s = game.playerShipRenderScale
+            return Point(
+                (playerShipPosition.x + s * crew.screenX).roundToInt(),
+                (playerShipPosition.y + s * crew.screenY).roundToInt()
+            )
         }
 
         // The crewmember must be on the enemy ship, convert their
@@ -1348,6 +1395,25 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
             autoPause.draw(centreX - autoPause.width / 2, autoPauseY)
             roomSelection.draw(centreX - roomSelection.width / 2, roomSelY)
         }
+
+        // The touch weapon-targeting overlay, in the same bottom-anchored
+        // banner style as the room-selection one, using the iPad port's
+        // own art from ftl.dat (img/autopause.png + img/pause_target.png,
+        // swapping to img/pause_target_beam.png while a beam is drawn).
+        if (weaponTargetingMode) {
+            val autoPause = game.getImg("img/autopause.png")
+            val target = game.getImg(
+                if (beamTargeting != null) "img/pause_target_beam.png"
+                else "img/pause_target.png"
+            )
+            val centreX = container.width / 2
+
+            val targetY = container.height - 16 - target.height
+            val autoPauseY = targetY - 20 - autoPause.height
+
+            autoPause.draw(centreX - autoPause.width / 2, autoPauseY)
+            target.draw(centreX - target.width / 2, targetY)
+        }
     }
 
     private fun renderSingleMenu(container: GameContainer, g: Graphics, window: Window) {
@@ -1869,6 +1935,7 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
     }
 
     fun updateUI(x: Int, y: Int, playerShipPosition: IPoint) {
+        updateWeaponTargetingMode()
         updateRoomSelectionMode()
         updatePowerPopup()
 
