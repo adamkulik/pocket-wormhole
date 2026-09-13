@@ -553,6 +553,10 @@ class ShipEquipmentPanel(private val game: InGameState, val ship: Ship) {
         }
 
         companion object {
+            // Touch-only: side margin between the message text and the
+            // sell box's frame art (total width increase is twice this).
+            private const val SELL_TEXT_MARGIN = 16
+
             fun create(game: InGameState, type: Type, pos: IPoint, getDrag: () -> Blueprint?): SellDropBox {
                 val widgetName = when (type) {
                     Type.SELL_EQUIPMENT -> "sell_drop_box"
@@ -587,6 +591,17 @@ class ShipEquipmentPanel(private val game: InGameState, val ship: Ship) {
                     val lastBreak = t.lastIndexOf('\n')
                     if (lastBreak >= 0)
                         message.text = t.substring(0, lastBreak) + " " + t.substring(lastBreak + 1)
+
+                    // The vanilla box hugs its widest line (the frame art
+                    // has no built-in padding), so the text sits flush
+                    // against the frame. Stretch the label - the widest
+                    // child, hence the root width driver - so the frame
+                    // extends past the text and every centred line gets
+                    // side margins. Sell box only: the crew over-capacity
+                    // box tucks against ShipWindow's crew grid and must
+                    // stay narrow.
+                    if (type == Type.SELL_EQUIPMENT)
+                        message.attemptStretch(message.size.x + 2 * SELL_TEXT_MARGIN, 0)
                 }
 
                 widget.updateLayout()
