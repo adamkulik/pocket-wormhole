@@ -8,6 +8,7 @@ import xyz.znix.xftl.rendering.Colour
 import xyz.znix.xftl.rendering.Graphics
 import xyz.znix.xftl.rendering.Image
 import xyz.znix.xftl.sys.Input
+import xyz.znix.xftl.sys.PlatformSpecific
 import xyz.znix.xftl.systems.SubSystem
 import xyz.znix.xftl.systems.SystemBlueprint
 import xyz.znix.xftl.ui.Label
@@ -20,8 +21,15 @@ class ShipWindow(val game: InGameState, val ship: Ship, initialTab: Tab, private
     Window() {
     override val size = ConstPoint(587, 464)
 
-    // Make the system power stuff visible
-    override val windowCentreOffset = ConstPoint(-10, 0)
+    // Touch ergonomics: scale up 1.2x like the map windows. The window
+    // plus its right-hand info panel is ~933*1.2 = 1120px wide, so the
+    // whole group is pulled left to stay centred on screen (vanilla
+    // nudges it just -10 to make room for the power-display column).
+    override val windowCentreOffset = ConstPoint(
+        if (PlatformSpecific.INSTANCE.isTouchUi) -266 else -10, 0
+    )
+
+    override val renderScale = if (PlatformSpecific.INSTANCE.isTouchUi) 1.2f else 1f
 
     override val appliesSelfTint: Boolean get() = crewToDismiss != null
 
@@ -535,10 +543,20 @@ class ShipWindow(val game: InGameState, val ship: Ship, initialTab: Tab, private
         }
 
         if (game.playerHasTooManyCrew() && updatingButtons) {
+            // On touch the window group is pulled left to fit the info
+            // panel, so vanilla's left-of-window spot would be off-screen;
+            // tuck the box against the window's left edge instead (it
+            // overlaps one crew box's corner - the per-crew dismiss buttons
+            // remain the primary dismissal path).
+            val sellCrewPos = if (PlatformSpecific.INSTANCE.isTouchUi) {
+                ConstPoint(-60, 250)
+            } else {
+                ConstPoint(-275, 107)
+            }
             buttons += ShipEquipmentPanel.SellDropBox.create(
                 game,
                 ShipEquipmentPanel.SellDropBox.Type.TOO_MANY_CREW,
-                ConstPoint(-275, 107)
+                sellCrewPos
             ) { null }
         }
     }
@@ -679,9 +697,12 @@ class ShipWindow(val game: InGameState, val ship: Ship, initialTab: Tab, private
     }
 
     override fun mouseClick(button: Int, x: Int, y: Int) {
+        // super.mouseClick converts the point itself for buttons - only
+        // our own extra surfaces need the converted point.
         if (crewToDismiss != null) {
+            val p = scaleWindowPoint(x, y)
             for (btn in crewDismissWidgetButtons) {
-                btn.mouseDown(button, x, y)
+                btn.mouseDown(button, p.x, p.y)
             }
             return
         }
@@ -691,8 +712,10 @@ class ShipWindow(val game: InGameState, val ship: Ship, initialTab: Tab, private
 
         super.mouseClick(button, x, y)
 
-        if (tab == Tab.EQUIPMENT)
-            equipmentPanel.mouseClick(button, x, y)
+        if (tab == Tab.EQUIPMENT) {
+            val p = scaleWindowPoint(x, y)
+            equipmentPanel.mouseClick(button, p.x, p.y)
+        }
     }
 
     override fun mouseReleased(button: Int, x: Int, y: Int) {
@@ -702,23 +725,28 @@ class ShipWindow(val game: InGameState, val ship: Ship, initialTab: Tab, private
 
         super.mouseReleased(button, x, y)
 
-        if (tab == Tab.EQUIPMENT)
-            equipmentPanel.mouseReleased(button, x, y)
+        if (tab == Tab.EQUIPMENT) {
+            val p = scaleWindowPoint(x, y)
+            equipmentPanel.mouseReleased(button, p.x, p.y)
+        }
     }
 
     override fun updateUI(x: Int, y: Int) {
         // If the crew dismiss window is up, block all other interactions.
         if (crewToDismiss != null) {
+            val p = scaleWindowPoint(x, y)
             for (button in crewDismissWidgetButtons) {
-                button.update(x, y, false)
+                button.update(p.x, p.y, false)
             }
             return
         }
 
         super.updateUI(x, y)
 
-        if (tab == Tab.EQUIPMENT)
-            equipmentPanel.updateUI(x, y)
+        if (tab == Tab.EQUIPMENT) {
+            val p = scaleWindowPoint(x, y)
+            equipmentPanel.updateUI(p.x, p.y)
+        }
     }
 
     override fun escapePressed() {

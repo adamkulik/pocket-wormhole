@@ -17,6 +17,7 @@ import xyz.znix.xftl.sector.Event
 import xyz.znix.xftl.sector.EventStatus
 import xyz.znix.xftl.sector.EventSystemUpgrade
 import xyz.znix.xftl.sys.Input
+import xyz.znix.xftl.sys.PlatformSpecific
 import xyz.znix.xftl.weapons.AbstractWeaponBlueprint
 import xyz.znix.xftl.weapons.DroneBlueprint
 import kotlin.math.max
@@ -27,6 +28,10 @@ class DialogueWindow private constructor(val game: InGameState, val playerShip: 
     Window() {
 
     override val size: IPoint get() = ConstPoint(602, 377)
+
+    // Touch ergonomics: bigger option text/targets. Fits the canvas at
+    // 1.2x (722x452) without an offset, so no windowCentreOffset needed.
+    override val renderScale = if (PlatformSpecific.INSTANCE.isTouchUi) 1.2f else 1f
 
     private val resourceNumFont = game.getFont("JustinFont10")
     private val font = game.getFont("JustinFont11Bold")
@@ -708,9 +713,15 @@ class DialogueWindow private constructor(val game: InGameState, val playerShip: 
     override fun updateUI(x: Int, y: Int) {
         super.updateUI(x, y)
 
+        // The bounding boxes are in window coordinates; convert so they
+        // still match when the window is drawn scaled (identity when
+        // renderScale is 1). super.updateUI converts for the buttons
+        // itself - don't pass it the converted point.
+        val p = scaleWindowPoint(x, y)
+
         hoveredOption = null
         for ((i, bb) in optionBoundingBoxes.withIndex()) {
-            if (bb.contains(x.f, y.f)) {
+            if (bb.contains(p.x.f, p.y.f)) {
                 hoveredOption = i
             }
         }

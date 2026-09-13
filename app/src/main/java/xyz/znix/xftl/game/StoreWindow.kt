@@ -6,17 +6,29 @@ import xyz.znix.xftl.Ship
 import xyz.znix.xftl.f
 import xyz.znix.xftl.math.ConstPoint
 import xyz.znix.xftl.math.IPoint
+import xyz.znix.xftl.math.Point
 import xyz.znix.xftl.rendering.Graphics
 import xyz.znix.xftl.rendering.HotkeyDelayedTooltip
 import xyz.znix.xftl.sys.Input
+import xyz.znix.xftl.sys.PlatformSpecific
 
 class StoreWindow(val game: InGameState, val ship: Ship, val store: StoreData, private val close: () -> Unit) :
     Window() {
 
     override val size = ConstPoint(587, 423)
 
-    // Make the description box visible
-    override val windowCentreOffset = ConstPoint(-50, 0)
+    // Touch ergonomics: scale up 1.2x like the map windows. As with
+    // ShipWindow, window + right-hand info panel is ~1120px scaled, so
+    // pull the group left; also nudge up 50px because the close button
+    // hangs 81px below the declared window rect (vanilla y 472 vs size
+    // 423) and would otherwise be clipped off the bottom of the screen
+    // when scaled (same issue as JumpWindow's CANCEL button).
+    override val windowCentreOffset = ConstPoint(
+        if (PlatformSpecific.INSTANCE.isTouchUi) -266 else -50,
+        if (PlatformSpecific.INSTANCE.isTouchUi) -50 else 0
+    )
+
+    override val renderScale = if (PlatformSpecific.INSTANCE.isTouchUi) 1.2f else 1f
 
     private val buyImage = game.getImg("img/storeUI/store_buy_main.png")
     private val sellImage = game.getImg("img/storeUI/store_sell_main.png")
@@ -652,22 +664,31 @@ class StoreWindow(val game: InGameState, val ship: Ship, val store: StoreData, p
     override fun mouseClick(button: Int, x: Int, y: Int) {
         super.mouseClick(button, x, y)
 
-        if (sellTab)
-            sellPanel.mouseClick(button, x, y)
+        if (sellTab) {
+            // The sell panel's buttons/blocks are in window coordinates
+            // (identity when renderScale is 1); super converts for the
+            // window's own buttons itself.
+            val p = scaleWindowPoint(x, y)
+            sellPanel.mouseClick(button, p.x, p.y)
+        }
     }
 
     override fun mouseReleased(button: Int, x: Int, y: Int) {
         super.mouseReleased(button, x, y)
 
-        if (sellTab)
-            sellPanel.mouseReleased(button, x, y)
+        if (sellTab) {
+            val p = scaleWindowPoint(x, y)
+            sellPanel.mouseReleased(button, p.x, p.y)
+        }
     }
 
     override fun updateUI(x: Int, y: Int) {
         super.updateUI(x, y)
 
-        if (sellTab)
-            sellPanel.updateUI(x, y)
+        if (sellTab) {
+            val p = scaleWindowPoint(x, y)
+            sellPanel.updateUI(p.x, p.y)
+        }
     }
 
     override fun shipModified() {
