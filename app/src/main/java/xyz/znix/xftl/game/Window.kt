@@ -2,7 +2,9 @@ package xyz.znix.xftl.game
 
 import xyz.znix.xftl.math.ConstPoint
 import xyz.znix.xftl.math.IPoint
+import xyz.znix.xftl.math.Point
 import xyz.znix.xftl.rendering.Graphics
+import kotlin.math.roundToInt
 
 abstract class Window {
     var position: IPoint = ConstPoint.ZERO
@@ -22,6 +24,35 @@ abstract class Window {
     open val windowCentreOffset: IPoint get() = ConstPoint.ZERO
 
     /**
+     * Touch ergonomics: a scale factor the window is drawn at, anchored
+     * at the window's centre. renderSingleMenu places the SCALED window
+     * centrally, then scales the drawing about the unscaled window's
+     * centre - which maps it exactly onto that rectangle. Hit-testing
+     * overrides receiving mouse coordinates convert them with
+     * [scaleWindowPoint]; the base [mouseClick]/[updateUI] already do.
+     * 1 on vanilla layouts.
+     */
+    open val renderScale: Float get() = 1f
+
+    /**
+     * Convert a screen-space point into this window's unscaled
+     * coordinate space (still in absolute screen coordinates, like
+     * [position]) - the inverse of drawing at [renderScale] about the
+     * window's centre. Identity when [renderScale] is 1.
+     */
+    fun scaleWindowPoint(x: Int, y: Int): Point {
+        if (renderScale == 1f)
+            return Point(x, y)
+
+        val centreX = position.x + size.x / 2f
+        val centreY = position.y + size.y / 2f
+        return Point(
+            (centreX + (x - centreX) / renderScale).roundToInt(),
+            (centreY + (y - centreY) / renderScale).roundToInt()
+        )
+    }
+
+    /**
      * If true, the window applies the background grey-out tint itself.
      *
      * (this is what makes everything in-game darker when a window is open)
@@ -37,10 +68,12 @@ abstract class Window {
     abstract fun draw(g: Graphics)
 
     open fun mouseClick(button: Int, x: Int, y: Int) {
+        val p = scaleWindowPoint(x, y)
+
         // Mouse clicking may change the buttons array (eg in the store
         // window when switching tabs), so copy it.
         for (btn in ArrayList(buttons)) {
-            btn.mouseDown(button, x, y)
+            btn.mouseDown(button, p.x, p.y)
         }
     }
 
@@ -65,11 +98,13 @@ abstract class Window {
     }
 
     open fun updateUI(x: Int, y: Int) {
+        val p = scaleWindowPoint(x, y)
+
         // Start at the end of the array, so if buttons overlap we only
         // hover the one that's rendered last.
         var anyHovered = false
         for (i in buttons.size - 1 downTo 0) {
-            buttons[i].update(x, y, anyHovered)
+            buttons[i].update(p.x, p.y, anyHovered)
             if (buttons[i].hovered)
                 anyHovered = true
         }

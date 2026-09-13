@@ -8,12 +8,19 @@ import xyz.znix.xftl.math.Point
 import xyz.znix.xftl.rendering.Colour
 import xyz.znix.xftl.rendering.Graphics
 import xyz.znix.xftl.sector.GameMap
+import xyz.znix.xftl.sys.PlatformSpecific
 import org.newdawn.slick.geom.Rectangle
 
 class SectorMapWindow(private val game: InGameState, private val selectedCallback: (GameMap.SectorInfo?) -> Unit) :
     Window() {
 
     override val size = ConstPoint(567, 327)
+
+    // Touch ergonomics: scaled up and nudged up, like JumpWindow (the
+    // sector icons and name boxes are small tap targets otherwise).
+    override val renderScale = if (PlatformSpecific.INSTANCE.isTouchUi) 1.2f else 1f
+    override val windowCentreOffset: IPoint =
+        ConstPoint(0, if (PlatformSpecific.INSTANCE.isTouchUi) -15 else 0)
 
     private val titleFont = game.getFont("HL2", 3f)
     private val sectorColourFont = game.getFont("HL1", 2f)
@@ -274,6 +281,8 @@ class SectorMapWindow(private val game: InGameState, private val selectedCallbac
     override fun updateUI(x: Int, y: Int) {
         super.updateUI(x, y)
 
+        val p = scaleWindowPoint(x, y)
+
         val pos = Point(0, 0)
 
         val oldHovered = hoveredSector
@@ -294,9 +303,9 @@ class SectorMapWindow(private val game: InGameState, private val selectedCallbac
             val margin = 5
 
             // Check if we're hovering over this beacon?
-            if (x !in pos.x - margin..pos.x + SECTOR_RADIUS * 2 + margin)
+            if (p.x !in pos.x - margin..pos.x + SECTOR_RADIUS * 2 + margin)
                 continue
-            if (y !in pos.y - margin..pos.y + SECTOR_RADIUS * 2 + margin)
+            if (p.y !in pos.y - margin..pos.y + SECTOR_RADIUS * 2 + margin)
                 continue
 
             hoveredSector = sector
@@ -304,7 +313,7 @@ class SectorMapWindow(private val game: InGameState, private val selectedCallbac
 
         // Check if one of the name boxes is hovered
         for ((i, rect) in nextSectorNameBoxes.withIndex()) {
-            if (!rect.contains(x.f, y.f))
+            if (!rect.contains(p.x.f, p.y.f))
                 continue
 
             hoveredSector = nextSectors[i]

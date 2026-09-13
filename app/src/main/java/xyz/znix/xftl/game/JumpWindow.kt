@@ -12,6 +12,7 @@ import xyz.znix.xftl.rendering.Image
 import xyz.znix.xftl.sector.Beacon
 import xyz.znix.xftl.sector.Sector
 import xyz.znix.xftl.sys.Input
+import xyz.znix.xftl.sys.PlatformSpecific
 import kotlin.math.atan2
 import kotlin.math.max
 import kotlin.math.roundToInt
@@ -23,6 +24,13 @@ import kotlin.random.Random
 // for us atm.
 class JumpWindow(val game: InGameState, showSectorMap: () -> Unit, val jump: (Beacon?) -> Unit) : Window() {
     override val size = ConstPoint(752, 534)
+
+    // Touch ergonomics: the map windows are scaled up and nudged up a
+    // bit - the beacon diamonds are small tap targets, and the vanilla
+    // centred placement sits low over the systems strip.
+    override val renderScale = if (PlatformSpecific.INSTANCE.isTouchUi) 1.2f else 1f
+    override val windowCentreOffset: IPoint =
+        ConstPoint(0, if (PlatformSpecific.INSTANCE.isTouchUi) -15 else 0)
 
     private val sectorInfoTab = game.getImg("img/map/side_sector.png")
     private val titleTab = game.getImg("img/map/side_beaconmap.png")
@@ -570,6 +578,8 @@ class JumpWindow(val game: InGameState, showSectorMap: () -> Unit, val jump: (Be
     override fun updateUI(x: Int, y: Int) {
         super.updateUI(x, y)
 
+        val p = scaleWindowPoint(x, y)
+
         hovered = null
 
         // Can't hover over beacons while out of fuel
@@ -579,7 +589,7 @@ class JumpWindow(val game: InGameState, showSectorMap: () -> Unit, val jump: (Be
 
         val closest = sector.beacons.map {
             val bp = it.pos + mapBase
-            val dist = bp.distToSq(ConstPoint(x, y))
+            val dist = bp.distToSq(ConstPoint(p.x, p.y))
             Pair(it, dist)
         }.minByOrNull { it.second } ?: return
 

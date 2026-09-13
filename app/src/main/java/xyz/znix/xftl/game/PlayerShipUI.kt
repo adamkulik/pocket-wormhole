@@ -1468,13 +1468,31 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
         // Don't let tooltips show up through the tint
         g.tooltip = null
 
-        // Centre the window.
+        // Centre the window. Touch-scaled windows (Window.renderScale)
+        // are placed so the SCALED window is centred; the draw below
+        // scales about the unscaled window's centre, which maps it
+        // exactly onto that rectangle.
+        val scale = window.renderScale
+        val halfGrowX = (window.size.x * (scale - 1) / 2).roundToInt()
+        val halfGrowY = (window.size.y * (scale - 1) / 2).roundToInt()
         window.position = window.windowCentreOffset + ConstPoint(
-            (container.width - window.size.x) / 2,
-            (container.height - window.size.y) / 2
+            (container.width - window.size.x) / 2 + halfGrowX,
+            (container.height - window.size.y) / 2 + halfGrowY
         )
 
+        if (scale == 1f) {
+            window.draw(g)
+            return
+        }
+
+        val centreX = window.position.x + window.size.x / 2f
+        val centreY = window.position.y + window.size.y / 2f
+        g.pushTransform()
+        g.translate(centreX, centreY)
+        g.scale(scale, scale)
+        g.translate(-centreX, -centreY)
         window.draw(g)
+        g.popTransform()
     }
 
     fun drawWindowBackgroundTint(g: Graphics) {
