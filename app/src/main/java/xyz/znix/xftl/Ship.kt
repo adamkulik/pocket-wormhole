@@ -1131,11 +1131,19 @@ class Ship(
         // The reason this function is in Ship and not Shields is to support
         // ships with a super shield, but no shield system.
         if (superShield != 0) {
+            // Reverse Ion Field also protects the super-shield (wiki): on a
+            // proc only the ion component of the hit is negated.
+            val ionNegated = damage.ionDamage > 0 && ionArmourNegates()
+            val ionArmourIon = if (ionNegated) 0 else max(damage.ionDamage, 0)
+
             // Clamp damages to at least zero, to avoid negative values
             // repairing the super shield.
-            val damageValue = max(damage.ionDamage, 0) * 2 + max(damage.hullDamage, 0)
+            val damageValue = ionArmourIon * 2 + max(damage.hullDamage, 0)
             superShield -= damageValue
 
+            if (damagePos != null && ionNegated) {
+                showDamageTextAt(damagePos, "text_resist", DAMAGE_COLOUR_ION)
+            }
             if (damagePos != null && damageValue > 0) {
                 showDamageTextAt(damagePos, damageValue, DAMAGE_COLOUR_ZOLTAN)
             }
@@ -1193,10 +1201,24 @@ class Ship(
         val casingNegates = target.system != null && damage.effectiveSysDamage > 0 &&
                 systemCasingChance > 0f && Random.rollChance((systemCasingChance * 100).toInt())
 
+        // Reverse Ion Field (ION_ARMOR): a chance to negate the incoming
+        // ion damage entirely. Hull, system and crew damage are all
+        // unaffected. This covers weapon ion on any room (including ion
+        // against the shield system itself) and ion bombs; the pulsar rolls
+        // per-pulse via the same [ionArmourNegates] helper. On a proc
+        // vanilla shows the same 'RESIST' popup as Rock Plating, tinted
+        // with the ion damage-number blue; any hull/system components of
+        // the hit still show their own numbers.
+        val ionNegated = damage.ionDamage > 0 && ionArmourNegates()
+        val appliedIonDamage = if (ionNegated) 0 else damage.ionDamage
+
+        if (ionNegated)
+            target.showDamageText("text_resist", DAMAGE_COLOUR_ION, textPos)
+
         if (rockNegates)
             target.showDamageText("text_resist", Colour.white, textPos)
         else
-            showDamageText(target, hullDamage, if (casingNegates) 0 else damage.effectiveSysDamage, damage.ionDamage, textPos)
+            showDamageText(target, hullDamage, if (casingNegates) 0 else damage.effectiveSysDamage, appliedIonDamage, textPos)
         crewWeaponDamage(target, damage.effectiveCrewDamage.f, damage)
 
         if (sys.debugFlags.noDmg.set)
@@ -1204,7 +1226,7 @@ class Ship(
 
         if (!rockNegates)
             health -= hullDamage
-        target.system?.dealDamage(if (casingNegates) 0 else damage.effectiveSysDamage, damage.ionDamage)
+        target.system?.dealDamage(if (casingNegates) 0 else damage.effectiveSysDamage, appliedIonDamage)
 
         // Fire and breach are mutually exclusive, if a fire spawns then a breach cannot.
         if (Random.rollChance(damage.fireChance)) {
@@ -1660,6 +1682,17 @@ class Ship(
      */
     fun getAugmentValue(name: String): Float {
         return getAugmentValueOrNull(name) ?: 0f
+    }
+
+    /**
+     * Reverse Ion Field (ION_ARMOR): roll against this ship's ion armour.
+     * Returns true if an incoming amount of ion damage is negated entirely.
+     * One arm gives a 50% chance, two or more are a total immunity - the
+     * same roll the pulsar has always applied (value x count > random).
+     */
+    fun ionArmourNegates(): Boolean {
+        val armour = getAugmentValue(AugmentBlueprint.ION_ARMOR)
+        return armour > Random.nextFloat()
     }
 
     /**

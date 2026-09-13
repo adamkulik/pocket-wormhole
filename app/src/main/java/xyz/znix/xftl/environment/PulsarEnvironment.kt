@@ -4,7 +4,6 @@ import org.jdom2.Element
 import xyz.znix.xftl.AbstractSystem
 import xyz.znix.xftl.Constants
 import xyz.znix.xftl.Ship
-import xyz.znix.xftl.augments.AugmentBlueprint
 import xyz.znix.xftl.game.InGameState
 import xyz.znix.xftl.random
 import xyz.znix.xftl.rendering.Colour
@@ -169,10 +168,7 @@ class PulsarEnvironment(game: InGameState, beacon: Beacon) : AbstractEnvironment
     }
 
     private fun dealIonDamage(ship: Ship) {
-        val ionArmour = game.blueprintManager["ION_ARMOR"] as AugmentBlueprint
-        val count = ship.augments.count { it == ionArmour }
-        val armourAmount = ionArmour.value * count
-        val resistDamage = armourAmount > Random.nextFloat()
+        val resistDamage = ship.ionArmourNegates()
 
         // Super-shields block all incoming damage
         if (ship.superShield > 0 && !resistDamage) {
@@ -200,7 +196,9 @@ class PulsarEnvironment(game: InGameState, beacon: Beacon) : AbstractEnvironment
         val damage = 1 + (currentPower / 2f).toInt()
 
         if (resist) {
-            system.room!!.showDamageText("text_resist", Colour.white)
+            // Vanilla tints the ion-resist popup with the ion damage-number
+            // blue (user-observed in 1.6.14), not white.
+            system.room!!.showDamageText("text_resist", Constants.DAMAGE_COLOUR_ION)
         } else {
             system.dealDamage(0, damage)
             system.room!!.showDamageText(damage, Constants.DAMAGE_COLOUR_ION)

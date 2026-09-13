@@ -781,6 +781,17 @@ class DebugCommands(console: DebugConsole) : ConsoleCommandProvider(console) {
         addLine("Breached room ${ship.rooms.indexOf(room)} (${room.system?.codename ?: "no system"})")
     }
 
+    @ConsoleCommand(name = "ion")
+    @CmdHelp("Apply ion damage to a random system of the player ship, like a weapon hit")
+    private fun cmdIon(@ParName("amount") amount: Int) {
+        val room = ship.rooms.filter { it.system != null }.random()
+        val damage = Damage()
+        damage.ionDamage = amount
+        ship.damage(room, damage)
+
+        addLine("Applied $amount ion damage to ${room.system!!.codename}")
+    }
+
     @ConsoleCommand(name = "hurt")
     @CmdHelp("Damage all of the player's crewmembers by a given amount (negative heals)")
     private fun cmdHurt(@ParName("amount") amount: Int) {

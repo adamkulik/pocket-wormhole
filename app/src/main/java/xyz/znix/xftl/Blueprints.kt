@@ -176,6 +176,7 @@ class BlueprintManager {
             AugmentBlueprint.CRYSTAL_SHARDS -> AugmentBlueprint(elem)
             AugmentBlueprint.DRONE_SPEED -> AugmentBlueprint(elem)
             AugmentBlueprint.SCRAP_COLLECTOR -> AugmentBlueprint(elem)
+            AugmentBlueprint.ION_ARMOR -> AugmentBlueprint(elem)
 
             else -> {
                 println("WARNING: Adding unknown augment '$name'")
