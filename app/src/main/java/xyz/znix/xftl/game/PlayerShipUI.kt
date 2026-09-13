@@ -458,10 +458,14 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
 
         // On touch layouts the top-bar buttons (JUMP / ship / store /
         // menu) are shifted right and scaled up, anchored at each
-        // button's position, so they're easier to tap. The row still has
-        // to end left of the enemy ship box (its art edge is at x~911 on
-        // touch), so the scale is reduced from 1.25 until the whole row
-        // - including the store button, when this beacon has one - fits.
+        // button's position, so they're easier to tap. While an enemy
+        // ship is displayed the row has to end left of the enemy box
+        // (its art edge is at x~911 on touch), so the scale is reduced
+        // from 1.25 until the whole row fits. Vanilla stores never
+        // coexist with an enemy (the store events spawn no ships, quests
+        // skip store beacons, and the fleet overtaking a beacon strips
+        // its store), so store rows get the full scale - only a modded
+        // store-with-fight compresses.
         var startX = 531
         var buttonScale = 1f
         if (PlatformSpecific.INSTANCE.isTouchUi) {
@@ -469,9 +473,10 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
             val hasStore = game.currentBeacon?.hasStore == true
             val widths = if (hasStore) 74 + 60 + 88 + 41 else 74 + 60 + 41
             val gaps = if (hasStore) 27 + 17 + 17 else 27 + 17
+            val rightBound = if (game.enemy != null) 905 else Int.MAX_VALUE
             buttonScale = min(
                 1.25f,
-                (905 - startX - gaps).toFloat() / widths
+                (rightBound - startX - gaps).toFloat() / widths
             ).coerceAtLeast(1f)
         }
 
