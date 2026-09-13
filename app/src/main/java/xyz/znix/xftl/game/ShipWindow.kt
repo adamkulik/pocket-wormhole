@@ -25,8 +25,13 @@ class ShipWindow(val game: InGameState, val ship: Ship, initialTab: Tab, private
     // plus its right-hand info panel is ~933*1.2 = 1120px wide, so the
     // whole group is pulled left to stay centred on screen (vanilla
     // nudges it just -10 to make room for the power-display column).
+    // The -40 vertical nudge clears the ACCEPT/UNDO buttons: they're
+    // drawn at local y 464 == the declared window height (their click
+    // regions reach y 503), so scaled they hang ~73px below the rect
+    // and were ~1/3 clipped off the screen bottom.
     override val windowCentreOffset = ConstPoint(
-        if (PlatformSpecific.INSTANCE.isTouchUi) -266 else -10, 0
+        if (PlatformSpecific.INSTANCE.isTouchUi) -266 else -10,
+        if (PlatformSpecific.INSTANCE.isTouchUi) -40 else 0
     )
 
     override val renderScale = if (PlatformSpecific.INSTANCE.isTouchUi) 1.2f else 1f

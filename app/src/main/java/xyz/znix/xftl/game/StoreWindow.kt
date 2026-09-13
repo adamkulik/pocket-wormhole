@@ -19,13 +19,14 @@ class StoreWindow(val game: InGameState, val ship: Ship, val store: StoreData, p
 
     // Touch ergonomics: scale up 1.2x like the map windows. As with
     // ShipWindow, window + right-hand info panel is ~1120px scaled, so
-    // pull the group left; also nudge up 50px because the close button
-    // hangs 81px below the declared window rect (vanilla y 472 vs size
-    // 423) and would otherwise be clipped off the bottom of the screen
-    // when scaled (same issue as JumpWindow's CANCEL button).
+    // pull the group left. Vertical: -50 because the close button
+    // hangs below the declared rect (vanilla y 472 vs height 423),
+    // raised to -70 after on-device feedback so it keeps a comfortable
+    // margin from the screen bottom when scaled (same issue as
+    // JumpWindow's CANCEL button).
     override val windowCentreOffset = ConstPoint(
         if (PlatformSpecific.INSTANCE.isTouchUi) -266 else -50,
-        if (PlatformSpecific.INSTANCE.isTouchUi) -50 else 0
+        if (PlatformSpecific.INSTANCE.isTouchUi) -70 else 0
     )
 
     override val renderScale = if (PlatformSpecific.INSTANCE.isTouchUi) 1.2f else 1f
