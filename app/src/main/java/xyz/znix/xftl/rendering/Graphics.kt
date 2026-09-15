@@ -165,7 +165,7 @@ class Graphics {
         drawTriangle(360, 225, 270)
         drawTriangle(360, 270, 360)
 
-        imageRenderer.imageFiltering = Image.DEFAULT_TEXTURE_FILTERING
+        imageRenderer.imageFiltering = currentImageFiltering()
         imageRenderer.flush(image)
     }
 
@@ -402,6 +402,7 @@ class Graphics {
         filter: Colour,
         alpha: Float
     ) {
+        imageRenderer.imageFiltering = currentImageFiltering()
         imageRenderer.pushImage(
             x, y, x2, y2,
             srcX1, srcY1, srcX2, srcY2,
@@ -415,6 +416,26 @@ class Graphics {
 
         fun getTextureTransformMatrix(): Matrix3f {
             return CURRENT!!.transform
+        }
+
+        /**
+         * Choose the texture filtering mode for an image draw, based on the
+         * current transform: draws at 1:1 (including rotated drones, whose
+         * transform columns stay unit-length) keep vanilla's nearest-neighbour
+         * filtering, while scaled draws use linear filtering so fractional
+         * scales - like the touch UI's resized windows - come out smooth
+         * instead of jagged/uneven. At exact integer scales linear and
+         * nearest sample the same texels, so enlarged pixel art (eg the 2x
+         * selected crew) is unaffected either way.
+         */
+        fun currentImageFiltering(): Int {
+            val m = CURRENT!!.transform
+            val sx = sqrt(m.m00 * m.m00 + m.m10 * m.m10)
+            val sy = sqrt(m.m01 * m.m01 + m.m11 * m.m11)
+            return if (abs(sx - 1f) > 0.001f || abs(sy - 1f) > 0.001f)
+                GL11.GL_LINEAR
+            else
+                Image.DEFAULT_TEXTURE_FILTERING
         }
 
         /**

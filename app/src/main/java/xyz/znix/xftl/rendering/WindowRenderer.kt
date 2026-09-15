@@ -117,6 +117,7 @@ class WindowRenderer(
             }
             tileX += TILE_X
         }
+        baseImage.imageFiltering = Graphics.currentImageFiltering()
         baseImage.flush(backgroundImage)
     }
 

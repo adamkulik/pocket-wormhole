@@ -4,6 +4,7 @@ import org.lwjgl.opengl.GL11
 import org.newdawn.slick.opengl.ImageData
 import xyz.znix.xftl.rendering.BulkImageRenderer
 import xyz.znix.xftl.rendering.Colour
+import xyz.znix.xftl.rendering.Graphics
 import xyz.znix.xftl.rendering.Image
 import xyz.znix.xftl.rendering.TextureLoader
 import xyz.znix.xftl.sys.ResourceContext
@@ -187,6 +188,7 @@ class SILFontLoader {
                 return
         }
 
+        renderer.imageFiltering = Graphics.currentImageFiltering()
         renderer.flush(picture)
     }
 
@@ -233,7 +235,9 @@ class SILFontLoader {
             next += ((info.w + info.postkern) * scale).roundToInt()
         }
 
+        bgFont.renderer.imageFiltering = Graphics.currentImageFiltering()
         bgFont.renderer.flush(bgFont.picture)
+        renderer.imageFiltering = Graphics.currentImageFiltering()
         renderer.flush(picture)
     }
 
