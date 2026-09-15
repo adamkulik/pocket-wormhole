@@ -178,6 +178,7 @@ class BlueprintManager {
             AugmentBlueprint.SCRAP_COLLECTOR -> AugmentBlueprint(elem)
             AugmentBlueprint.ION_ARMOR -> AugmentBlueprint(elem)
             AugmentBlueprint.FTL_BOOSTER -> AugmentBlueprint(elem)
+            AugmentBlueprint.REPAIR_ARM -> AugmentBlueprint(elem)
 
             else -> {
                 println("WARNING: Adding unknown augment '$name'")

@@ -1763,25 +1763,51 @@ public class InGameState extends MainGame.GameState {
     }
 
     /**
-     * Scrap Recovery Arm (SCRAP_COLLECTOR): +10% scrap per arm, from any
-     * source. Arms stack additively (dat: stackable, value 0.1) and the
-     * result rounds down against the player (vanilla: 19 scrap -> +1, two
-     * arms on 15 scrap -> +3). Vanilla does NOT boost store sales - those
-     * never route through here, and resource purchases never carry scrap.
+     * Scrap Recovery Arm (SCRAP_COLLECTOR) + Repair Arm (REPAIR_ARM) scrap
+     * modifiers, from any source that isn't a store.
+     *
+     * Vanilla-measured (2026-09-15, save-editor experiment, augments-plan
+     * §3.5): the augments COMPOUND as float multipliers and the result
+     * truncates once - 13 base scrap paid 12, 23 base paid 21, both =
+     * int(B * 0.85 * 1.1); the sequential-step models (Repair→Collect,
+     * Collect→Repair, alt roundings) were all ruled out by measurement.
+     *
+     * Collector: +10% per arm, arms stack additively (dat: stackable,
+     * value 0.1); vanilla does NOT boost store sales - those never route
+     * through here, and resource purchases never carry scrap.
+     *
+     * Repair Arm: -15% scrap (value 0.15) - but NOT when the hull is at
+     * maximum (wiki, confirmed as a rule by the store-sale exemption).
+     * The max-hull check happens at collection time, before the +2 repair.
      */
-    private int applyScrapCollector(int scrap) {
+    private int applyScrapModifiers(int scrap) {
         if (scrap <= 0)
             return scrap;
 
-        float augment = player.getAugmentValue(AugmentBlueprint.SCRAP_COLLECTOR);
-        return scrap + (int) (scrap * augment);
+        float mult = 1f;
+
+        if (player.getAugmentValue(AugmentBlueprint.REPAIR_ARM) > 0f &&
+            player.getHealth() < player.getMaxHealth()) {
+            mult *= 0.85f;
+        }
+
+        mult *= 1f + player.getAugmentValue(AugmentBlueprint.SCRAP_COLLECTOR);
+
+        return (int) (scrap * mult);
     }
 
     public void givePlayerResources(@NotNull ResourceSet resources) {
         player.setFuelCount(player.getFuelCount() + resources.getFuel());
         player.setDronesCount(player.getDronesCount() + resources.getDroneParts());
         player.setMissilesCount(player.getMissilesCount() + resources.getMissiles());
-        player.setScrap(player.getScrap() + applyScrapCollector(resources.getScrap()));
+
+        int scrapGain = resources.getScrap();
+        player.setScrap(player.getScrap() + applyScrapModifiers(scrapGain));
+
+        // Repair Arm: repairs 2 hull every time scrap is collected (wiki).
+        if (scrapGain > 0 && player.getAugmentValue(AugmentBlueprint.REPAIR_ARM) > 0f) {
+            player.setHealth(player.getHealth() + 2);
+        }
 
         for (Blueprint item : resources.getItems()) {
             player.addBlueprint(item, true);
