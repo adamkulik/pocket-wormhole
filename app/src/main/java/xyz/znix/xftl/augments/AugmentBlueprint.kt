@@ -47,6 +47,7 @@ open class AugmentBlueprint(elem: Element) : Blueprint(elem) {
         const val DRONE_SPEED: String = "DRONE_SPEED"
         const val SCRAP_COLLECTOR: String = "SCRAP_COLLECTOR"
         const val ION_ARMOR: String = "ION_ARMOR"
+        const val FTL_BOOSTER: String = "FTL_BOOSTER"
     }
 }
 

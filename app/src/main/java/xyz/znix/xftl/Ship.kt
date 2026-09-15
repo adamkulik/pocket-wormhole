@@ -924,6 +924,13 @@ class Ship(
                 rate *= 3
             }
 
+            // FTL Booster (FTL_BOOSTER): the drive charges 25% faster per
+            // install (value=0.25, stackable=true - getAugmentValue sums).
+            // It scales the whole rate, including the no-enemy boost. This
+            // is player-side only - enemy escapes run on ShipAI's own
+            // separate timer, and nothing in vanilla equips this augment.
+            rate *= 1 + getAugmentValue(AugmentBlueprint.FTL_BOOSTER)
+
             ftlChargeProgress += rate * dt / 68f
         }
         if (ftlChargeProgress > 1f) {
