@@ -29,9 +29,15 @@ class DialogueWindow private constructor(val game: InGameState, val playerShip: 
 
     override val size: IPoint get() = ConstPoint(602, 377)
 
-    // Touch ergonomics: bigger option text/targets. Fits the canvas at
-    // 1.2x (722x452) without an offset, so no windowCentreOffset needed.
-    override val renderScale = if (PlatformSpecific.INSTANCE.isTouchUi) 1.2f else 1f
+    // Touch ergonomics: bigger option text/targets. 1.3x (783x490) fits
+    // the canvas; nudged left+up so it sits a little clearer of the touch
+    // HUD (top-bar buttons to the right, scaled systems strip below).
+    // Both values are by-eye tuning points.
+    override val renderScale = if (PlatformSpecific.INSTANCE.isTouchUi) 1.3f else 1f
+    override val windowCentreOffset = ConstPoint(
+        if (PlatformSpecific.INSTANCE.isTouchUi) -40 else 0,
+        if (PlatformSpecific.INSTANCE.isTouchUi) -60 else 0
+    )
 
     private val resourceNumFont = game.getFont("JustinFont10")
     private val font = game.getFont("JustinFont11Bold")
