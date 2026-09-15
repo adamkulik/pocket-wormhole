@@ -199,15 +199,24 @@ public class InGameState extends MainGame.GameState {
         }
         player.update(0f);
 
-        // Start the music up again.
-        // We need a special exception here for the continuous-save-load mode,
-        // as otherwise it'll be restarting the music every frame. As the music
-        // isn't saved, this would use a lot of CPU for no benefit.
-        // To do this, just check if it's already playing something. Since
-        // the sound manager is part of the game content, it's not cleared
-        // across a reload.
-        if (getSounds() instanceof RealSoundManager real && real.getCurrentMusic() == null) {
-            loadSectorMusic(currentBeacon.getSector().getType());
+        // Start the music up again - unless this sector's music is already
+        // playing, in which case let it carry on.
+        //
+        // The continuous-save-load mode reloads the game every frame, and
+        // restarting the music each time would use a lot of CPU for no
+        // benefit. The sound manager is part of the game content, so it's
+        // not cleared across a reload and the sector's music keeps playing.
+        //
+        // Only carrying on when it's THIS sector's tracks (rather than any
+        // music at all) matters since the main menu exists (issue #28):
+        // continuing a run from it leaves the title theme playing, which
+        // then never got replaced as the tracklist still only had the
+        // title track in it.
+        if (getSounds() instanceof RealSoundManager real) {
+            List<MusicSpec> sectorTracks = getSectorTracks(currentBeacon.getSector().getType());
+            if (!sectorTracks.contains(real.getCurrentMusic())) {
+                getSounds().switchMusicList(sectorTracks);
+            }
         }
 
         updatePlayerCrew();
@@ -1049,10 +1058,16 @@ public class InGameState extends MainGame.GameState {
      * shouldn't be called unless there's a new sector.
      */
     private void loadSectorMusic(SectorType type) {
-        List<MusicSpec> tracks = type.getSoundtracks().stream()
+        getSounds().switchMusicList(getSectorTracks(type));
+    }
+
+    /**
+     * Resolve a sector's soundtrack names into their MusicSpecs.
+     */
+    private List<MusicSpec> getSectorTracks(SectorType type) {
+        return type.getSoundtracks().stream()
                 .map(name -> getSounds().getTrack(name))
                 .collect(java.util.stream.Collectors.toList());
-        getSounds().switchMusicList(tracks);
     }
 
     public void loadEventShip(Event event) {
