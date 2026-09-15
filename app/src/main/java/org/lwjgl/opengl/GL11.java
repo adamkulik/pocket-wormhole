@@ -43,6 +43,9 @@ public class GL11 {
     public static final int GL_TEXTURE_MIN_FILTER = 0x2801;
     public static final int GL_NEAREST = 0x2600;
     public static final int GL_LINEAR = 0x2601;
+    public static final int GL_TEXTURE_WRAP_S = 0x2802;
+    public static final int GL_TEXTURE_WRAP_T = 0x2803;
+    public static final int GL_CLAMP_TO_EDGE = 0x812F;
     public static final int GL_MAX_TEXTURE_SIZE = 0x0D33;
     public static final int GL_ARRAY_BUFFER = 0x8892;
     public static final int GL_ELEMENT_ARRAY_BUFFER = 0x8893;
