@@ -61,6 +61,13 @@ object TextureLoader {
         val textureBuffer = imageData.imageBufferData
         val buf = textureBuffer.duplicate()
 
+        // The android image loader flips its buffer after writing only the
+        // visible rows, so the view's limit can be smaller than the padded
+        // capacity; raise the limit on our duplicate so the passes below
+        // can reach the padding (the GLES upload reads the full capacity
+        // either way). No-op on desktop, where limit == capacity.
+        buf.limit(buf.capacity())
+
         // Premultiply the RGB channels by alpha. Linear filtering averages a
         // pixel's neighbours, and fully-transparent pixels have meaningless
         // RGB values (the PNGs keep their colour there - some black, some
