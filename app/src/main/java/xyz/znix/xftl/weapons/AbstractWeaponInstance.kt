@@ -40,6 +40,13 @@ abstract class AbstractWeaponInstance(val type: AbstractWeaponBlueprint, val shi
     var isPowered: Boolean = false
         private set
 
+    /**
+     * Per-weapon autofire override: null follows the ship's global autofire
+     * setting, true/false forces it on/off for this weapon. Toggled with
+     * ctrl + aim (or ctrl + weapon hotkey), like vanilla.
+     */
+    var autofireOverride: Boolean? = null
+
     abstract val isFiring: Boolean
 
     // Turn missile weapons off once their ship runs out of missiles

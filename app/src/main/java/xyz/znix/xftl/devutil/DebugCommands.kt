@@ -792,6 +792,33 @@ class DebugCommands(console: DebugConsole) : ConsoleCommandProvider(console) {
         addLine("Applied $amount ion damage to ${room.system!!.codename}")
     }
 
+    @ConsoleCommand(name = "autofire")
+    @CmdHelp("Toggle autofire globally, or for one weapon slot (1-4)")
+    private fun cmdAutofire(@CmdVarArg args: List<String>) {
+        val weapons = ship.weapons ?: return addLine("This ship has no weapons system")
+
+        if (args.size > 1) {
+            addLine("Usage: autofire [slot 1-4]")
+            return
+        }
+
+        val slot = args.getOrNull(0)?.toIntOrNull()
+        when {
+            slot == null -> weapons.toggleAutofire()
+            slot in 1..4 && ship.hardpoints.getOrNull(slot - 1)?.weapon != null ->
+                weapons.toggleAutofireSlot(slot - 1)
+            else -> {
+                addLine("Weapon slot $slot is empty")
+                return
+            }
+        }
+
+        val states = ship.hardpoints.mapIndexed { i, hp ->
+            "${i + 1}: ${if (weapons.isAutofire(i)) "ON" else "off"}"
+        }
+        addLine("Global autofire ${if (weapons.autofire) "ON" else "off"}; weapons: ${states.joinToString(", ")}")
+    }
+
     @ConsoleCommand(name = "hurt")
     @CmdHelp("Damage all of the player's crewmembers by a given amount (negative heals)")
     private fun cmdHurt(@ParName("amount") amount: Int) {

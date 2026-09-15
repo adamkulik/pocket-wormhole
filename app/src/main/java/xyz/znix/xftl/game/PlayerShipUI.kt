@@ -45,6 +45,8 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
     private val powerUpSound = game.sounds.getSample("powerUpSystem")
     private val powerUpFailSound = game.sounds.getSample("powerUpFail")
     private val powerDownSound = game.sounds.getSample("powerDownSystem")
+    private val autofireOnSound = game.sounds.getSample("autofireOn")
+    private val autofireOffSound = game.sounds.getSample("autofireOff")
 
     private val cursorNormal = game.getCursor("img/mouse/pointerInvalid.png")
     private val cursorHover = game.getCursor("img/mouse/pointerValid.png")
@@ -432,6 +434,14 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
     private var crewBaseY: Int = 0 // Set while rendering
     private var lastCrewCount: Int = 0
 
+    // Set when the player has selected the AUTOFIRE button: the next
+    // weapon taps toggle that weapon's autofire (touch-friendly flow).
+    // While set the game auto-pauses (via [InGameState.isPaused]) and
+    // resumes when the mode is disarmed.
+    private var autofireArmMode = false
+
+    val isAutofireArmed: Boolean get() = autofireArmMode
+
     // These time the message that shows up for a second when you save/restore
     // your crew positions.
     private var saveCrewPosMessageTimer: Float = 0f
@@ -791,7 +801,7 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
         }
     }
 
-    fun weaponHotkeyPressed(id: Int, shiftPressed: Boolean) {
+    fun weaponHotkeyPressed(id: Int, shiftPressed: Boolean, ctrlPressed: Boolean = false) {
         if (pauseWindow != null) return
 
         // Temporary hack to make the option hotkeys work
@@ -808,6 +818,19 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
         // Block interactions with hacked weapons
         if (weapons.isHackActive)
             return
+
+        // Ctrl + weapon (desktop), or an armed AUTOFIRE button, reverses
+        // that weapon's autofire setting - without arming it or changing
+        // its power. An armed mode auto-disarms after the selection, which
+        // also ends the auto-pause.
+        if (ctrlPressed || autofireArmMode) {
+            val armModeWas = autofireArmMode
+            weapons.toggleAutofireSlot(id)
+            if (weapons.isAutofire(id)) autofireOnSound.play() else autofireOffSound.play()
+            if (armModeWas)
+                autofireArmMode = false
+            return
+        }
 
         // If the user was previously targeting a beam, cancel that.
         beamTargeting = null
@@ -856,6 +879,21 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
             }
         }
         game.clickEvent = selectWeaponClickEvent
+    }
+
+    /**
+     * The autofire button: arms the autofire assignment mode - the next
+     * weapon taps toggle that weapon's autofire. Tap the button again (or
+     * anything that isn't a weapon) to finish.
+     */
+    fun toggleAutofireArm() {
+        autofireArmMode = !autofireArmMode
+        if (autofireArmMode) autofireOnSound.play() else autofireOffSound.play()
+    }
+
+    private fun isCtrlDown(): Boolean {
+        val input = game.input ?: return false
+        return input.isKeyDown(Input.KEY_LCTRL) || input.isKeyDown(Input.KEY_RCTRL)
     }
 
     fun systemPowerHotkeyPressed(type: Class<*>, powerUp: Boolean) {
@@ -1143,6 +1181,17 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
             val weaponBoxX = weaponPowerX!! + 1
             drawWeaponBox(weaponBoxX, "weapons_label", ship.weaponSlots!!)
 
+            // The autofire toggle - vanilla anchors it just right of the
+            // weapons box's right edge (screenshot-measured: 5px right of
+            // the box, 7px above its top). On touch the whole systems strip
+            // is scaled, so track the scaled box via barToScreen and scale
+            // the button to match.
+            if (updatingButtons) {
+                val autofire = AutofireButton(autofireButtonPos(weaponBoxX))
+                autofire.renderScale = systemsBarScale
+                buttons += autofire
+            }
+
             for (i in 0 until ship.weaponSlots!!) {
                 if (!updatingButtons)
                     continue
@@ -1172,13 +1221,26 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
 
                     override fun click(button: Int) {
                         when (button) {
-                            Input.MOUSE_LEFT_BUTTON -> weaponHotkeyPressed(i, false)
+                            Input.MOUSE_LEFT_BUTTON -> weaponHotkeyPressed(i, false, isCtrlDown())
                             Input.MOUSE_RIGHT_BUTTON -> weaponHotkeyPressed(i, true)
                         }
                     }
 
                     override fun draw(g: Graphics) {
                         super.draw(g)
+
+                        // Mark weapons with autofire active (per-weapon
+                        // override or the global setting) with a small
+                        // 'AUTO' tag above the slot's top-right corner.
+                        // drawString's y is the glyph bottom, so -1 puts
+                        // the 7px glyphs into the gap between the slot's
+                        // top border and the frame's (stretched) top edge
+                        // without touching either.
+                        if (weapon != null && weapons.isAutofire(i)) {
+                            weaponNumberFont.drawString(
+                                pos.x + size.x - 26f, (pos.y - 1).f, "AUTO", WEAPONS_ITEM_CHARGED
+                            )
+                        }
 
                         if (weapon != null && weapon.type.chargeLevels != null) {
                             drawChargedShots()
@@ -1444,19 +1506,26 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
         // banner style as the room-selection one, using the iPad port's
         // own art from ftl.dat (img/autopause.png + img/pause_target.png,
         // swapping to img/pause_target_beam.png while a beam is drawn).
-        if (weaponTargetingMode) {
+        // The autofire arm mode pauses the game too (isPaused), so show
+        // the auto-pause banner there as well - there's no iPad art for
+        // "select a weapon", so it gets the single banner.
+        if (weaponTargetingMode || autofireArmMode) {
             val autoPause = game.getImg("img/autopause.png")
-            val target = game.getImg(
-                if (beamTargeting != null) "img/pause_target_beam.png"
-                else "img/pause_target.png"
-            )
             val centreX = container.width / 2
 
-            val targetY = container.height - 16 - target.height
-            val autoPauseY = targetY - 20 - autoPause.height
+            if (weaponTargetingMode) {
+                val target = game.getImg(
+                    if (beamTargeting != null) "img/pause_target_beam.png"
+                    else "img/pause_target.png"
+                )
+                val targetY = container.height - 16 - target.height
+                val autoPauseY = targetY - 20 - autoPause.height
 
-            autoPause.draw(centreX - autoPause.width / 2, autoPauseY)
-            target.draw(centreX - target.width / 2, targetY)
+                autoPause.draw(centreX - autoPause.width / 2, autoPauseY)
+                target.draw(centreX - target.width / 2, targetY)
+            } else {
+                autoPause.draw(centreX - autoPause.width / 2, container.height - 16 - autoPause.height)
+            }
         }
     }
 
@@ -1974,7 +2043,17 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
 
     // Draw the box containing the weapon or drone selection buttons
     private fun drawWeaponBox(x: Int, label: String, size: Int) {
-        game.getImg("img/box_weapons_bottom$size.png").draw(x.f, weaponBoxY.f)
+        val frameImg = game.getImg("img/box_weapons_bottom$size.png")
+
+        // The per-weapon AUTO tags draw with their glyph bottom at the
+        // slot's second row, so they poke above the slots' top border into
+        // the gap under the frame's top edge - which is only ~7px tall and
+        // can't fit them (their top rows land on the frame's top edge
+        // band). Stretch the frame art upwards, anchored at the bottom:
+        // the bottom edge, label and slots keep their vanilla positions
+        // and only the top border moves up, making that gap roomy.
+        val extraTop = 8
+        frameImg.draw(x.f, (weaponBoxY - extraTop).f, frameImg.width.f, (frameImg.height + extraTop).f)
 
         val textX = x + 18
         val textY = weaponBoxY + 61
@@ -2000,6 +2079,11 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
         updateWeaponTargetingMode()
         updateRoomSelectionMode()
         updatePowerPopup()
+
+        // Any open window absorbs input - drop the autofire assignment mode
+        // so it can't linger behind a dialogue.
+        if (currentWindow != null || pauseWindow != null)
+            autofireArmMode = false
 
         mousePos.set(x, y)
 
@@ -2439,7 +2523,7 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
 
         targetingSelectedWeapon?.let { id ->
             val valid = game.hoveredRoom != null
-            val autofire = false // TODO
+            val autofire = ship.weapons?.isAutofire(id) == true
 
             // Combine the cursor and crosshairs icon
             val baseName = when {
@@ -2468,6 +2552,64 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
         currentWindow?.let { return it.onTextInput(key, c) }
 
         return false
+    }
+
+    /**
+     * The autofire toggle uses the weapons-box label look: the stretched
+     * label plate + text in the box-label font, right-aligned in the
+     * weapons box's label strip below the slots (the lower right corner of
+     * the weapons bar). On touch the positions are in the scaled strip's
+     * bar space, so convert through [barToScreen] and let
+     * [Button.renderScale] scale the button like the rest of the strip.
+     */
+    private fun autofireButtonPos(weaponBoxX: Int): ConstPoint {
+        val slots = ship.weaponSlots ?: return ConstPoint(1125, 600)
+
+        // The weapons box art: 31px of end-cap plus 97px per weapon slot.
+        // A 26px right margin keeps the plate's ramp inside the box art.
+        val barX = weaponBoxX + slots * 97 + 31 - font.getWidth("AUTOFIRE") - 26
+        val barY = weaponBoxY + 61
+
+        if (!PlatformSpecific.INSTANCE.isTouchUi)
+            return ConstPoint(barX, barY)
+
+        val (screenX, screenY) = barToScreen(barX, barY)
+        return ConstPoint(screenX, screenY)
+    }
+
+    private inner class AutofireButton(pos: ConstPoint) : Button(game, pos, ConstPoint(font.getWidth("AUTOFIRE") + 13, 30)) {
+        /** Text is drawn exactly like the box labels, so measure with the same font. */
+        private val textWidth = font.getWidth("AUTOFIRE")
+
+        private val tooltip = object : StandardTooltip(game) {
+            override fun getText(): String {
+                return "Select, then tap weapons to toggle their autofire.\nTap AUTOFIRE again when done." +
+                        "\n\nCtrl + weapon also toggles it."
+            }
+        }
+
+        override fun draw(g: Graphics) {
+            // Green while the assignment mode is armed, otherwise the same
+            // teal as the other box labels.
+            val textColour = if (autofireArmMode) WEAPONS_ITEM_CHARGED else UI_TEXT_COLOUR_1
+
+            // Same stretched label plate + font as the 'WEAPONS' label.
+            val img = game.getImg("img/box_weapons_bottom_label.png")
+            img.draw(
+                pos.x.f, pos.y.f, pos.x + textWidth - 13f, pos.y + img.height.f,
+                0f, 0f, 3f, img.height.f
+            )
+            img.draw(pos.x + textWidth - 13f, pos.y.f)
+            font.drawString(pos.x + 1f, pos.y + 15f, "AUTOFIRE", textColour)
+
+            if (hovered)
+                g.tooltip = tooltip
+        }
+
+        override fun click(button: Int) {
+            // Tap arms the assignment mode; tapping again disarms it.
+            toggleAutofireArm()
+        }
     }
 
     private abstract inner class WeaponDroneButton(pos: IPoint, slotNumber: Int, size: ConstPoint) :

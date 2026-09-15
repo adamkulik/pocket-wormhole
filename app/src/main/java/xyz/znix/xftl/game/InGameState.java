@@ -74,6 +74,13 @@ public class InGameState extends MainGame.GameState {
     private RoomClickListener clickEvent;
     private final boolean[] mouseDownPrev = new boolean[3];
 
+    /**
+     * The input device from the most recent update() call. Lets UI code read
+     * the keyboard modifier state while handling clicks (eg ctrl + clicking
+     * a weapon slot for autofire).
+     */
+    public Input input;
+
     private ITooltipProvider lastFameTooltip;
 
     private PlayerShipUI shipUI;
@@ -361,6 +368,7 @@ public class InGameState extends MainGame.GameState {
 
     @Override
     public void update(@NotNull GameContainer container, float delta) throws SlickException {
+        input = container.getInput();
         renderingDeltaTime = delta;
 
         // The game stays frozen while an arrival or jump-out animation
@@ -571,13 +579,16 @@ public class InGameState extends MainGame.GameState {
             paused = !paused;
 
         boolean shiftPressed = in.isKeyDown(Input.KEY_LSHIFT);
+        boolean ctrlPressed = in.isKeyDown(Input.KEY_LCTRL) || in.isKeyDown(Input.KEY_RCTRL);
         for (int i = 0; i < VanillaHotkeys.WEAPON_SLOTS.size(); i++) {
             if (key.getId().equals(VanillaHotkeys.WEAPON_SLOTS.get(i))) {
-                shipUI.weaponHotkeyPressed(i, shiftPressed);
+                shipUI.weaponHotkeyPressed(i, shiftPressed, ctrlPressed);
             }
         }
+        if (key.getId().equals(VanillaHotkeys.WEAPON_AUTOFIRE_TOGGLE)) {
+            shipUI.toggleAutofireArm();
+        }
         // TODO drone hotkeys
-        // TODO autofire
 
         shipUI.hotkeyPressed(key, in);
     }
@@ -1480,7 +1491,7 @@ public class InGameState extends MainGame.GameState {
         return paused || shipUI.isWindowOpen() ||
                 (shipUI != null && shipUI.getRoomSelectionMode()) ||
                 (shipUI != null && shipUI.getPowerPopupOpen()) ||
-                isWeaponTargeting();
+                isWeaponTargeting() || shipUI.isAutofireArmed();
     }
 
     /**

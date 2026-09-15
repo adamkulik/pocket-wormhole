@@ -25,6 +25,17 @@ class Weapons(blueprint: SystemBlueprint) : MainSystem(blueprint) {
 
     val selectedTargets = TargetList()
 
+    // Is autofire globally enabled for this ship's weapons? Toggled by the
+    // autofire button / hotkey; individual weapons can override it (see
+    // [AbstractWeaponInstance.autofireOverride]).
+    var autofire: Boolean = false
+        private set
+
+    // The last target of each weapon that fired while autofire was enabled,
+    // keyed by weapon slot. Autofire keeps firing at this target each time
+    // the weapon recharges.
+    private val autofireTargets = HashMap<Int, SelectedTarget>()
+
     // Ship isn't set when constructed, and this reads the number of
     // hardpoints when it's constructed, so lazy-init it.
     val powerManager by lazy { WeaponPowerManager(this, WeaponPowerAccess()) }
@@ -72,6 +83,70 @@ class Weapons(blueprint: SystemBlueprint) : MainSystem(blueprint) {
         }
 
         selectedTargets.update()
+
+        restoreAutofireTargets()
+    }
+
+    /**
+     * Is the weapon in the given hardpoint slot set to fire automatically
+     * when charged?
+     */
+    fun isAutofire(slot: Int): Boolean {
+        val weapon = ship.hardpoints.getOrNull(slot)?.weapon ?: return false
+        return weapon.autofireOverride ?: autofire
+    }
+
+    fun toggleAutofire() {
+        setAutofire(!autofire)
+    }
+
+    fun setAutofire(on: Boolean) {
+        autofire = on
+    }
+
+    /**
+     * Reverses the effective autofire setting of one weapon slot, like
+     * vanilla's ctrl + aim. If the new setting matches the ship's global one
+     * the override is cleared, keeping the state tidy.
+     */
+    fun toggleAutofireSlot(slot: Int) {
+        val weapon = ship.hardpoints.getOrNull(slot)?.weapon ?: return
+        val effective = weapon.autofireOverride ?: autofire
+        val newEffective = !effective
+        weapon.autofireOverride = if (newEffective == autofire) null else newEffective
+    }
+
+    /**
+     * Autofire: re-target every autofire-enabled weapon at the room (or beam
+     * line) it last fired at, so [TargetList.fireChargedWeapons] fires it
+     * again each time it recharges. Re-adding the target also makes the
+     * placed-crosshair markers render, like vanilla.
+     */
+    private fun restoreAutofireTargets() {
+        // Only valid while actually fighting the ship the targets point at.
+        val enemy = ship.sys.getEnemyOf(ship)
+
+        for ((slot, hp) in ship.hardpoints.withIndex()) {
+            val weapon = hp.weapon ?: continue
+            if (!isAutofire(slot) || !weapon.isPowered || isHackActive)
+                continue
+
+            if (selectedTargets.getTarget(slot) != null)
+                continue
+
+            val target = autofireTargets[slot] ?: continue
+
+            // Drop stale targets (the enemy ship fled or was destroyed).
+            if (enemy == null || target.targetShip !== enemy) {
+                autofireTargets.remove(slot)
+                continue
+            }
+
+            when (target) {
+                is SelectedTarget.RoomAim -> selectedTargets.targetRoom(slot, target.room)
+                is SelectedTarget.BeamAim -> selectedTargets.targetBeam(slot, target)
+            }
+        }
     }
 
     override fun drawBackground(g: Graphics) {
@@ -192,8 +267,18 @@ class Weapons(blueprint: SystemBlueprint) : MainSystem(blueprint) {
     }
 
     // The weapons are all serialised individually by the ship, we only
-    // have to serialise the selected targets.
+    // have to serialise the selected targets (and autofire state).
     override fun saveSystem(elem: Element, refs: ObjectRefs) {
+        elem.addContent(Element("autofire").setText(autofire.toString()))
+
+        for ((slot, hp) in ship.hardpoints.withIndex()) {
+            val override = hp.weapon?.autofireOverride ?: continue
+            val overrideElem = Element("autofireOverride")
+            overrideElem.setAttribute("slot", slot.toString())
+            overrideElem.setText(override.toString())
+            elem.addContent(overrideElem)
+        }
+
         for (target in selectedTargets) {
             val targetElem = Element("target")
             target.saveToXML(targetElem, refs)
@@ -203,6 +288,13 @@ class Weapons(blueprint: SystemBlueprint) : MainSystem(blueprint) {
 
     override fun loadSystem(elem: Element, refs: RefLoader) {
         val getWeapon: (Int) -> AbstractWeaponInstance = { ship.hardpoints[it].weapon!! }
+
+        elem.getChildText("autofire")?.let { autofire = it.toBoolean() }
+
+        for (overrideElem in elem.getChildren("autofireOverride")) {
+            val slot = overrideElem.getAttributeValue("slot").toInt()
+            ship.hardpoints.getOrNull(slot)?.weapon?.autofireOverride = overrideElem.text.toBoolean()
+        }
 
         for (targetElem in elem.getChildren("target")) {
             SelectedTarget.loadFromXML(targetElem, refs, getWeapon) { target ->
@@ -275,6 +367,11 @@ class Weapons(blueprint: SystemBlueprint) : MainSystem(blueprint) {
             }
 
             fired?.forEach { tgt ->
+                // Autofire remembers where this weapon was aimed so it can
+                // fire here again when it recharges.
+                if (isAutofire(tgt.weaponNumber))
+                    autofireTargets[tgt.weaponNumber] = tgt
+
                 unTarget(tgt.weaponNumber)
             }
         }
