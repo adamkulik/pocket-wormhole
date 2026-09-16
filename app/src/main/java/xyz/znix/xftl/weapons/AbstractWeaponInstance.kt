@@ -143,6 +143,10 @@ abstract class AbstractWeaponInstance(val type: AbstractWeaponBlueprint, val shi
             val replicator = ship.getAugmentValue(AugmentBlueprint.EXPLOSIVE_REPLICATOR)
             if (replicator <= Random.nextFloat()) {
                 ship.missilesCount = max(0, ship.missilesCount - type.missilesUsed)
+            } else {
+                // Vanilla-verified: a proc flashes a '0' by the missile
+                // counter, where a consumed volley flashes '-N'.
+                ship.replicatorProcPopups++
             }
         }
     }

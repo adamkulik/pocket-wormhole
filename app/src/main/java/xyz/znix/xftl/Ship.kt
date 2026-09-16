@@ -192,6 +192,14 @@ class Ship(
     // are set during ship loading. Player ships always seem to start with 16 fuel.
     var fuelCount: Int = 16
     var missilesCount: Int = 0
+
+    /**
+     * Explosive Replicator procs waiting to be shown as a '0' flash by
+     * the player HUD's missile counter (vanilla: a proc pops '0' where a
+     * consumed volley pops '-N'). Queued by [AbstractWeaponInstance.fire],
+     * drained by PlayerShipUI; purely cosmetic, never saved.
+     */
+    var replicatorProcPopups: Int = 0
     var dronesCount: Int = 0
 
     // How much scrap the player has

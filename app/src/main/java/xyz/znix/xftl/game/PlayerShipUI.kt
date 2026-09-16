@@ -1786,6 +1786,12 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
         drawSmallCounter("fuel", shieldsEndX, 0, ship.fuelCount, deltaFuel, 3, fuelTooltip)
 
         // Missiles only show as red when there's none left.
+        // Explosive Replicator procs queue a vanilla-style '0' flash
+        // (a consumed volley flashes its '-N' cost via the delta below).
+        while (ship.replicatorProcPopups > 0) {
+            ship.replicatorProcPopups--
+            resourceDeltaAnimations.add(ResourceDeltaText(shieldsEndX + 66f + 40f, 65f, 0))
+        }
         drawSmallCounter("missiles", shieldsEndX + 66, 1, ship.missilesCount, deltaMissiles, 0, missileTooltip)
 
         // Same for drones.
