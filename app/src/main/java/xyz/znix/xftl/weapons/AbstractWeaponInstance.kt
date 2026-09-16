@@ -18,6 +18,7 @@ import xyz.znix.xftl.savegame.SaveUtil
 import xyz.znix.xftl.systems.Artillery
 import xyz.znix.xftl.systems.Weapons
 import kotlin.math.max
+import kotlin.random.Random
 
 abstract class AbstractWeaponInstance(val type: AbstractWeaponBlueprint, val ship: Ship) {
     // The time spent charging thus far
@@ -135,8 +136,14 @@ abstract class AbstractWeaponInstance(val type: AbstractWeaponBlueprint, val shi
         // Deduct a missile (or multiple), if this weapon uses them
         // This really shouldn't be going negative here, but guard
         // it just in case.
-        if (!ship.sys.debugFlags.infiniteMissiles.set) {
-            ship.missilesCount = max(0, ship.missilesCount - type.missilesUsed)
+        if (!ship.sys.debugFlags.infiniteMissiles.set && type.missilesUsed > 0) {
+            // Explosive Replicator: each volley has a chance to consume
+            // no ammo (vanilla: "50 percent chance of not using a missile",
+            // rolled once per volley - multi-shot weapons pay once too).
+            val replicator = ship.getAugmentValue(AugmentBlueprint.EXPLOSIVE_REPLICATOR)
+            if (replicator <= Random.nextFloat()) {
+                ship.missilesCount = max(0, ship.missilesCount - type.missilesUsed)
+            }
         }
     }
 

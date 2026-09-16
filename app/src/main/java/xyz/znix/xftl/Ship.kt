@@ -1188,14 +1188,19 @@ class Ship(
 
         val hullDamage = damage.hullDamage * hullMult
 
-        // Rock Plating (ROCK_ARMOR): a chance to negate the incoming hull
-        // damage. Only the hull is protected - system damage, crew damage,
-        // fires and breaches all still apply. On a proc vanilla shows a
-        // 'RESIST' popup (img/numbers/text_resist.png) instead of any
-        // damage numbers.
-        val rockArmorChance = getAugmentValue(AugmentBlueprint.ROCK_ARMOR)
-        val rockNegates = hullDamage > 0 && rockArmorChance > 0f &&
-                Random.rollChance((rockArmorChance * 100).toInt())
+        // Rock Plating (ROCK_ARMOR) + Reinforced/Advanced Hull Plating
+        // (HULL_ARMOR / ADV_HULL_ARMOR): a chance to negate the incoming
+        // hull damage. Only the hull is protected - system damage, crew
+        // damage, fires and breaches all still apply. On a proc vanilla
+        // shows a 'RESIST' popup (img/numbers/text_resist.png) instead of
+        // any damage numbers. The dat values are per-plate probabilities
+        // (0.15 / 0.25), stackable=true, so they sum via getAugmentValue;
+        // Rock Plating (stackable=false, 0.15) rides the same roll.
+        val hullArmorChance = getAugmentValue(AugmentBlueprint.ROCK_ARMOR) +
+                getAugmentValue(AugmentBlueprint.HULL_ARMOR) +
+                getAugmentValue(AugmentBlueprint.ADV_HULL_ARMOR)
+        val hullArmorNegates = hullDamage > 0 && hullArmorChance > 0f &&
+                Random.rollChance((hullArmorChance * 100).toInt())
 
         // Titanium System Casing (SYSTEM_CASING): a chance to negate the
         // incoming system damage - the hull still takes its damage, and ion
@@ -1222,7 +1227,7 @@ class Ship(
         if (ionNegated)
             target.showDamageText("text_resist", DAMAGE_COLOUR_ION, textPos)
 
-        if (rockNegates)
+        if (hullArmorNegates)
             target.showDamageText("text_resist", Colour.white, textPos)
         else
             showDamageText(target, hullDamage, if (casingNegates) 0 else damage.effectiveSysDamage, appliedIonDamage, textPos)
@@ -1231,7 +1236,7 @@ class Ship(
         if (sys.debugFlags.noDmg.set)
             return
 
-        if (!rockNegates)
+        if (!hullArmorNegates)
             health -= hullDamage
         target.system?.dealDamage(if (casingNegates) 0 else damage.effectiveSysDamage, appliedIonDamage)
 
@@ -1251,7 +1256,7 @@ class Ship(
         // regular shields, affected by evasion, and shootable by ANY
         // defence drone (including ours - a vanilla quirk).
         val enemy = sys.getEnemyOf(this)
-        val damageTaken = !rockNegates || damage.effectiveSysDamage > 0
+        val damageTaken = !hullArmorNegates || damage.effectiveSysDamage > 0
         if (enemy != null && !enemy.isGone && damageTaken) {
             val shardChance = getAugmentValue(AugmentBlueprint.CRYSTAL_SHARDS)
             if (shardChance > 0f && Random.rollChance((shardChance * 100).toInt())) {

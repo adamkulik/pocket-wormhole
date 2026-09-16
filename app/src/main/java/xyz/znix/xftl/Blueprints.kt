@@ -179,6 +179,15 @@ class BlueprintManager {
             AugmentBlueprint.ION_ARMOR -> AugmentBlueprint(elem)
             AugmentBlueprint.FTL_BOOSTER -> AugmentBlueprint(elem)
             AugmentBlueprint.REPAIR_ARM -> AugmentBlueprint(elem)
+            AugmentBlueprint.HULL_ARMOR -> AugmentBlueprint(elem)
+            AugmentBlueprint.ADV_HULL_ARMOR -> AugmentBlueprint(elem)
+            AugmentBlueprint.EXPLOSIVE_REPLICATOR -> AugmentBlueprint(elem)
+
+            // Adv. FTL Navigation's mechanic (jumping to visited beacons)
+            // is implemented by the jump map; the stasis pod is an event
+            // quest prop. Neither has a passive effect to implement.
+            AugmentBlueprint.ADVANCED_FTL_NAVIGATION -> AugmentBlueprint(elem)
+            AugmentBlueprint.STASIS_POD -> AugmentBlueprint(elem)
 
             else -> {
                 println("WARNING: Adding unknown augment '$name'")

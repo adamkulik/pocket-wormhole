@@ -49,6 +49,12 @@ open class AugmentBlueprint(elem: Element) : Blueprint(elem) {
         const val ION_ARMOR: String = "ION_ARMOR"
         const val FTL_BOOSTER: String = "FTL_BOOSTER"
         const val REPAIR_ARM: String = "REPAIR_ARM"
+        const val HULL_ARMOR: String = "HULL_ARMOR"
+        const val ADV_HULL_ARMOR: String = "ADV_HULL_ARMOR"
+        const val EXPLOSIVE_REPLICATOR: String = "EXPLOSIVE_REPLICATOR"
+
+        // Quest prop - granted and traded by events, no passive effect.
+        const val STASIS_POD: String = "STASIS_POD"
     }
 }
 
