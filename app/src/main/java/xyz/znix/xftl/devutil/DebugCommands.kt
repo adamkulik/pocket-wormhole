@@ -792,6 +792,31 @@ class DebugCommands(console: DebugConsole) : ConsoleCommandProvider(console) {
         addLine("Applied $amount ion damage to ${room.system!!.codename}")
     }
 
+    @ConsoleCommand(name = "wreck")
+    @CmdHelp("Break a system of the player ship ('wreck doors'), or ionise it ('wreck doors ion [bars]'). 'fix' repairs it")
+    private fun cmdWreck(
+        @ParName("system") @ParType(SystemArgCompleter::class) systemName: String,
+        @CmdVarArg args: List<String>
+    ) {
+        val target = ship.systems.firstOrNull { it.codename.equals(systemName, ignoreCase = true) }
+
+        if (target == null) {
+            addLine("The player ship has no '$systemName' system - see 'system list'.")
+            return
+        }
+
+        if (args.isNotEmpty() && args[0].equals("ion", ignoreCase = true)) {
+            val bars = args.getOrNull(1)?.toIntOrNull() ?: 3
+            target.dealDamage(0, bars)
+            addLine("Ionised ${target.codename} for ${5 * bars}s - power now ${target.undamagedEnergy}/${target.energyLevels}")
+            return
+        }
+
+        target.damagedEnergyLevels = target.energyLevels
+        target.powerLimitChanged()
+        addLine("Broke the ${target.codename} system (all bars). Use 'fix' to repair it.")
+    }
+
     @ConsoleCommand(name = "autofire")
     @CmdHelp("Toggle autofire globally, or for one weapon slot (1-4)")
     private fun cmdAutofire(@CmdVarArg args: List<String>) {

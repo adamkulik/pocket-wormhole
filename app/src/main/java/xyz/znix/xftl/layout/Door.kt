@@ -222,8 +222,11 @@ data class Door(val position: ConstPoint, val left: Room?, val right: Room?, val
     }
 
     fun updateMouseHover(x: Int, y: Int) {
-        // Broken and hacked doors can't be controlled by the player.
-        if (isBroken || isHacked) {
+        // Broken and hacked doors can't be controlled by the player, and
+        // neither can any door at all while the doors system is inoperable
+        // (broken/ionised/hacked/powered down/absent) - vanilla then refuses
+        // to open or close anything, so don't even highlight the doors.
+        if (isBroken || isHacked || !ship.areDoorsOperable) {
             hovered = false
             return
         }
@@ -253,6 +256,12 @@ data class Door(val position: ConstPoint, val left: Room?, val right: Room?, val
         // Update our hovered status, since we use that
         // to determine if we're being clicked.
         updateMouseHover(x, y)
+
+        // Belt and braces: an inoperable doors system means no door on the
+        // ship may be toggled (see [Ship.areDoorsOperable]).
+        if (!ship.areDoorsOperable) {
+            return false
+        }
 
         if (!hovered) {
             return false

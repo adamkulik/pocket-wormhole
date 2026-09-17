@@ -367,6 +367,22 @@ class Ship(
     var doorsSystem: Doors? = null
         private set
 
+    /**
+     * True if the player may open or close this ship's doors.
+     *
+     * Vanilla blocks all manual door control - clicking individual doors and
+     * airlocks, the open/close-all buttons in the doors subsystem, and their
+     * hotkeys - whenever the doors system is inoperable: broken, ionised,
+     * actively hacked, left without power, or missing entirely. Note that the
+     * doors themselves keep whatever state they had; crew, drones and
+     * boarders still move through them freely.
+     */
+    val areDoorsOperable: Boolean
+        get() {
+            val system = doorsSystem ?: return false
+            return !system.broken && !system.isIonised && !system.isHackActive && system.effectivePower > 0
+        }
+
     var oxygen: Oxygen? = null
         private set
 

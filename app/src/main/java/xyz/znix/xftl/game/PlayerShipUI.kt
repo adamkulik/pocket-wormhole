@@ -2308,6 +2308,11 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
     }
 
     fun openAllDoors() {
+        // Vanilla refuses every door command - buttons, hotkeys - while the
+        // doors system is inoperable. See Ship.areDoorsOperable.
+        if (!ship.areDoorsOperable)
+            return
+
         val internalDoors = ship.doors.filter { !it.isAirlock }
         val allInternalDoorsOpen = internalDoors.all { it.open }
 
@@ -2323,6 +2328,11 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
     }
 
     fun closeAllDoors() {
+        // Same gate as openAllDoors: no manual door control at all while the
+        // doors system is broken, ionised, hacked or unpowered.
+        if (!ship.areDoorsOperable)
+            return
+
         for (door in ship.doors) {
             door.open = false
         }

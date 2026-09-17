@@ -67,7 +67,9 @@ class Doors(blueprint: SystemBlueprint) : SubSystem(blueprint) {
     ) :
         Button(ship.sys, powerPos + offset, ConstPoint(20, 20)) {
 
-        override val disabled: Boolean get() = broken || isHackActive
+        // Greyed out whenever the doors can't be operated at all - broken,
+        // ionised, hacked, or without power (Ship.areDoorsOperable).
+        override val disabled: Boolean get() = !ship.areDoorsOperable
 
         private val tooltip = HotkeyDelayedTooltip(game, if (open) "open_doors" else "close_doors")
 
