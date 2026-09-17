@@ -30,7 +30,22 @@ class CrewZoltan(blueprint: CrewBlueprint, animations: Animations, room: Room, m
     override fun onStartedDying() {
         super.onStartedDying()
 
+        // Vanilla only damages the crew hostile to the exploding Zoltan, in the
+        // room where it dies: "Zoltan explode on death, causing damage to nearby
+        // enemies" (official changelog), "15 HP damage to all enemy crew in the
+        // room... No damage to allies" (wiki, Zoltans). Crew on the same side
+        // take nothing, however close they were standing - previously they did
+        // (a player's own crew were caught in their own Zoltan's blast).
+        //
+        // Hostility is the same test crew combat uses (see AbstractCrew: crew in
+        // a room fight those with a different slot mode). That keeps mind control
+        // consistent, as LivingCrew.mode flips for a controlled crewmember - the
+        // blast hits whoever the Zoltan was fighting, not whoever it happened to
+        // be standing next to.
         for (crew in room.crew) {
+            if (crew.mode == mode)
+                continue
+
             crew.dealDamage(ZoltanDeathDamage(15f, this))
         }
     }
