@@ -561,8 +561,10 @@ class ShipWindow(val game: InGameState, val ship: Ship, initialTab: Tab, private
             buttons += ShipEquipmentPanel.SellDropBox.create(
                 game,
                 ShipEquipmentPanel.SellDropBox.Type.TOO_MANY_CREW,
-                sellCrewPos
-            ) { null }
+                sellCrewPos,
+                { null },
+                { null }
+            )
         }
     }
 

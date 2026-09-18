@@ -16,6 +16,7 @@ import xyz.znix.xftl.ui.WidgetContainer
 import xyz.znix.xftl.weapons.AbstractWeaponBlueprint
 import xyz.znix.xftl.weapons.DroneBlueprint
 import kotlin.math.min
+import kotlin.math.roundToInt
 
 /**
  * This contains the drag-and-drop equipment UI used in the equipment tab
@@ -293,8 +294,10 @@ class ShipEquipmentPanel(private val game: InGameState, val ship: Ship) {
             sellButton = SellDropBox.create(
                 game,
                 SellDropBox.Type.SELL_EQUIPMENT,
-                ConstPoint(0, 0)
-            ) { draggingBlueprint?.blueprint }
+                ConstPoint(0, 0),
+                { draggingBlueprint?.blueprint },
+                { getHoveredBlueprint() }
+            )
 
             sellBoxLocalPos = sellBoxPlacer?.invoke(sellButton!!.size) ?: ConstPoint(-275, 107)
 
@@ -488,6 +491,7 @@ class ShipEquipmentPanel(private val game: InGameState, val ship: Ship) {
         private val type: Type,
         private val container: WidgetContainer,
         private val getDrag: () -> Blueprint?,
+        private val getHovered: () -> Blueprint?,
     ) :
         Button(game, pos, container.root.size) {
 
@@ -534,12 +538,24 @@ class ShipEquipmentPanel(private val game: InGameState, val ship: Ship) {
 
             if (price == null) {
                 // For the over-capacity boxes
-            } else if (draggingBlueprint != null) {
-                // You only get half of what you paid for it
-                val sellPrice = (draggingBlueprint.cost ?: 0) / 2
-                price.text = sellPrice.toString()
             } else {
-                price.text = ""
+                // The vanilla box shows the value only while an item is
+                // being dragged. Touch has no sustained drag - items are
+                // picked up and dropped with taps (Window.tapToArm) - so
+                // there the value would flash for a single frame at most
+                // and was never visible (pocket-wormhole issue 39). On
+                // touch, fall back to previewing the value of the hovered
+                // item so it stays visible before committing to the sale.
+                val shown = draggingBlueprint
+                    ?: if (PlatformSpecific.INSTANCE.isTouchUi) getHovered() else null
+
+                if (shown != null) {
+                    // You only get half of what you paid for it
+                    val sellPrice = (shown.cost ?: 0) / 2
+                    price.text = sellPrice.toString()
+                } else {
+                    price.text = ""
+                }
             }
 
             g.pushTransform()
@@ -557,7 +573,19 @@ class ShipEquipmentPanel(private val game: InGameState, val ship: Ship) {
             // sell box's frame art (total width increase is twice this).
             private const val SELL_TEXT_MARGIN = 16
 
-            fun create(game: InGameState, type: Type, pos: IPoint, getDrag: () -> Blueprint?): SellDropBox {
+            // Left edge of the scrap icon baked into the value row of
+            // img/dropbox_sell_on.png (art x 186 of 272, measured from
+            // the vanilla sheet). Only used to re-anchor the number on
+            // widened touch boxes, see create().
+            private const val SELL_ICON_ART_LEFT = 186
+
+            // Gap between the number's right edge and the icon (by-eye).
+            private const val SELL_NUMBER_ICON_GAP = 6
+
+            fun create(
+                game: InGameState, type: Type, pos: IPoint,
+                getDrag: () -> Blueprint?, getHovered: () -> Blueprint?
+            ): SellDropBox {
                 val widgetName = when (type) {
                     Type.SELL_EQUIPMENT -> "sell_drop_box"
                     Type.TOO_MUCH_EQUIPMENT -> TODO()
@@ -606,7 +634,33 @@ class ShipEquipmentPanel(private val game: InGameState, val ship: Ship) {
 
                 widget.updateLayout()
 
-                return SellDropBox(game, pos, type, widget, getDrag)
+                // On a widened (touch) box the art band with the baked-in
+                // scrap icon stretches too: the icon slides right and ends
+                // up under the value number, whose fixed pLeft assumes the
+                // art's natural 272px width (pocket-wormhole issue 39).
+                // Wide boxes: re-anchor the number to sit just LEFT of the
+                // icon's drawn position. At natural width (scale 1) this
+                // computes to the XML pLeft and nothing moves.
+                if (type == Type.SELL_EQUIPMENT && PlatformSpecific.INSTANCE.isTouchUi) {
+                    // The bottom (value row) band - the last image in
+                    // sell_drop_box.xml; every band shares the box's width.
+                    val band = widget.allWidgets.filterIsInstance(ImageView::class.java).last()
+                    val scale = band.size.x.f / band.baseSize.x.f
+                    if (scale > 1.001f) {
+                        val price = widget.byId["price"] as Label
+                        val iconLeft = band.position.x + SELL_ICON_ART_LEFT * scale
+                        val desired = iconLeft - SELL_NUMBER_ICON_GAP - price.size.x
+                        val shift = (desired - price.position.x).roundToInt()
+
+                        // Move the live position - updateLayout() never runs
+                        // again after create(), so only touching parentLeft
+                        // (for any future re-layout) changes nothing.
+                        price.position.x += shift
+                        price.parentLeft = price.parentLeft?.plus(shift)
+                    }
+                }
+
+                return SellDropBox(game, pos, type, widget, getDrag, getHovered)
             }
         }
 
