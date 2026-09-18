@@ -1501,12 +1501,13 @@ public class InGameState extends MainGame.GameState {
     public boolean isPaused() {
         // The touch UI's room-selection mode (iPad-style auto-pause while
         // crew are selected), the power popup (while power is being
-        // manipulated) and the weapon-targeting mode (while aiming)
-        // also freeze the game.
+        // manipulated) and the targeting modes (weapon aiming, or the
+        // teleporter/hacking/mind-control room pickers) also freeze the
+        // game.
         return paused || shipUI.isWindowOpen() ||
                 (shipUI != null && shipUI.getRoomSelectionMode()) ||
                 (shipUI != null && shipUI.getPowerPopupOpen()) ||
-                isWeaponTargeting() || shipUI.isAutofireArmed();
+                isTouchTargeting() || shipUI.isAutofireArmed();
     }
 
     /**
@@ -1619,15 +1620,25 @@ public class InGameState extends MainGame.GameState {
     }
 
     /**
+     * True while ANY touch targeting mode is active: weapon targeting, or
+     * one of the teleporter/hacking/mind-control room pickers. All of
+     * these aim at the enemy ship's rooms, so they get the same
+     * auto-pause + enlarged-enemy-ship treatment (the iPad port's UX).
+     */
+    public boolean isTouchTargeting() {
+        return isWeaponTargeting() || (shipUI != null && shipUI.getSystemTargetingMode());
+    }
+
+    /**
      * The scale the player's ship is rendered at: 1 normally; on touch
-     * layouts it shrinks while the weapon-targeting mode is active, so
-     * the (full-size) enemy ship is easier to aim at. playerShipOffset
-     * stays the ship render space's screen anchor, so screen positions
-     * convert with (mouse - offset) / scale - see
-     * {@link #convertScreenToPlayerShip(Point)}.
+     * layouts it shrinks while a targeting mode (weapon or one of the
+     * room pickers) is active, so the (full-size) enemy ship is easier
+     * to aim at. playerShipOffset stays the ship render space's screen
+     * anchor, so screen positions convert with (mouse - offset) / scale
+     * - see {@link #convertScreenToPlayerShip(Point)}.
      */
     public float getPlayerShipRenderScale() {
-        return isWeaponTargeting() ? TARGETING_SHIP_SCALE : 1f;
+        return isTouchTargeting() ? TARGETING_SHIP_SCALE : 1f;
     }
 
     /**

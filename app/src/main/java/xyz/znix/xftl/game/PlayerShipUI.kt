@@ -456,6 +456,21 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
     val isSelectingHackingTarget: Boolean get() = game.clickEvent is HackingRoomListener
     val isSelectingMindControlTarget: Boolean get() = game.clickEvent is MindControlRoomListener
 
+    /**
+     * The touch room-picker targeting mode (iPad-style): while the
+     * teleporter (send or recall), hacking or mind-control picker is
+     * waiting for a room tap, the game auto-pauses, the player's ship is
+     * drawn shrunken and the enemy ship box returns to full size - the
+     * same treatment as weapon targeting, since all of these pick rooms
+     * on the ENEMY ship. The iPad port auto-paused for these too; the
+     * banner art (img/pause_teleport_leave.png, pause_teleport_arrive.png,
+     * pause_mind.png, pause_hacking.png) ships in ftl.dat.
+     */
+    val systemTargetingMode: Boolean
+        get() = PlatformSpecific.INSTANCE.isTouchUi &&
+                (teleportMode != null || isSelectingHackingTarget ||
+                        isSelectingMindControlTarget)
+
     init {
         updateButtons()
     }
@@ -548,9 +563,10 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
         }
 
         // Only while a weapon is armed and waiting for a target - the
-        // teleporter/hacking/mind-control room pickers keep the UI as-is.
-        // The null guard matters: clickEvent is null most of the time,
-        // and null === null would engage the mode permanently.
+        // teleporter/hacking/mind-control room pickers get the same
+        // treatment via systemTargetingMode. The null guard matters:
+        // clickEvent is null most of the time, and null === null would
+        // engage the mode permanently.
         weaponTargetingMode = beamTargeting != null ||
                 (selectWeaponClickEvent != null &&
                         game.clickEvent === selectWeaponClickEvent)
@@ -1526,6 +1542,32 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
             } else {
                 autoPause.draw(centreX - autoPause.width / 2, container.height - 16 - autoPause.height)
             }
+        }
+
+        // The touch room-picker overlay (teleporter send/recall, hacking
+        // and mind control): same banner style, with the iPad port's art
+        // for each picker. MIND THE ART'S FILE NAMING: 'arrive' is the
+        // RECALL banner ("tap an enemy ship's room to retrieve any crew
+        // inside" - the crew arrive back home) and 'leave' is the SEND
+        // one ("tap an enemy ship's room to send your boarding team").
+        if (systemTargetingMode) {
+            val autoPause = game.getImg("img/autopause.png")
+            val banner = game.getImg(
+                when (teleportMode) {
+                    true -> "img/pause_teleport_leave.png"
+                    false -> "img/pause_teleport_arrive.png"
+                    null -> when {
+                        isSelectingHackingTarget -> "img/pause_hacking.png"
+                        else -> "img/pause_mind.png"
+                    }
+                }
+            )
+            val centreX = container.width / 2
+            val bannerY = container.height - 16 - banner.height
+            val autoPauseY = bannerY - 20 - autoPause.height
+
+            autoPause.draw(centreX - autoPause.width / 2, autoPauseY)
+            banner.draw(centreX - banner.width / 2, bannerY)
         }
     }
 
