@@ -57,7 +57,18 @@ class LootPool(private val bpManager: BlueprintManager, sector: SectorType?) {
     }
 
     fun <T> getManyRandom(type: Class<T>, rand: Random, limit: Int): List<T> {
-        val matching = pool.filterIsInstance(type).shuffled(rand)
-        return matching.subList(0, min(matching.size, limit))
+        // The pool contains multiple copies of each blueprint, to weight them
+        // by rarity, so a naive draw can pick the same item several times -
+        // but stores must never offer two copies of the same blueprint
+        // (GitHub issue #49). Draw from the weighted pool like getRandom
+        // does, removing every copy of an item once it's been picked.
+        val candidates = pool.filterIsInstance(type).toMutableList()
+        val result = ArrayList<T>(min(candidates.size, limit))
+        while (result.size < limit && candidates.isNotEmpty()) {
+            val picked = candidates.removeAt(candidates.indices.random(rand))
+            candidates.removeAll { it == picked }
+            result.add(picked)
+        }
+        return result
     }
 }
