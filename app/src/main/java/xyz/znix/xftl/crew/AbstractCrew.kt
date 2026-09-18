@@ -28,6 +28,17 @@ abstract class AbstractCrew(
 
     protected val game: InGameState get() = room.ship.sys
 
+    /**
+     * True while the ship this crewmember is standing on is hostile to
+     * them, and hence one they may sabotage. Once a fight ends while both
+     * ships are still present - in practice, when the enemy's crew has
+     * been killed and the ship turns into a derelict - boarders must stop
+     * breaking it: continuing is pointless, and wrecking the O2 system can
+     * suffocate the boarding party long after the combat is over (GitHub
+     * issue #50).
+     */
+    open val standingShipHostile: Boolean get() = true
+
     val codename: String get() = blueprint.name
 
     var icon: FTLAnimation
@@ -588,7 +599,7 @@ abstract class AbstractCrew(
         }
 
         val system = room.system
-        if (mode == SlotType.INTRUDER && system != null && !system.broken) {
+        if (mode == SlotType.INTRUDER && standingShipHostile && system != null && !system.broken) {
             isPunching = false
             enemyToAttack = null
 

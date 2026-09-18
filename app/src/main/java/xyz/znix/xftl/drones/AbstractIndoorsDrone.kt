@@ -160,6 +160,11 @@ abstract class AbstractIndoorsDrone(type: DroneBlueprint) : AbstractDrone(type) 
         override val augmentSpeedMult: Float
             get() = drone.getSpeedMult()
 
+        // Boarding drones stop sabotaging a ship they're no longer at war
+        // with - e.g. one that's just been crew-killed (GitHub issue #50).
+        override val standingShipHostile: Boolean
+            get() = game.getEnemyOf(ship) == ownerShip || !ship.sys.isShipPresent(ownerShip)
+
         override fun update(dt: Float) {
             // If the ship powering this drone has jumped away, destroy it.
             // Also self-destruct if the pawn field no longer points to this

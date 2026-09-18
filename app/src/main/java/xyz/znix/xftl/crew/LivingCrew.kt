@@ -38,6 +38,21 @@ abstract class LivingCrew(blueprint: CrewBlueprint, anims: Animations, room: Roo
      */
     var ownerShip: Ship? = if (mode == SlotType.CREW) room.ship else null
 
+    override val standingShipHostile: Boolean
+        get() {
+            // Event-spawned boarders have no owner ship, and are hostile
+            // to the player's ship regardless of any ongoing fights.
+            val owner = ownerShip ?: return true
+
+            // Are we at war with the ship we're standing on?
+            if (game.getEnemyOf(room.ship) == owner)
+                return true
+
+            // If the ship that deployed us is gone (destroyed or jumped
+            // away), we're stranded - keep fighting regardless.
+            return !game.isShipPresent(owner)
+        }
+
     /**
      * The mind control system that is actively controlling this crewmember.
      */

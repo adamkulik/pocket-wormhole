@@ -56,6 +56,12 @@ class BoardingDrone(type: DroneBlueprint) : AbstractIndoorsDrone(type) {
     override fun updatePawn(dt: Float) {
         val pawn = this.pawn!!
 
+        // Once the ship we're aboard is no longer at war with the ship
+        // that deployed us - for example all of its crew were just killed -
+        // stop looking for things to break and stand idle (GitHub issue #50).
+        if (!pawn.standingShipHostile)
+            return
+
         // Are we moving somewhere
         if (pawn.pathingTarget != null)
             return
