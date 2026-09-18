@@ -61,6 +61,9 @@ class MainActivity : Activity() {
         }
 
         input = AndroidInput()
+        input.stallMarkerDir = filesDir
+        input.debugInputHooks =
+            (applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0
 
         root = FrameLayout(this)
         statusText = TextView(this).apply {
@@ -327,6 +330,16 @@ class GameSurfaceView(
         input.onTouchEvent(event)
         performClick()
         return true
+    }
+
+    override fun onPause() {
+        super.onPause()
+
+        // Flush the input flight recorder: a user reporting "taps don't
+        // register" usually backgrounds the app right afterwards, so the
+        // ring (with the failing taps) lands in the log-session file they
+        // send us.
+        input.dumpFlightLog("activity paused")
     }
 
     @Suppress("UNUSED_PARAMETER")
