@@ -1355,20 +1355,24 @@ abstract class AbstractCrew(
     }
 
     open fun onStartedDying() {
-        // Vanilla plays a race-specific (or, for humans, gendered) death
-        // sound as the crewmember starts dying.
+        // Death sounds: engi, mantis, rock, zoltan and crystal crew have
+        // race-specific ones (the engiDeath wiring is user-confirmed by
+        // ear against vanilla); every other race (human, slug, ghost,
+        // anaerobic) uses the generic gendered set death1-2 /
+        // femaleDeath1-3 - slugs reusing the human sounds is also the
+        // fandom wiki's Slugs-trivia note. The old slug mapping played
+        // shrikeDeath, a leftover of the cut Shrike race that sounds like
+        // the Engi death, which is what the reporter heard.
         val deathSound = when (codename) {
             "engi" -> "engiDeath"
             "mantis" -> "mantisDeath"
             "rock" -> "rockDeath"
             "zoltan" -> "energyDeath"
             "crystal" -> "crystalDeath"
-            "slug" -> "shrikeDeath"
-            "human" -> if ((this as? LivingCrew)?.info?.isFemale == true)
+            else -> if ((this as? LivingCrew)?.info?.isFemale == true)
                 "femaleDeath${(1..3).random()}"
             else
                 "death${(1..2).random()}"
-            else -> return
         }
         game.sounds.getSampleOrWarn(deathSound)?.play()
     }
