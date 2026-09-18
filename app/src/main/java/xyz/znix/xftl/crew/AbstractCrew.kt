@@ -1200,11 +1200,14 @@ abstract class AbstractCrew(
                     false -> anims["${codename}_shoot_${dirAsString(dir)}"].startSingle(game)
                 }
 
-                // Only use the first frame of shooting animations - this seems
-                // a bit weird, but also seems to match FTL.
-                if (!isPunching) {
-                    icon.isPaused = true
-                }
+                // Vanilla plays the shooting animation once per attack - each
+                // race has fully-authored per-direction shoot strips (3-4
+                // frames, 1s, matching the attack cycle), and the exe has a
+                // CrewAnimation::UpdateShooting/FireShot/GetFiringFrame chain
+                // driving the firing visuals. Restarting per attack and
+                // stretching it over attackDuration (like punches) matches the
+                // vanilla rhythm: strike, hold the final aim frame, strike
+                // again.
 
                 // Leave the animation at its default 1 second if
                 // the attack timer isn't set, as the animation will
