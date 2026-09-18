@@ -863,6 +863,36 @@ class DebugCommands(console: DebugConsole) : ConsoleCommandProvider(console) {
         addLine("Applied $amount points of damage to $count crewmembers")
     }
 
+    @ConsoleCommand(name = "skill")
+    @CmdHelp("Give the first player crewmember experience in a skill: 'skill shields [count]'. Names: piloting/engines/shields/weapons/repairs/combat")
+    private fun cmdSkill(@ParName("skill") skillName: String, @CmdVarArg args: List<String>) {
+        val skill = Skill.entries.firstOrNull {
+            it.name.equals(skillName, ignoreCase = true) || it.xmlName.equals(skillName, ignoreCase = true)
+        }
+        if (skill == null) {
+            addLine("Unknown skill '$skillName' - try ${Skill.entries.joinToString("/") { it.xmlName }}.")
+            return
+        }
+
+        val count = args.getOrNull(0)?.toIntOrNull() ?: 1
+        if (count < 1 || count > 100) {
+            addLine("Count must be between 1 and 100.")
+            return
+        }
+
+        val crew = ship.sys.playerCrew.firstOrNull { it.ownerShip == ship }
+        if (crew == null) {
+            addLine("No player crewmembers.")
+            return
+        }
+
+        repeat(count) {
+            crew.addSkillPoint(skill)
+        }
+
+        addLine("Gave $count '$skill' experience to ${crew.info.name}")
+    }
+
     @ConsoleCommand(name = "force-hack")
     @CmdHelp("Forces the enemy to hack a given player system")
     private fun cmdForceHack(@ParName("system") blueprint: SystemBlueprint) {

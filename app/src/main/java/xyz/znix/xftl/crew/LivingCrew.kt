@@ -54,6 +54,17 @@ abstract class LivingCrew(blueprint: CrewBlueprint, anims: Animations, room: Roo
 
     private var mindControlAnimation: FTLAnimation? = null
 
+    /**
+     * The skill this crewmember last gained experience in, for as long
+     * as the experience indicator on their crew box is shown.
+     *
+     * This is deliberately not serialised - it's transient UI feedback.
+     */
+    var lastTrainedSkill: Skill? = null
+        private set
+
+    private var skillIndicatorTimer = 0f
+
     override val playerControllable: Boolean
         get() = mindControlledBy == null && ownerShip?.isPlayerShip == true
 
@@ -112,6 +123,16 @@ abstract class LivingCrew(blueprint: CrewBlueprint, anims: Animations, room: Roo
         }
 
         super.update(dt)
+
+        // Countdown how long the experience indicator stays on this
+        // crewmember's crew box after their last point of experience.
+        if (skillIndicatorTimer > 0f) {
+            skillIndicatorTimer -= dt
+            if (skillIndicatorTimer <= 0f) {
+                skillIndicatorTimer = 0f
+                lastTrainedSkill = null
+            }
+        }
     }
 
     override fun drawForeground(g: Graphics) {
@@ -209,6 +230,14 @@ abstract class LivingCrew(blueprint: CrewBlueprint, anims: Animations, room: Roo
         val newProgress = (oldProgress + skill.amountPerAction).coerceIn(0f..1f)
         info.skills[skill] = newProgress
 
+        // Show the experience indicator on this crewmember's crew box -
+        // but only if they actually gained experience. At maximum
+        // progress further actions clamp in place, which isn't a gain.
+        if (newProgress > oldProgress) {
+            lastTrainedSkill = skill
+            skillIndicatorTimer = SKILL_INDICATOR_TIME
+        }
+
         // Play the level-up sound when this crewmember reaches a new skill
         // milestone (green at 0.5 progress, yellow at 1.0). Only for the
         // player's crew - you shouldn't hear enemy boarders levelling up.
@@ -251,6 +280,12 @@ abstract class LivingCrew(blueprint: CrewBlueprint, anims: Animations, room: Roo
     companion object {
         val REPAIR_SKILL_BONUS = listOf(0, 10, 20)
         val COMBAT_SKILL_BONUS = listOf(0, 10, 20)
+
+        /**
+         * How long (in seconds) the experience indicator stays visible
+         * on a crewmember's crew box after they last gained experience.
+         */
+        const val SKILL_INDICATOR_TIME = 4f
     }
 }
 

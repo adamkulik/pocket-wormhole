@@ -1985,7 +1985,29 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
             g.drawRect(x.f, y.f, CREW_BOX_WIDTH - 1f, CREW_BOX_HEIGHT - 1f)
             g.drawRect(x + 1f, y + 1f, CREW_BOX_WIDTH - 3f, CREW_BOX_HEIGHT - 3f)
 
-            // TODO show the animation when the crewmember gets a skill point.
+            // Vanilla shows which skill a crewmember is currently gaining
+            // experience in: the skill's icon, tinted green, with an up
+            // arrow beside it - drawn to the right of their crew box. The
+            // hovered crewmember's expanded skill panel already shows all
+            // the skills, so skip the indicator there.
+            val trainedSkill = crew.lastTrainedSkill
+            if (trainedSkill != null) {
+                val iconX = x + CREW_BOX_WIDTH + 1
+                val icon = game.getImg(trainedSkill.iconPath)
+                icon.draw(iconX.f, y.f, SYS_ENERGY_ACTIVE)
+
+                // The arrow art points down; flip it to point up. It is
+                // green too, and sits flush against the icon's right edge.
+                val arrow = game.getImg("img/icons/arrow.png")
+                g.pushTransform()
+                g.translate(
+                    iconX + icon.width + arrow.width / 2f,
+                    y + CREW_BOX_HEIGHT / 2f
+                )
+                g.scale(1f, -1f)
+                arrow.draw(-arrow.width / 2f, -arrow.height / 2f, SYS_ENERGY_ACTIVE)
+                g.popTransform()
+            }
         } else {
             // Draw the semi-transparent background
             g.colour = Colour(colour.r, colour.g, colour.b, 0.25f)
