@@ -231,15 +231,15 @@ object VanillaSaveParser {
                 repeat(r.int()) {
                     val shelf = VanillaSaveData.VanillaShelf()
                     shelf.type = r.int()
+                    // Vanilla writes all three items unconditionally
+                    // (avail=0 = sold out, with the name preserved).
                     repeat(3) {
                         val avail = r.int()
-                        if (avail == 0 || avail == 1) {
-                            val item = VanillaSaveData.VanillaItem()
-                            item.available = avail == 1
-                            item.name = r.string()
-                            item.extra = r.int()
-                            shelf.items.add(item)
-                        }
+                        val item = VanillaSaveData.VanillaItem()
+                        item.available = avail == 1
+                        item.name = r.string()
+                        item.extra = r.int()
+                        shelf.items.add(item)
                     }
                     store.shelves.add(shelf)
                 }

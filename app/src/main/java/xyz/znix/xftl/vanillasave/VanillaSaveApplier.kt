@@ -69,8 +69,8 @@ object VanillaSaveApplier {
         for (shelf in store.shelves) {
             for (item in shelf.items) {
                 // xftl models a store section as a list with nulls for
-                // sold-out slots; vanilla shelves terminate early when a
-                // store stocks fewer than three items of a kind.
+                // sold-out slots; vanilla marks them avail=0 with the name
+                // preserved (the name is lost in our model).
                 addShelfItem(result, shelf.type, item, game)
             }
         }
@@ -89,6 +89,7 @@ object VanillaSaveApplier {
             return
         }
         if (item.name.isEmpty()) {
+            addNull(result, shelfType)
             return
         }
         val bp = game.blueprintManager.getOrNull(item.name)

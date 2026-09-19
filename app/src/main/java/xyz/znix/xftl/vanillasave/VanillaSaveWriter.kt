@@ -323,15 +323,17 @@ object VanillaSaveWriter {
         w.bool(false) // boarding_drone
         w.int(member.health.roundToInt())
 
-        // Sprite position + room/square. Vanilla only really uses the room
-        // and square; the sprite position is corrected on the first update.
+        // Sprite position + room/square. Vanilla's sprite frame includes the
+        // ship's layout offset - without it crew render outside the hull on
+        // load. 17 = half a room-square, centring the crew in their square.
         val standing = member.standingPosition
         val room = standing?.room ?: member.room
         val squareX = standing?.x ?: 0
         val squareY = standing?.y ?: 0
         val square = squareY * room.width + squareX
-        val spriteX = room.x * 35 + squareX * 35 + 17
-        val spriteY = room.y * 35 + squareY * 35 + 17
+        val off = member.room.ship.offset
+        val spriteX = xyz.znix.xftl.Constants.ROOM_SIZE * (room.x + off.x + squareX) + 17
+        val spriteY = xyz.znix.xftl.Constants.ROOM_SIZE * (room.y + off.y + squareY) + 17
         w.int(spriteX)
         w.int(spriteY)
         w.int(room.id)
@@ -469,40 +471,56 @@ object VanillaSaveWriter {
     private fun writeStore(w: VanillaSaveByteWriter, game: InGameState, beacon: Beacon) {
         val data = beacon.getStore(game) ?: StoreData()
 
-        // Vanilla's store: 5 shelves (systems, weapons, drones, augments,
-        // crew) of 3 items each, plus the resource stock. xftl's store lists
-        // use nulls for sold-out items, which maps across directly.
-        w.int(5)
+        // Vanilla's store: only the sections the store actually stocks are
+        // written (2-4 shelves), each with EXACTLY three (avail, name, extra)
+        // items - sold-out items keep their name with avail=0, and empty
+        // sections are left out entirely. Vanilla's parser reads all three
+        // items unconditionally, so inventing terminators hangs it (found by
+        // the freeze bisect).
+        val shelves = ArrayList<Triple<Int, Int, List<String?>>>()
+        if (data.systems.any { it != null }) {
+            shelves.add(Triple(VanillaSaveFormat.SHELF_SYSTEM, data.systems.size,
+                data.systems.map { it?.name }))
+        }
+        if (data.weapons.any { it != null }) {
+            shelves.add(Triple(VanillaSaveFormat.SHELF_WEAPON, data.weapons.size,
+                data.weapons.map { it?.name }))
+        }
+        if (data.drones.any { it != null }) {
+            shelves.add(Triple(VanillaSaveFormat.SHELF_DRONE, data.drones.size,
+                data.drones.map { it?.name }))
+        }
+        if (data.augments.any { it != null }) {
+            shelves.add(Triple(VanillaSaveFormat.SHELF_AUGMENT, data.augments.size,
+                data.augments.map { it?.name }))
+        }
+        if (data.crew.any { it != null }) {
+            shelves.add(Triple(VanillaSaveFormat.SHELF_CREW, data.crew.size,
+                data.crew.map { it?.race?.name }))
+        }
 
-        writeShelf(w, VanillaSaveFormat.SHELF_SYSTEM, data.systems) { it.name }
-        writeShelf(w, VanillaSaveFormat.SHELF_WEAPON, data.weapons) { it.name }
-        writeShelf(w, VanillaSaveFormat.SHELF_DRONE, data.drones) { it.name }
-        writeShelf(w, VanillaSaveFormat.SHELF_AUGMENT, data.augments) { it.name }
-        writeShelf(w, VanillaSaveFormat.SHELF_CREW, data.crew) { it.race.name }
+        w.int(shelves.size)
+        for ((type, count, names) in shelves) {
+            w.int(type)
+            for (index in 0 until 3) {
+                val name = names.getOrNull(index)
+                if (name == null) {
+                    // Sold-out slot: vanilla keeps the item with avail=0; the
+                    // name is lost in xftl's model, so write a blank one.
+                    w.bool(false)
+                    w.string("")
+                    w.int(0)
+                } else {
+                    w.bool(true)
+                    w.string(name)
+                    w.int(0) // extra data
+                }
+            }
+        }
 
         w.int(data.availableResources.fuel)
         w.int(data.availableResources.missiles)
         w.int(data.availableResources.droneParts)
-    }
-
-    private inline fun <T> writeShelf(
-        w: VanillaSaveByteWriter,
-        type: Int,
-        items: List<T?>,
-        nameOf: (T) -> String
-    ) {
-        w.int(type)
-        for (index in 0 until 3) {
-            val item = items.getOrNull(index)
-            if (item == null) {
-                // Vanilla terminates the shelf early with a non-0/1 value.
-                w.int(-1)
-            } else {
-                w.bool(true) // available (sold-out items are null in xftl)
-                w.string(nameOf(item))
-                w.int(0) // extra data
-            }
-        }
     }
 
     /**
