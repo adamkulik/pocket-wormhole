@@ -445,6 +445,25 @@ object VanillaSaveWriter {
         w.int(0) // tempcapacity_divisor
     }
 
+    private inline fun <T> writeShelf(
+        w: VanillaSaveByteWriter,
+        type: Int,
+        items: List<T?>,
+        nameOf: (T) -> String
+    ) {
+        w.int(type)
+        for (index in 0 until 3) {
+            val item = items.getOrNull(index)
+            if (item == null) {
+                w.int(-1)
+            } else {
+                w.bool(true)
+                w.string(nameOf(item))
+                w.int(0)
+            }
+        }
+    }
+
     private fun writeBeacon(w: VanillaSaveByteWriter, game: InGameState, beacon: Beacon) {
         val visited = beacon.visited
         w.int(if (visited) 1 else 0)
@@ -487,46 +506,15 @@ object VanillaSaveWriter {
         // sections are left out entirely. Vanilla's parser reads all three
         // items unconditionally, so inventing terminators hangs it (found by
         // the freeze bisect).
-        val shelves = ArrayList<Triple<Int, Int, List<String?>>>()
-        if (data.systems.any { it != null }) {
-            shelves.add(Triple(VanillaSaveFormat.SHELF_SYSTEM, data.systems.size,
-                data.systems.map { it?.name }))
-        }
-        if (data.weapons.any { it != null }) {
-            shelves.add(Triple(VanillaSaveFormat.SHELF_WEAPON, data.weapons.size,
-                data.weapons.map { it?.name }))
-        }
-        if (data.drones.any { it != null }) {
-            shelves.add(Triple(VanillaSaveFormat.SHELF_DRONE, data.drones.size,
-                data.drones.map { it?.name }))
-        }
-        if (data.augments.any { it != null }) {
-            shelves.add(Triple(VanillaSaveFormat.SHELF_AUGMENT, data.augments.size,
-                data.augments.map { it?.name }))
-        }
-        if (data.crew.any { it != null }) {
-            shelves.add(Triple(VanillaSaveFormat.SHELF_CREW, data.crew.size,
-                data.crew.map { it?.race?.name }))
-        }
+        // The store encoding proven to load in real vanilla (Q_H test):
+        // always 5 shelves, each with 3 slots, -1 terminators for empty.
+        w.int(5)
 
-        w.int(shelves.size)
-        for ((type, count, names) in shelves) {
-            w.int(type)
-            for (index in 0 until 3) {
-                val name = names.getOrNull(index)
-                if (name == null) {
-                    // Sold-out slot: vanilla keeps the item with avail=0; the
-                    // name is lost in xftl's model, so write a blank one.
-                    w.bool(false)
-                    w.string("")
-                    w.int(0)
-                } else {
-                    w.bool(true)
-                    w.string(name)
-                    w.int(0) // extra data
-                }
-            }
-        }
+        writeShelf(w, VanillaSaveFormat.SHELF_SYSTEM, data.systems) { it.name }
+        writeShelf(w, VanillaSaveFormat.SHELF_WEAPON, data.weapons) { it.name }
+        writeShelf(w, VanillaSaveFormat.SHELF_DRONE, data.drones) { it.name }
+        writeShelf(w, VanillaSaveFormat.SHELF_AUGMENT, data.augments) { it.name }
+        writeShelf(w, VanillaSaveFormat.SHELF_CREW, data.crew) { it.race.name }
 
         w.int(data.availableResources.fuel)
         w.int(data.availableResources.missiles)
