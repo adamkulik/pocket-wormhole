@@ -59,6 +59,11 @@ class EventManager(
         return byDeserialisationId[id] ?: error("Missing event with deserialisation ID '$id'")
     }
 
+    /** Like [getByDeserialisationId], but null for unknown ids. Used by the
+     * vanilla save loader, which can encounter events from mods that aren't
+     * installed. */
+    fun getByDeserialisationIdOrNull(id: String): Event? = byDeserialisationId[id]
+
     fun getChoiceByDeserialisationId(id: String): Choice {
         return byChoiceId[id] ?: error("Missing choice with deserialisation ID '$id'")
     }

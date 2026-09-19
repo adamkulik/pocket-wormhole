@@ -20,6 +20,15 @@ import kotlin.random.Random
  * different types of sectors) and generates a random set of them to be used in the sector map.
  */
 class GameMap private constructor(df: Datafile, private val eventManager: EventManager, enableAE: Boolean) {
+
+    /**
+     * The seed this map's sector tree was generated from, used by the
+     * vanilla-format save writer. Callers that seed the generation should
+     * set this to the same value so the tree can be regenerated from a
+     * vanilla-format save.
+     */
+    var generationSeed: Int = Random.nextInt()
+
     private val sectorClasses = HashMap<SectorClass, List<SectorType>>()
     private val sectorTypes = HashMap<String, SectorType>()
 
@@ -79,6 +88,11 @@ class GameMap private constructor(df: Datafile, private val eventManager: EventM
      */
     constructor(df: Datafile, eventManager: EventManager, enableAE: Boolean, random: Random)
             : this(df, eventManager, enableAE) {
+
+        // The vanilla save format stores the RNG seed the map was generated
+        // from, so keep it around for VanillaSaveWriter. This constructor
+        // can't know the caller's seed (kotlin.random.Random doesn't expose
+        // it), so the caller sets [generationSeed] afterwards.
 
         // This assertion lets us modify the sectors array in the constructor
         require(sectors is ArrayList)

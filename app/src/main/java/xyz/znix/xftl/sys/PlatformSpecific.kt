@@ -37,6 +37,28 @@ sealed interface PlatformSpecific {
      */
     val isTouchUi: Boolean get() = false
 
+    /**
+     * Hooks for moving saves in and out of the game on platforms where the
+     * save directory isn't directly user-accessible (Android's SAF). Null on
+     * platforms that expose the save directory directly (desktop), in which
+     * case UIs should hide their transfer affordances.
+     */
+    open val saveTransfer: SaveTransfer? get() = null
+
+    /**
+     * Transfer a vanilla-format continue.sav between the app and a
+     * user-chosen location.
+     */
+    interface SaveTransfer {
+        /** Ask the user for a destination and write [bytes] (a continue.sav). */
+        fun exportSave(bytes: ByteArray)
+
+        /** Ask the user to pick a continue.sav; [onResult] receives its
+         * bytes, or null if the user cancelled. May be invoked on any
+         * thread. */
+        fun importSave(onResult: (ByteArray?) -> Unit)
+    }
+
     companion object {
         @JvmField
         val INSTANCE: PlatformSpecific = AndroidPlatform
@@ -59,6 +81,9 @@ object AndroidPlatform : PlatformSpecific {
     var baseDir: Path = Paths.get(".")
 
     override val isTouchUi: Boolean get() = true
+
+    /** Wired up by [com.pocketwormhole.android.MainActivity] at startup. */
+    override var saveTransfer: PlatformSpecific.SaveTransfer? = null
 
     override val saveGamePath: Path
         get() = baseDir.resolve("ProjectWormhole")

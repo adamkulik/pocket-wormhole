@@ -28,6 +28,12 @@
             <widget type="button" pTop="247" id="quit">
                 <widget type="label" text="escape_save"/>
             </widget>
+            <widget type="button" pTop="284" id="export_save">
+                <widget type="label" text="pw_export_save" id="export_label"/>
+            </widget>
+            <widget type="button" pTop="321" id="import_save">
+                <widget type="label" text="pw_import_save" id="import_label"/>
+            </widget>
         </widget>
 
         <widget type="free" pTop="30" pLeft="200">

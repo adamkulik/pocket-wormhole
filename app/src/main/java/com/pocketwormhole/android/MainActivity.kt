@@ -115,6 +115,10 @@ class MainActivity : Activity() {
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        if (requestCode == REQUEST_EXPORT_SAVE || requestCode == REQUEST_IMPORT_SAVE) {
+            handleSaveTransferResult(requestCode, resultCode, data)
+            return
+        }
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode != PICK_FTL_DAT) return
         awaitingPicker = false
@@ -173,6 +177,7 @@ class MainActivity : Activity() {
 
         val view = GameSurfaceView(this, container, input)
         surfaceView = view
+        xyz.znix.xftl.sys.AndroidPlatform.saveTransfer = saveTransfer
         root.addView(view, FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT,
             FrameLayout.LayoutParams.MATCH_PARENT
@@ -248,9 +253,76 @@ class MainActivity : Activity() {
         if (hasFocus) hideSystemUi()
     }
 
+    private var pendingExportBytes: ByteArray? = null
+    private var importSaveCallback: ((ByteArray?) -> Unit)? = null
+
+    /**
+     * Save-file transfer via the Storage Access Framework, offered to the
+     * engine through AndroidPlatform.saveTransfer (the pause menu's
+     * EXPORT SAVE / IMPORT SAVE buttons).
+     */
+    private val saveTransfer = object : xyz.znix.xftl.sys.PlatformSpecific.SaveTransfer {
+        override fun exportSave(bytes: ByteArray) {
+            pendingExportBytes = bytes
+            val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+                addCategory(Intent.CATEGORY_OPENABLE)
+                type = "application/octet-stream"
+                putExtra(Intent.EXTRA_TITLE, "continue.sav")
+            }
+            runOnUiThread { startActivityForResult(intent, REQUEST_EXPORT_SAVE) }
+        }
+
+        override fun importSave(onResult: (ByteArray?) -> Unit) {
+            importSaveCallback = onResult
+            val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                addCategory(Intent.CATEGORY_OPENABLE)
+                type = "*/*"
+            }
+            runOnUiThread { startActivityForResult(intent, REQUEST_IMPORT_SAVE) }
+        }
+    }
+
+    private fun handleSaveTransferResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        val uri = data?.data
+        if (requestCode == REQUEST_EXPORT_SAVE) {
+            val bytes = pendingExportBytes
+            pendingExportBytes = null
+            if (resultCode == RESULT_OK && uri != null && bytes != null) {
+                thread {
+                    try {
+                        contentResolver.openOutputStream(uri, "wt")?.use { it.write(bytes) }
+                        android.util.Log.i(TAG, "Save exported to $uri")
+                    } catch (e: Exception) {
+                        android.util.Log.e(TAG, "Save export failed", e)
+                    }
+                }
+            }
+            return
+        }
+        // REQUEST_IMPORT_SAVE
+        val callback = importSaveCallback
+        importSaveCallback = null
+        if (resultCode == RESULT_OK && uri != null && callback != null) {
+            thread {
+                val bytes = try {
+                    contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                } catch (e: Exception) {
+                    android.util.Log.e(TAG, "Save import read failed", e)
+                    null
+                }
+                // Hand the bytes to the game thread.
+                surfaceView?.queueEvent { callback(bytes) } ?: callback(null)
+            }
+        } else {
+            callback?.invoke(null)
+        }
+    }
+
     companion object {
         private const val TAG = "XFTL"
         private const val PICK_FTL_DAT = 4242
+        private const val REQUEST_EXPORT_SAVE = 4243
+        private const val REQUEST_IMPORT_SAVE = 4244
     }
 }
 

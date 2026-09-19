@@ -38,6 +38,7 @@ class ShipGenerator(val df: Datafile, val bp: BlueprintManager) {
         val elem = shipBlueprint.loadElem()
 
         val ship = Ship(shipBlueprint, sys, null, spec, null)
+        ship.generationSeed = effectiveSeed
         ship.loadDefaultContents()
 
         ship.escapeHealth = spec.escapeHealth?.pick(rand) ?: 0

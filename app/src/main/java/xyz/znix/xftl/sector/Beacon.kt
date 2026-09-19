@@ -166,6 +166,14 @@ class Beacon(
         eventSeed = rand.nextInt()
     }
 
+    /**
+     * Set the store contents directly - used by the vanilla save loader,
+     * which restores a store's stock from the save.
+     */
+    fun setStoreData(data: StoreData?) {
+        internalStore = data
+    }
+
     fun getStore(game: InGameState): StoreData? {
         if (!hasStore)
             return null

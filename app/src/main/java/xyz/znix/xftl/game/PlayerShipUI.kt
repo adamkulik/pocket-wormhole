@@ -2245,6 +2245,10 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
     private fun eventDialogueClosed() {
         currentWindow = null
 
+        // The beacon's event has fully resolved (rewards, ships, stores) -
+        // save so a process kill resumes after the event, not before it.
+        game.mainGame?.writeRunSave()
+
         // If a store was made available by the dialogue, open it
         if (game.currentBeacon.hasStore && !storeAlreadyOpened) {
             updateButtons() // Make the store button show up

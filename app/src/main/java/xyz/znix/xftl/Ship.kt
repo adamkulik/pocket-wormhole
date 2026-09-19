@@ -208,6 +208,15 @@ class Ship(
     // How far through charging the FTL drive, 1=fully charged.
     // These only apply to the player, enemies use a fixed timer.
     var ftlChargeProgress: Float = 0f
+
+    /**
+     * The seed this ship was generated with by [xyz.znix.xftl.shipgen.ShipGenerator],
+     * for ships spawned from an [EnemyShipSpec]. Used by the vanilla-format
+     * save writer, which can only store the spawn spec rather than the ship
+     * itself. Null for hand-authored ships and for ships loaded from saves
+     * that predate this field.
+     */
+    var generationSeed: Int? = null
     val isFtlCharged get() = ftlChargeProgress >= 1f
     val isFtlReady get() = isFtlCharged && engines!!.powerSelected > 0
 
@@ -1916,6 +1925,9 @@ class Ship(
         // These two are read by InGameState, as they're needed for constructor arguments.
         SaveUtil.addAttr(elem, "shipId", name)
         SaveUtil.addAttr(elem, "specId", spec?.name ?: "null")
+        if (generationSeed != null) {
+            SaveUtil.addAttrInt(elem, "genSeed", generationSeed!!)
+        }
 
         val resources = ResourceSet()
         resources.fuel = fuelCount

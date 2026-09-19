@@ -33,6 +33,17 @@ class PauseWindow(val game: InGameState, val close: () -> Unit) : Window() {
         widgetTree.addButtonListener("options", this::optionsClicked)
         widgetTree.addButtonListener("controls", this::controlsClicked)
         widgetTree.addButtonListener("quit", this::quitClicked)
+        widgetTree.addButtonListener("export_save") { exportSaveClicked() }
+        widgetTree.addButtonListener("import_save") { importSaveClicked() }
+
+        // Save transfer buttons are only offered when the platform can't
+        // expose the save directory directly (Android's SAF); on desktop the
+        // continue.sav sits next to the other saves anyway.
+        val transfer = xyz.znix.xftl.sys.PlatformSpecific.INSTANCE.saveTransfer
+        widgetTree.byId["export_save"]?.isVisible = transfer != null
+        widgetTree.byId["import_save"]?.isVisible = transfer != null
+        (widgetTree.byId["export_label"] as? Label)?.text = "EXPORT SAVE"
+        (widgetTree.byId["import_label"] as? Label)?.text = "IMPORT SAVE"
 
         // Set the difficulty label
         val difficultyLabel = widgetTree.byId["difficulty"] as Label
@@ -147,6 +158,32 @@ class PauseWindow(val game: InGameState, val close: () -> Unit) : Window() {
     }
 
     // Button handlers
+    private fun exportSaveClicked() {
+        val transfer = xyz.znix.xftl.sys.PlatformSpecific.INSTANCE.saveTransfer ?: return
+        val path = game.mainGame.getVanillaSavePath()
+        val bytes = if (java.nio.file.Files.exists(path)) {
+            java.nio.file.Files.readAllBytes(path)
+        } else {
+            // No vanilla save yet - write one from the current state.
+            game.mainGame.writeRunSave()
+            java.nio.file.Files.readAllBytes(path)
+        }
+        transfer.exportSave(bytes)
+    }
+
+    private fun importSaveClicked() {
+        val transfer = xyz.znix.xftl.sys.PlatformSpecific.INSTANCE.saveTransfer ?: return
+        transfer.importSave { bytes ->
+            if (bytes != null) {
+                val path = game.mainGame.getVanillaSavePath()
+                java.nio.file.Files.createDirectories(path.parent)
+                java.nio.file.Files.write(path, bytes)
+                // Switch to the imported run (also handles parse errors).
+                game.mainGame.continueVanillaSave()
+            }
+        }
+    }
+
     private fun continueClicked() {
         close()
     }

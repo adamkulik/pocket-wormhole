@@ -20,6 +20,9 @@ import xyz.znix.xftl.rendering.ShaderProgramme;
 import xyz.znix.xftl.sys.DatafileSelectState;
 import xyz.znix.xftl.sys.Game;
 import xyz.znix.xftl.sys.GameContainer;
+import xyz.znix.xftl.vanillasave.VanillaSaveWriter;
+import xyz.znix.xftl.vanillasave.VanillaSaveParser;
+import xyz.znix.xftl.vanillasave.VanillaSaveData;
 import xyz.znix.xftl.sys.PlatformSpecific;
 
 import java.io.BufferedReader;
@@ -117,7 +120,12 @@ public class MainGame implements Game {
      * Is there a run saved by Save+Quit that could be continued?
      */
     public boolean hasRunSave() {
-        return Files.exists(getRunSavePath());
+        return Files.exists(getRunSavePath()) || Files.exists(getVanillaSavePath());
+    }
+
+    /** Path of the vanilla-format save (continue.sav), next to the run save. */
+    public Path getVanillaSavePath() {
+        return PlatformSpecific.INSTANCE.getSaveGamePath().resolve("continue.sav");
     }
 
     /**
@@ -128,8 +136,58 @@ public class MainGame implements Game {
         Document doc = consumeRunSave();
         if (doc != null) {
             loadSavedGame(doc);
-        } else {
-            switchToShipSelect();
+            return;
+        }
+
+        // No engine-native run save - maybe a vanilla-format continue.sav was
+        // copied in (from a PC install or another device). Import it.
+        if (continueVanillaSave()) {
+            return;
+        }
+
+        switchToShipSelect();
+    }
+
+    /**
+     * Try to continue from a vanilla-format continue.sav, e.g. one copied in
+     * from a PC install. The save is consumed on success so stale copies
+     * can't shadow newer engine saves.
+     *
+     * @return true if a run was loaded
+     */
+    public boolean continueVanillaSave() {
+        Path path = getVanillaSavePath();
+        if (!Files.exists(path)) {
+            return false;
+        }
+
+        try {
+            byte[] bytes = Files.readAllBytes(path);
+            InGameState.GameContent content = getGameContent();
+            VanillaSaveData data = VanillaSaveParser.INSTANCE.parse(bytes, bpId -> {
+                xyz.znix.xftl.game.ShipBlueprint bp = content.blueprintManager.getShip(bpId);
+                java.util.List<Integer> tiles = new java.util.ArrayList<>();
+                for (xyz.znix.xftl.game.ShipBlueprint.ParsedRoom room : bp.getRooms()) {
+                    tiles.add(room.getSize().getX() * room.getSize().getY());
+                }
+                return new kotlin.Pair<>(tiles, bp.getDoors().size());
+            });
+            setCurrentState(new InGameState(this, content, data));
+            // Consumed: rename to a backup so it can't shadow newer saves.
+            try {
+                Files.move(path, path.resolveSibling("continue-imported.sav"),
+                        StandardCopyOption.REPLACE_EXISTING);
+            } catch (IOException ioEx) {
+                ioEx.printStackTrace(System.err);
+            }
+            System.out.println("Continued run from vanilla-format save");
+            return true;
+        } catch (Exception ex) {
+            // Keep the file - the failure may be a missing mod, and the user
+            // can retry after installing it.
+            System.err.println("Failed to load vanilla-format save (file kept):");
+            ex.printStackTrace(System.err);
+            return false;
         }
     }
 
@@ -308,6 +366,22 @@ public class MainGame implements Game {
             System.err.println("Failed to write the run save:");
             ex.printStackTrace(System.err);
         }
+
+        // Also write the vanilla-format save (continue.sav), so runs can be
+        // moved to a PC install or another device. A failure here must not
+        // affect the engine-native save above.
+        try {
+            byte[] vanillaBytes = xyz.znix.xftl.vanillasave.VanillaSaveWriter.INSTANCE.writeToByteArray(
+                    (InGameState) currentState);
+            Path vanillaPath = getVanillaSavePath();
+            Path vanillaTemp = vanillaPath.resolveSibling("continue-temp.sav");
+            Files.createDirectories(vanillaPath.getParent());
+            Files.write(vanillaTemp, vanillaBytes);
+            Files.move(vanillaTemp, vanillaPath, StandardCopyOption.REPLACE_EXISTING);
+        } catch (Exception ex) {
+            System.err.println("Failed to write vanilla-format save:");
+            ex.printStackTrace(System.err);
+        }
     }
 
     private Path getRunSavePath() {
@@ -322,6 +396,7 @@ public class MainGame implements Game {
     public void deleteRunSave() {
         try {
             Files.deleteIfExists(getRunSavePath());
+            Files.deleteIfExists(getVanillaSavePath());
         } catch (IOException ex) {
             System.err.println("Failed to delete run save:");
             ex.printStackTrace(System.err);

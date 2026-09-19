@@ -313,6 +313,15 @@ class Clonebay(blueprint: SystemBlueprint) : MainSystem(blueprint) {
         val INFO: SystemInfo = ClonebayInfo
 
         val CLONE_DURATIONS = listOf(12f, 9f, 7f, 0.001f)
+
+        /**
+         * The clone duration in seconds for a 1-based system power level.
+         * Used by the vanilla-format save writer.
+         */
+        fun durationForLevel(level: Int): Float =
+            CLONE_DURATIONS.getOrNull(level - 1) ?: CLONE_DURATIONS[0]
+
+        val durationCount: Int get() = CLONE_DURATIONS.size
         val PASSIVE_HEALING = listOf(8, 16, 25, 65536)
     }
 }

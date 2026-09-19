@@ -69,6 +69,14 @@ class Sector {
      */
     val bosses = ArrayList<BossManager>()
 
+    /**
+     * The seed used to lay out this sector's beacons, written to
+     * vanilla-format saves. Our layout algorithm differs from vanilla's, so
+     * this is only self-consistent for our own loader.
+     */
+    var layoutSeed: Int = Random.nextInt()
+        private set
+
     // Note there's another constructor for deserialising a sector
     // from XML down at the bottom of the class.
 
@@ -98,6 +106,7 @@ class Sector {
         val eventPool = ArrayDeque(events.shuffled())
 
         val rand = Random.Default
+        layoutSeed = Random.nextInt()
 
         // Generate a random 6x6 grid. Each beacon to be placed will be offset from one position on the grid.
         val grid = ArrayList<IPoint>()
