@@ -31,6 +31,15 @@ import kotlin.math.roundToInt
  * validated against real vanilla saves.
  */
 object VanillaSaveWriter {
+    // Sprite paths verified to exist in the vanilla dat (img/stars/*).
+    private val VERIFIED_SPRITES = listOf(
+        "stars/planet_populated_orange.png",
+        "stars/planet_gas_yellow.png",
+        "stars/planet_peach.png",
+        "stars/planet_populated_brown.png",
+        "stars/planet_populated_dark.png",
+    )
+
     fun write(game: InGameState, out: OutputStream) {
         out.use { it.write(writeToByteArray(game)) }
     }
@@ -441,12 +450,13 @@ object VanillaSaveWriter {
         w.int(if (visited) 1 else 0)
         if (visited) {
             // Background art: xftl generates this visually rather than
-            // storing it, so write a valid generic entry.
+            // storing it, so write a valid generic entry with a sprite
+            // path verified to exist in the dat.
             w.string("stars/bg_dullstars2.png")
-            w.string("")
+            w.string(VERIFIED_SPRITES[beacon.pos.x % VERIFIED_SPRITES.size])
             w.int(0)
             w.int(0)
-            w.int(0)
+            w.int(180)
         }
 
         w.bool(visited) // seen
