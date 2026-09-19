@@ -28,7 +28,7 @@ class MindControl(blueprint: SystemBlueprint) : MainSystem(blueprint) {
     val active: Boolean get() = timeRemaining != null
 
     var controlledCrew: LivingCrew? = null
-        private set
+        internal set
 
     override val isPowerLocked: Boolean get() = super.isPowerLocked || active
     override val hasWhiteLockingBox: Boolean get() = active
@@ -152,10 +152,15 @@ class MindControl(blueprint: SystemBlueprint) : MainSystem(blueprint) {
         if (room.ship != ship && room.ship.superShield > 0)
             return
 
-        // The player can only target rooms they have visibility onto
-        // TODO slug/lifeform scanner exception
-        if (ship.isPlayerShip && !room.playerHasVision)
-            return
+        // The player can only target rooms they have visibility onto. Crew
+        // sensed through the hull count too: Slug telepathy and the
+        // Lifeform Scanner both reveal the crew aboard enemy ships, and
+        // mind control can target them (wiki Mind Control: "Slug telepathy
+        // and Lifeform Scanners count" - resolves upstream's TODO).
+        if (ship.isPlayerShip && !room.playerHasVision) {
+            if (!room.ship.crewVisibleThroughHull || room.crew.none { it is LivingCrew })
+                return
+        }
 
         // If we're attacking a room on the player's ship, look for intruders.
         // Otherwise, look for crewmembers on enemy ships.

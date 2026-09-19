@@ -803,6 +803,22 @@ class Ship(
         g.popTransform()
     }
 
+    /**
+     * Can the player see (and mind-control-target) the living crew on this
+     * ship through the hull, even without room vision? True via a Slug's
+     * telepathy - a living player-owned Slug aboard - or, on enemy ships,
+     * the Lifeform Scanner augment, which per the wiki "functions exactly
+     * like the slugs' ability to sense live crew" (GitHub issues #64, #36).
+     */
+    val crewVisibleThroughHull: Boolean
+        get() {
+            if (sys.player?.crew?.any { it is CrewSlug && it.ownerShip === sys.player } == true)
+                return true
+
+            // The scanner only senses lifeforms aboard enemy vessels.
+            return !isPlayerShip && sys.player?.hasAugment(AugmentBlueprint.LIFE_SCANNER) == true
+        }
+
     private fun drawInterior(g: Graphics, selected: Room?, alpha: Float) {
         floorImage?.draw(
             floorOffset.x + hullOffset.x,
@@ -835,8 +851,7 @@ class Ship(
         // hull) and as intruders on the player's own ship when the sensors
         // are absent or disabled. Full vision of the Slug's room and the
         // rooms connected to it is granted in Room.update.
-        val telepathy =
-                sys.player?.crew?.any { it is CrewSlug && it.ownerShip === sys.player } == true
+        val telepathy = crewVisibleThroughHull
         for (crew in crew) {
             // If the crew provides vision, that works if playerHasVision
             // isn't set. This prevents flickering as the crew walks between

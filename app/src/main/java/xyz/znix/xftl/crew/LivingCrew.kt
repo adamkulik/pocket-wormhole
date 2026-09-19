@@ -40,6 +40,15 @@ abstract class LivingCrew(blueprint: CrewBlueprint, anims: Animations, room: Roo
 
     override val standingShipHostile: Boolean
         get() {
+            // A mind-controlled crewmember has its allegiance flipped (see
+            // [mode]). Whenever that makes it an intruder on the ship it's
+            // standing on, it is at war with that ship - fighting its crew
+            // and sabotaging its systems (GitHub issue #61; wiki Mind
+            // Control). Without this the mind-controlled crew just stands
+            // around, too loyal to wreck anything.
+            if (mindControlledBy != null)
+                return mode == SlotType.INTRUDER
+
             // Event-spawned boarders have no owner ship, and are hostile
             // to the player's ship regardless of any ongoing fights.
             val owner = ownerShip ?: return true

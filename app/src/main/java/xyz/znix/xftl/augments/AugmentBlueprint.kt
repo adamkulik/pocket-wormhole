@@ -53,6 +53,14 @@ open class AugmentBlueprint(elem: Element) : Blueprint(elem) {
         const val ADV_HULL_ARMOR: String = "ADV_HULL_ARMOR"
         const val EXPLOSIVE_REPLICATOR: String = "EXPLOSIVE_REPLICATOR"
 
+        /**
+         * Lifeform Scanner: senses the crew aboard enemy ships through the
+         * hull, working exactly like Slug telepathy (wiki). The visibility
+         * lives in Ship.crewVisibleThroughHull; the augment itself has no
+         * per-frame behaviour (value 0.0, stackable false).
+         */
+        const val LIFE_SCANNER: String = "LIFE_SCANNER"
+
         // Quest prop - granted and traded by events, no passive effect.
         const val STASIS_POD: String = "STASIS_POD"
     }

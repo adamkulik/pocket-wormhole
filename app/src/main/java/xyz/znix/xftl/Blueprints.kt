@@ -189,6 +189,10 @@ class BlueprintManager {
             AugmentBlueprint.ADVANCED_FTL_NAVIGATION -> AugmentBlueprint(elem)
             AugmentBlueprint.STASIS_POD -> AugmentBlueprint(elem)
 
+            // The Lifeform Scanner's mechanic (sensing enemy crew through
+            // the hull) is implemented by the vision code in Ship.
+            AugmentBlueprint.LIFE_SCANNER -> AugmentBlueprint(elem)
+
             else -> {
                 println("WARNING: Adding unknown augment '$name'")
                 AugmentBlueprint(elem)
