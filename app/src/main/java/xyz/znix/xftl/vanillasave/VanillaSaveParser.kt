@@ -235,11 +235,16 @@ object VanillaSaveParser {
                     // (avail=0 = sold out, with the name preserved).
                     repeat(3) {
                         val avail = r.int()
-                        val item = VanillaSaveData.VanillaItem()
-                        item.available = avail == 1
-                        item.name = r.string()
-                        item.extra = r.int()
-                        shelf.items.add(item)
+                        if (avail == 0 || avail == 1) {
+                            // Vanilla always writes three (avail, name, extra)
+                            // triples; a non-0/1 avail is the legacy -1
+                            // terminator from older Pocket Wormhole exports.
+                            val item = VanillaSaveData.VanillaItem()
+                            item.available = avail == 1
+                            item.name = r.string()
+                            item.extra = r.int()
+                            shelf.items.add(item)
+                        }
                     }
                     store.shelves.add(shelf)
                 }
