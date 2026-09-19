@@ -58,6 +58,17 @@ class JumpWindow(val game: InGameState, showSectorMap: () -> Unit, val jump: (Be
 
     private val beaconShadow = game.getImg("img/map/map_icon_diamond_shadow.png")
     private val beaconEnvironmentHazard = game.getImg("img/map/map_icon_hazard.png")
+
+    // Nebula puffs (GitHub issue #74): vanilla envelopes each nebula beacon
+    // on the map in one of these soft clouds, making the sector's nebula
+    // areas visible at a glance. The variant is picked per-beacon, so it's
+    // stable between map openings.
+    private val nebulaPuffs = listOf(
+        game.getImg("img/map/nebula_0.png"),
+        game.getImg("img/map/nebula_1.png"),
+        game.getImg("img/map/nebula_2.png"),
+        game.getImg("img/map/nebula_3.png"),
+    )
     private val beaconYellow = game.getImg("img/map/map_icon_diamond_yellow.png")
     private val beaconBlue = game.getImg("img/map/map_icon_diamond_blue.png")
     private val beaconDanger = game.getImg("img/map/map_icon_triangle_red.png")
@@ -213,10 +224,14 @@ class JumpWindow(val game: InGameState, showSectorMap: () -> Unit, val jump: (Be
             val showBasicInfo = beacon.visited || sector.mapRevealed || isNeighbour
             val showAdvInfo = beacon.visited || sector.mapRevealed || (isNeighbour && hasLRS)
 
-            // Draw the little blue transparent circle below nebulas
+            // Draw the nebula cloud puffs under nebulas (GitHub issue #74):
+            // vanilla envelopes each nebula beacon in one of these soft
+            // clouds so the sector's nebula areas stand out on the map.
             if (beacon.environmentType.isNebula) {
-                g.colour = Constants.BEACON_NEBULA_CIRCLE
-                g.fillOval(centrePos.x - 9f, centrePos.y - 9f, 20f, 20f)
+                val puff = nebulaPuffs[(beacon.pos.x * 31 + beacon.pos.y * 17).mod(nebulaPuffs.size)]
+                puff.draw(
+                    centrePos.x - puff.width / 2f, centrePos.y - puff.height / 2f
+                )
             }
 
             if (showAdvInfo && beacon.environmentType.isDangerous) {

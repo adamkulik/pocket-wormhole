@@ -197,7 +197,9 @@ abstract class AbstractCrew(
     private var attackTimer: Float? = null
     private var attackDuration: Float = 1f
     private var damageTime: Float = 0f // Damage is applied half-way through the attack animation
-    private var enemyToAttack: AbstractCrew? = null
+    // Internal (not private) so the test kit can drive the targeting
+    // seam directly.
+    internal var enemyToAttack: AbstractCrew? = null
     private var isPunching: Boolean = false
     private var sharesHostileCell: Boolean = false
 
@@ -589,10 +591,11 @@ abstract class AbstractCrew(
                 }
             }, {
                 // If we're punching someone always attack them, otherwise pick
-                // someone in the room at random to shoot.
-                // For boarding drones that don't punch, still attack the person
-                // in the same slot instead of sharing the damage around.
-                enemyToAttack = sameCell ?: hostiles.random()
+                // someone in the room at random to shoot. Keep shooting the
+                // crewmember we already targeted while they're still valid -
+                // re-rolling every attack made the facing jump randomly between
+                // shots (GitHub issues #57, #60).
+                enemyToAttack = pickFightingTarget(sameCell, hostiles)
             })
 
             return
@@ -942,6 +945,21 @@ abstract class AbstractCrew(
     /**
      * Update the attack animation for fighting and sabotage actions.
      */
+    /**
+     * Pick who to fight this attack cycle: whoever occupies our cell
+     * (melee) takes priority, then we stick with our current target while
+     * they're still a valid hostile - re-rolling every attack made the
+     * facing jump randomly between shots (GitHub issues #57, #60) - and
+     * only brand-new fights pick a target at random.
+     */
+    internal fun pickFightingTarget(sameCell: AbstractCrew?, hostiles: List<AbstractCrew>): AbstractCrew {
+        return when {
+            sameCell != null -> sameCell
+            hostiles.contains(enemyToAttack) -> enemyToAttack!!
+            else -> hostiles.random()
+        }
+    }
+
     private fun updateAttack(action: Action, dt: Float, dealDamage: () -> Unit, onAnimationStart: () -> Unit) {
         // Reset everything if we switch between attacking and sabotaging
         // Otherwise we could end up doing damage after we started attacking
