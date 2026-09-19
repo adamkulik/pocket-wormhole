@@ -87,6 +87,16 @@ class Weapons(blueprint: SystemBlueprint) : MainSystem(blueprint) {
         restoreAutofireTargets()
     }
 
+    override fun onJump() {
+        super.onJump()
+
+        // Manually-assigned weapon targets don't survive a jump (GitHub
+        // issue #55) - the ship (or room) they pointed at was left behind
+        // at the previous beacon. Autofire re-targets itself at the new
+        // enemy, so its remembered aims are left alone here.
+        selectedTargets.clear()
+    }
+
     /**
      * Is the weapon in the given hardpoint slot set to fire automatically
      * when charged?
@@ -327,6 +337,13 @@ class Weapons(blueprint: SystemBlueprint) : MainSystem(blueprint) {
 
         fun unTarget(weaponId: Int) {
             targets.remove(weaponId)
+        }
+
+        /**
+         * Forget every target, e.g. when the ship jumps away.
+         */
+        fun clear() {
+            targets.clear()
         }
 
         operator fun iterator(): MutableIterator<SelectedTarget> {

@@ -898,6 +898,19 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
     }
 
     /**
+     * The ship has jumped: cancel any pending weapon targeting (GitHub
+     * issue #55). The armed weapon's click event, the aimed slot and any
+     * beam being drawn all refer to the fight we just left - without this
+     * the targeting UI would stay stuck on after arriving.
+     */
+    fun onJump() {
+        targetingSelectedWeapon = null
+        selectWeaponClickEvent = null
+        beamTargeting = null
+        game.clickEvent = null
+    }
+
+    /**
      * The autofire button: arms the autofire assignment mode - the next
      * weapon taps toggle that weapon's autofire. Tap the button again (or
      * anything that isn't a weapon) to finish.
@@ -2358,12 +2371,14 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
                 return@SectorMapWindow
 
             val sector = game.gameMap.generateSector(sectorInfo, game)
-            game.currentBeacon = sector.startBeacon
 
-            // Auto-save after jumping to the new sector, like beacon jumps
-            // do (InGameState.update, beginJumpOut) - a force-close should
-            // only cost the current beacon, not the whole run.
-            game.getMainGame().writeRunSave()
+            // Jump via the proper jump path (GitHub issue #63): the jump-out
+            // animation plays, then arrival at the new sector's start beacon
+            // runs setCurrentBeacon - which handles the sector music switch,
+            // the arrival chime, spawning whatever's at the beacon, etc.
+            // The run-save is written by the existing jump-out completion /
+            // immediate-switch fallback sites, same as normal beacon jumps.
+            game.beginJumpOut(sector.startBeacon)
 
             // In case we were at a store
             // TODO move this into an on-jump handler function

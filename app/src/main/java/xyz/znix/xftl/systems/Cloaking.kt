@@ -156,6 +156,16 @@ class Cloaking(blueprint: SystemBlueprint) : MainSystem(blueprint) {
         timeRemaining = previous - duration * 0.20f
     }
 
+    override fun onJump() {
+        super.onJump()
+
+        // The cloak doesn't survive a jump (GitHub issue #44). End it
+        // instantly, without the fade-out animation or the decloak sound -
+        // both would be playing at the beacon we've just left.
+        timeRemaining = null
+        animationTimer = 0f
+    }
+
     override fun saveSystem(elem: Element, refs: ObjectRefs) {
         SaveUtil.addTagFloat(elem, "timeRemaining", timeRemaining)
         SaveUtil.addTagFloat(elem, "animationTimer", animationTimer)

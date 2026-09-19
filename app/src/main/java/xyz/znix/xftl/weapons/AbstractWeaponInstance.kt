@@ -124,6 +124,24 @@ abstract class AbstractWeaponInstance(val type: AbstractWeaponBlueprint, val shi
         }
     }
 
+    /**
+     * Called when the ship jumps away: anything the weapon refers to from
+     * the previous fight - its targets, a firing animation in progress -
+     * is cancelled, as the ship it was aimed at no longer exists.
+     */
+    open fun onJump() {
+    }
+
+    protected fun damageCloak() {
+        // We only damage the cloak if we're fired from the weapons system. If
+        // we're fired via the artillery system, from a drone, etc then we
+        // don't affect the cloak.
+        if (ship.hardpoints.none { it.weapon == this })
+            return
+
+        ship.cloaking?.weaponFired()
+    }
+
     protected fun fire() {
         timeCharged = 0f
         extraCharges = 0

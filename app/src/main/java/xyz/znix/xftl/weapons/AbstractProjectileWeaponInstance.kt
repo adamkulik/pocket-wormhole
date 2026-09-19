@@ -212,14 +212,13 @@ abstract class AbstractProjectileWeaponInstance(type: AbstractWeaponBlueprint, s
         primeShot()
     }
 
-    protected fun damageCloak() {
-        // We only damage the cloak if we're fired from the weapons system. If
-        // we're fired via the artillery system, from a drone, etc then we
-        // don't affect the cloak.
-        if (ship.hardpoints.none { it.weapon == this })
-            return
+    override fun onJump() {
+        super.onJump()
 
-        ship.cloaking?.weaponFired()
+        // Whatever we were firing at was left behind at the previous beacon
+        // (GitHub issue #55).
+        stopFiring()
+        waitingToFireAt = null
     }
 
     protected fun stopFiring() {

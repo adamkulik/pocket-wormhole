@@ -951,6 +951,12 @@ public class InGameState extends MainGame.GameState {
             // Make the store button appear and disappear.
             shipUI.updateButtons();
 
+            // Cancel pending weapon targeting - the fight it belonged to
+            // doesn't survive the jump (GitHub issue #55).
+            if (shipUI != null) {
+                shipUI.onJump();
+            }
+
             player.resetAfterJump();
             if (currentBeacon.getState() == Beacon.State.UNVISITED) {
                 // Deferred until the arrival animation finishes (issue #4).

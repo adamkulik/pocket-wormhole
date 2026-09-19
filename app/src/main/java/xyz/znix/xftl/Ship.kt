@@ -1365,13 +1365,16 @@ class Ship(
         // Get rid of any drones orbiting us
         externalDrones.clear()
 
-        // Reset the weapon charge times
+        // Reset the weapon charge times, and cancel anything a weapon was
+        // doing aimed at the fight we've just left (GitHub issue #55).
         for (hp in hardpoints) {
             hp.weapon?.timeCharged = 0f
 
             // Reset the chain/charge count
             hp.weapon?.chainCount = 0
             hp.weapon?.extraCharges = 0
+
+            hp.weapon?.onJump()
         }
 
         // Clear any previously-set scripted power limits, and re-apply

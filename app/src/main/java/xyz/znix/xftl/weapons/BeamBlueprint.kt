@@ -389,11 +389,20 @@ class BeamBlueprint(xml: Element) : AbstractWeaponBlueprint(xml) {
             // Apply damage when applicable.
             if (targetShip.superShield > 0 && superShieldReady) {
                 superShieldReady = false
-                // TODO ion armour (reverse ion field)
+
+                // Reverse Ion Field protects the super-shield too (this
+                // replaces upstream's TODO): on a proc only the ion
+                // component of the zap is negated.
+                val ionNegated = ionDamage > 0 && targetShip.ionArmourNegates()
+                val ionArmourIon = if (ionNegated) 0 else max(ionDamage, 0)
+
                 // All beams do at least one damage against super-shields.
                 // Clamp here to avoid repairing them if the weapon does negative damage.
-                val damage = max(damage, 1) + max(ionDamage, 0) * 2
+                val damage = max(damage, 1) + ionArmourIon * 2
 
+                if (shieldHitPos != null && ionNegated) {
+                    targetShip.showDamageTextAt(shieldHitPos!!, "text_resist", Constants.DAMAGE_COLOUR_ION)
+                }
                 if (shieldHitPos != null && damage > 0) {
                     targetShip.showDamageTextAt(shieldHitPos!!, damage, Constants.DAMAGE_COLOUR_ZOLTAN)
                 }
@@ -421,6 +430,11 @@ class BeamBlueprint(xml: Element) : AbstractWeaponBlueprint(xml) {
             firingChainCount = chainCount
             fire()
 
+            // Firing from the weapons system drains our cloak, like any
+            // other weapon (GitHub issue #54). The hardpoint check inside
+            // damageCloak excludes beams fired by combat drones.
+            damageCloak()
+
             // Find the point the beam is going to come from. Only do this once per
             // shot so the beam doesn't bounce around.
             // This is mostly guessed from images of FTL, and may vary quite a bit.
@@ -445,6 +459,14 @@ class BeamBlueprint(xml: Element) : AbstractWeaponBlueprint(xml) {
         fun fireFromDrone(drone: CombatDrone, target: SelectedTarget.BeamAim, duration: Float) {
             this.target = target
             fireDuration = duration
+        }
+
+        override fun onJump() {
+            super.onJump()
+
+            // The ship we were firing at was left behind at the previous
+            // beacon (GitHub issue #55).
+            stopFiring()
         }
 
         // For use by drones, so they can angle themselves correctly.

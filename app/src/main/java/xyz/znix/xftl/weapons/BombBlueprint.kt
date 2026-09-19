@@ -97,6 +97,19 @@ class BombBlueprint(xml: Element) : AbstractWeaponBlueprint(xml) {
             this.target = targetSource()
 
             type.launchSounds?.get()?.play()
+
+            // Firing from the weapons system drains our cloak, like any
+            // other weapon (GitHub issue #54). Drones' bombs don't - only
+            // weapons actually sitting on our hardpoints do.
+            damageCloak()
+        }
+
+        override fun onJump() {
+            super.onJump()
+
+            // A bomb mid-firing-animation when the ship jumps would otherwise
+            // resume and hit us (or the left-behind ship) after arriving.
+            stopFiring()
         }
 
         override fun fireFromDrone(drone: CombatDrone, target: Room) {
