@@ -25,7 +25,7 @@ abstract class MainSystem(blueprint: SystemBlueprint) : AbstractSystem(blueprint
      */
     // Note: this is cached since it's used *everywhere*
     var powerSelected: Int = 0
-        private set
+        protected set
 
     /**
      * The amount of power this system is forced to use, and can't decrease below.
@@ -408,8 +408,19 @@ abstract class MainSystem(blueprint: SystemBlueprint) : AbstractSystem(blueprint
         }
     }
 
-    private fun updateCachedSelectedPower() {
-        powerSelected = selectedPowerSources.values.sum()
+    protected open fun updateCachedSelectedPower() {
+        // The cached selection is our demand: what the player (or the AI)
+        // asked for, clamped to what the system can still receive. It is
+        // deliberately NOT the raw sum of selectedPowerSources - that would
+        // let a Zoltan's per-room bonus bar leak into the selection when it
+        // walks in, and leave the demand permanently inflated (a bar drawn
+        // from the reactor while doing nothing) when it walks back out
+        // (GitHub issue #66).
+        val demand = selectedPowerSources.entries
+            .filter { !it.key.isPerSystem }
+            .sumOf { it.value }
+
+        powerSelected = max(demand, powerSelected.coerceIn(0, undamagedEnergy))
 
         // Store our forced power value, which we can't decrease below
         forcedPower = selectedPowerSources.entries.filter { it.key.isPerSystem }.sumOf { it.value }

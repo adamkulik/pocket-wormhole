@@ -380,6 +380,14 @@ public class InGameState extends MainGame.GameState {
         input = container.getInput();
         renderingDeltaTime = delta;
 
+        // Decay the screen shake (GitHub issue #31) in real time, even
+        // while the game itself is paused.
+        if (shakeTimer > 0f) {
+            shakeTimer = Math.max(0f, shakeTimer - delta);
+            if (shakeTimer == 0f)
+                shakeStrength = 0f;
+        }
+
         // The game stays frozen while an arrival or jump-out animation
         // plays (issue #4).
         if (!isPaused() && playerFlyIn <= 0 && playerJumpOut <= 0 && enemyJumpOut <= 0)
@@ -606,6 +614,11 @@ public class InGameState extends MainGame.GameState {
     public void render(@NotNull GameContainer container, @NotNull Graphics g) throws SlickException {
         g.clear(Colour.black);
 
+        // Screen shake (GitHub issue #31): jitter the whole view - ships
+        // and HUD alike - while the shake decays to stillness.
+        g.pushTransform();
+        g.translate(pickShakeOffset(), pickShakeOffset());
+
         currentBeacon.getEnvironment(this).renderBackground(container, g);
 
         // Set the position of the player's ship, based on whether or not
@@ -783,6 +796,31 @@ public class InGameState extends MainGame.GameState {
             }
         }
         lastFameTooltip = tooltip;
+
+        g.popTransform();
+    }
+
+    /**
+     * Add a screen shake, like vanilla plays when the player's hull takes
+     * a hit. The strength is in pixels; hits close together stack up to a
+     * cap, and the shake decays linearly back to stillness.
+     */
+    public void addScreenShake(float strength) {
+        if (strength <= 0f)
+            return;
+
+        shakeStrength = Math.min(shakeStrength + strength, SCREEN_SHAKE_MAX);
+        shakeTimer = SCREEN_SHAKE_TIME;
+    }
+
+    /**
+     * A random shake offset for this frame, decaying linearly to zero.
+     */
+    private float pickShakeOffset() {
+        if (shakeTimer <= 0f || shakeStrength <= 0f)
+            return 0f;
+
+        return (Random.Default.nextFloat() * 2f - 1f) * shakeStrength * (shakeTimer / SCREEN_SHAKE_TIME);
     }
 
     /**
@@ -891,6 +929,10 @@ public class InGameState extends MainGame.GameState {
     // from 1 (just arrived) to 0 (done).
     private float playerFlyIn = 0f;
     private boolean arrivalEventsPending = false;
+
+    // Screen shake state (GitHub issue #31) - cosmetic, never serialised.
+    private float shakeTimer = 0f;
+    private float shakeStrength = 0f;
     private boolean arrivalShowBeaconEvent = false;
     private Event arrivalEliteEvent;
     public Image jumpFlare;   // issue #4: shared by the arrival and jump-away animations
@@ -917,6 +959,19 @@ public class InGameState extends MainGame.GameState {
      * weapon-targeting mode is active (see getPlayerShipRenderScale).
      */
     private static final float TARGETING_SHIP_SCALE = 0.7f;
+
+    // Screen shake (GitHub issue #31): vanilla jitters the view when the
+    // player's hull takes a hit. The strength scales with the damage and
+    // decays linearly to stillness. By-eye tuning values (amplified after
+    // first-round feedback: 0.5px/damage was imperceptible).
+    private static final float SCREEN_SHAKE_TIME = 0.35f;
+    private static final float SCREEN_SHAKE_MAX = 12f;
+
+    /**
+     * How much shake a point of hull damage adds, in pixels.
+     * (Public: Ship.damage triggers the shake and scales it by the hit.)
+     */
+    public static final float SCREEN_SHAKE_PER_DAMAGE = 1.5f;
 
     public void setCurrentBeacon(Beacon currentBeacon) {
         boolean beaconChanged = this.currentBeacon == null || this.currentBeacon != currentBeacon;

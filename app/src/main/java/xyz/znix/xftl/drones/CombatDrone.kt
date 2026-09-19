@@ -76,10 +76,18 @@ class CombatDrone(type: DroneBlueprint) : AbstractExternalDrone(type, true) {
         // Make Kotlin smart-casts work with a mutable field
         val weapon = this.weapon
 
+        // A defeated ship is no longer a valid target: once the fight is
+        // over (our owner is no longer at war with the ship we're orbiting)
+        // stop attacking it. Vanilla disables everything on a defeated ship,
+        // and without this the drone would keep shooting the derelict -
+        // with beam drones visibly stuck firing forever (GitHub issue #65).
+        // The drone itself keeps flying, like vanilla.
+        val targetHostile = ownerShip.sys.getEnemyOf(ownerShip) == targetShip
+
         // Turn the weapon on and off to match the drone.
         // This makes beams stop firing when the drone is de-powered
-        // while shooting.
-        weapon.forceSetPowered(isRunning)
+        // while shooting - or when the fight it was in is over.
+        weapon.forceSetPowered(isRunning && targetHostile)
         weapon.update(dt, dt, weapon.isPowered)
 
         if (!flightController.paused || !isRunning)
@@ -90,8 +98,10 @@ class CombatDrone(type: DroneBlueprint) : AbstractExternalDrone(type, true) {
             if (fireTimer <= 0f) {
                 fireTimer = 0f
 
-                fire()
-                pickNewTarget()
+                if (targetHostile) {
+                    fire()
+                    pickNewTarget()
+                }
             }
         }
 

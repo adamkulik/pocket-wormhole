@@ -1260,8 +1260,14 @@ class Ship(
         if (sys.debugFlags.noDmg.set)
             return
 
-        if (!hullArmorNegates)
+        if (!hullArmorNegates) {
             health -= hullDamage
+
+            // Screen shake (GitHub issue #31): vanilla jitters the view
+            // when the player's hull takes a hit, scaling with the damage.
+            if (sys.player === this)
+                sys.addScreenShake(hullDamage * InGameState.SCREEN_SHAKE_PER_DAMAGE)
+        }
         target.system?.dealDamage(if (casingNegates) 0 else damage.effectiveSysDamage, appliedIonDamage)
 
         // Fire and breach are mutually exclusive, if a fire spawns then a breach cannot.

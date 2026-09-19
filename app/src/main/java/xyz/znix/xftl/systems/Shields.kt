@@ -155,6 +155,19 @@ class Shields(blueprint: SystemBlueprint) : MainSystem(blueprint) {
         targetPower = powerSelected
     }
 
+    override fun updateCachedSelectedPower() {
+        super.updateCachedSelectedPower()
+
+        // Shield bars are only ever selected in whole bubbles. The cached
+        // demand can still end up odd - damage clamping the allocation, or
+        // the accounting around a Zoltan bar arriving or leaving (GitHub
+        // issue #66) - and an unpaired bar would keep drawing power while
+        // doing nothing, since half a bubble primes nothing. Round down to
+        // the whole-bubble count.
+        if (powerSelected.mod(2) == 1)
+            powerSelected -= 1
+    }
+
     override fun getPowerBarSpacing(powerLevel: Int): Int {
         // Group the power bars into pairs
         if (powerLevel.mod(2) == 1) {
