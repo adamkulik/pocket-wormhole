@@ -42,7 +42,9 @@ object VanillaSaveWriter {
 
         // 1. Header
         w.int(VanillaSaveFormat.FILE_FORMAT)
-        w.bool(true) // random_native
+        // Vanilla 1.6.14 writes random_native = false (verified in real
+        // saves); match it byte-for-byte.
+        w.bool(false) // random_native
         w.bool(game.isAdvancedEdition)
         w.int(game.difficulty.saveFormatValue)
         // Lifetime profile stats: xftl doesn't track these, so they're zeroed.
@@ -129,8 +131,15 @@ object VanillaSaveWriter {
 
         w.int(0) // unknown_mu
 
-        // 8. Encounter tail (see writeMinimalEncounterTail).
-        writeMinimalEncounterTail(w, game)
+        // 8. Encounter tail: a byte-exact real-vanilla tail (the template,
+        // or the donor's own tail when this run was imported), since vanilla
+        // hangs on our invented minimal encoding.
+        val donorTail = game.vanillaTail
+        if (donorTail != null) {
+            w.raw(donorTail)
+        } else {
+            w.raw(VanillaSaveFormat.TEMPLATE_TAIL)
+        }
 
         return w.toByteArray()
     }
@@ -143,13 +152,19 @@ object VanillaSaveWriter {
         w.string(if (title != null) game.translator[title] else ship.name)
         w.string(ship.type.img)
 
-        // Vanilla writes the ship's default crew (race + default names)
-        // here; the names are only used by the hangar, so write blanks.
-        val startingCrew = ship.type.initialCrew
+        // Vanilla writes ONE (race, name) pair PER CREW MEMBER (with the
+        // ship's default crew names); initialCrew is a list of specifiers
+        // carrying an amount, so expand them.
+        val startingCrew = ArrayList<Pair<String, String>>()
+        for (crewSpec in ship.type.initialCrew) {
+            repeat(crewSpec.amount) {
+                startingCrew.add(crewSpec.race to "")
+            }
+        }
         w.int(startingCrew.size)
-        for (crewSpec in startingCrew) {
-            w.string(crewSpec.race)
-            w.string("")
+        for ((race, name) in startingCrew) {
+            w.string(race)
+            w.string(name)
         }
 
         // Vanilla writes hostile=true for the player ship (verified in real
@@ -498,21 +513,6 @@ object VanillaSaveWriter {
      * been byte-verified against vanilla's own writer - see the validation
      * checklist.
      */
-    private fun writeMinimalEncounterTail(w: VanillaSaveByteWriter, game: InGameState) {
-        val spec = game.currentBeacon.ship?.spec
-
-        w.string(spec?.surrender?.debugId ?: VanillaSaveFormat.DEFAULT_SURRENDER_EVENT)
-        w.string(spec?.escape?.debugId ?: VanillaSaveFormat.DEFAULT_ESCAPE_EVENT)
-        w.string(spec?.destroyed?.debugId ?: VanillaSaveFormat.DEFAULT_DESTROYED_EVENT)
-        w.string(spec?.deadCrew?.debugId ?: VanillaSaveFormat.DEFAULT_DEAD_CREW_EVENT)
-
-        // Last encounter text (empty), current event text (empty), then a
-        // zeroed numeric blob. If vanilla rejects this, compare against a
-        // real quiet-state save and adjust.
-        w.string("")
-        w.string("")
-        repeat(8) { w.int(0) }
-    }
 
     private val Difficulty.saveFormatValue: Int
         get() = when (this) {

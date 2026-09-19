@@ -107,6 +107,14 @@ public class InGameState extends MainGame.GameState {
 
     private boolean isCurrentlyLoadingSave;
 
+    /**
+     * The encounter tail bytes from a vanilla save this run was imported
+     * from, preserved verbatim by the vanilla-format writer (vanilla hangs
+     * on tails we invent). Null for runs that started in this engine.
+     */
+    @Nullable
+    public byte[] vanillaTail;
+
     // Used for animation rendering only
     private float renderingDeltaTime;
 
@@ -235,6 +243,7 @@ public class InGameState extends MainGame.GameState {
     public InGameState(MainGame mainGame, GameContent content, VanillaSaveData data) {
         this(mainGame, content);
         difficulty = data.getDifficulty();
+        vanillaTail = data.getTail();
         isCurrentlyLoadingSave = true;
 
         // Rebuild the sector tree from the save's seed and walk to the saved

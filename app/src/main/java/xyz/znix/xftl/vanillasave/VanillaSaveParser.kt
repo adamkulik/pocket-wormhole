@@ -26,6 +26,9 @@ class VanillaSaveData {
     var fleetFudge: Int = 0
     var pursuitMod: Int = 0
 
+    // The encounter tail, preserved verbatim for re-export
+    var tail: ByteArray = ByteArray(0)
+
     // Map
     var currentBeaconId: Int = 0
     var hiddenCrystalWorld: Boolean = false
@@ -255,8 +258,9 @@ object VanillaSaveParser {
         repeat(r.int()) { out.distantQuests.add(r.string()) }
         r.int() // unknown_mu
 
-        // The encounter tail (encounter text state) is deliberately skipped:
-        // the loader doesn't need it and the file may end right here.
+        // Preserve the encounter tail verbatim: the writer re-emits it so
+        // vanilla keeps accepting the file after we re-save the run.
+        out.tail = data.copyOfRange(r.pos, data.size)
         return out
     }
 
