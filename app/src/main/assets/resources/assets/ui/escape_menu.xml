@@ -29,10 +29,10 @@
                 <widget type="label" text="escape_save"/>
             </widget>
             <widget type="button" pTop="284" id="export_save">
-                <widget type="label" text="pw_export_save" id="export_label"/>
+                <widget type="label" text="noloc:EXPORT SAVE" id="export_label"/>
             </widget>
             <widget type="button" pTop="321" id="import_save">
-                <widget type="label" text="pw_import_save" id="import_label"/>
+                <widget type="label" text="noloc:IMPORT SAVE" id="import_label"/>
             </widget>
         </widget>
 
