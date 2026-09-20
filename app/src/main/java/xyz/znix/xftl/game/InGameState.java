@@ -268,6 +268,20 @@ public class InGameState extends MainGame.GameState {
         // serialised ship XML with the vanilla save's values and reload it
         // through the regular deserialiser. This guarantees the element
         // structure matches exactly what the engine knows how to load.
+        // The regenerated geometry doesn't match vanilla's, so the save's
+        // current-beacon index would land the player at an arbitrary map
+        // position (reported: mid-sector on import). The intended workflow
+        // is transferring runs at a sector boundary, so always arrive at
+        // the regenerated sector's entry beacon and mark it visited, like
+        // an in-engine jump would.
+        //
+        // This block MUST stay before createNewPlayerShip: its update pass
+        // reaches Sensors.getBlocked -> getCurrentBeacon(), which NPE'd
+        // while currentBeacon was still null.
+        currentBeacon = sector.getStartBeacon();
+        currentBeacon.setVisited(true);
+        int beaconId = sector.getBeacons().indexOf(currentBeacon);
+
         createNewPlayerShip(data.getBlueprintName(), null);
         player = applyVanillaShip(data, data.getShip());
 
@@ -278,13 +292,13 @@ public class InGameState extends MainGame.GameState {
         isCurrentlyLoadingSave = false;
         lootPool = new LootPool(blueprintManager, sector.getType());
 
-        int beaconId = Math.min(data.getCurrentBeaconId(), sector.getBeacons().size() - 1);
-        currentBeacon = sector.getBeacons().get(beaconId);
-
         // The ship the player was fighting (or the one parked at the beacon)
-        // is rebuilt from its spawn spec and seed, like vanilla does.
-        if (data.getBeacons().get(beaconId).getEnemyPresent()) {
-            spawnVanillaEnemy(data.getBeacons().get(beaconId).getShipEventId(), data.getBeacons().get(beaconId).getShipEventSeed());
+        // is rebuilt from its spawn spec and seed, like vanilla does. The
+        // data list is indexed by VANILLA's beacon order, which can differ
+        // in length from ours - clamp before looking up.
+        int dataBeaconId = Math.min(beaconId, data.getBeacons().size() - 1);
+        if (data.getBeacons().get(dataBeaconId).getEnemyPresent()) {
+            spawnVanillaEnemy(data.getBeacons().get(dataBeaconId).getShipEventId(), data.getBeacons().get(dataBeaconId).getShipEventSeed());
         } else {
             setEnemy(currentBeacon.getShip());
         }
@@ -375,6 +389,7 @@ public class InGameState extends MainGame.GameState {
         // Crew: replace the default crew with the saved one.
         Element crewList = xml.getChild("crew");
         crewList.removeChildren("crewMember");
+        int crewIndex = 0;
         for (VanillaSaveData.VanillaCrew vc : vs.getCrew()) {
             if (vc.getCloneReady() > 0) {
                 continue; // crew waiting in the clonebay is dropped on import
@@ -389,6 +404,12 @@ public class InGameState extends MainGame.GameState {
             float y = Constants.ROOM_SIZE * (room.getY() + player.getOffset().getY() + sqY + 0.5f);
 
             Element crewElem = new Element("crewMember");
+            // The deserialiser registers every crew element by oid
+            // (SaveUtil.registerObjectId) — freshly built elements need one
+            // too, else Ship.loadFromXml dies with "Missing object ID!".
+            // Nothing else in the fresh ship's XML references crew oids,
+            // so any unique id works.
+            crewElem.setAttribute("oid", "vanillacrew:" + crewIndex);
             crewElem.setAttribute("type", vc.getRace());
             crewElem.setAttribute("x", Float.toString(x));
             crewElem.setAttribute("y", Float.toString(y));
@@ -407,6 +428,7 @@ public class InGameState extends MainGame.GameState {
                 crewElem.addContent(skillElem);
             }
             crewList.addContent(crewElem);
+            crewIndex++;
         }
 
         // Doors: open/closed state string; damage is reset on import.

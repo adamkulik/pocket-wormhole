@@ -226,8 +226,13 @@ class JumpWindow(val game: InGameState, showSectorMap: () -> Unit, val jump: (Be
 
             // Draw the nebula cloud puffs under nebulas (GitHub issue #74):
             // vanilla envelopes each nebula beacon in one of these soft
-            // clouds so the sector's nebula areas stand out on the map.
+            // clouds so the sector's nebula areas stand out on the map —
+            // AND it keeps the little blue glow oval underneath (the user
+            // spotted the missing indicator against vanilla; the clouds
+            // alone read wrong). Blue first, cloud on top.
             if (beacon.environmentType.isNebula) {
+                g.colour = Constants.BEACON_NEBULA_CIRCLE
+                g.fillOval(centrePos.x - 9f, centrePos.y - 9f, 20f, 20f)
                 val puff = nebulaPuffs[(beacon.pos.x * 31 + beacon.pos.y * 17).mod(nebulaPuffs.size)]
                 puff.draw(
                     centrePos.x - puff.width / 2f, centrePos.y - puff.height / 2f

@@ -261,10 +261,14 @@ object VanillaSaveParser {
             out.questEvents.add(event to r.int())
         }
         repeat(r.int()) { out.distantQuests.add(r.string()) }
-        r.int() // unknown_mu
 
-        // Preserve the encounter tail verbatim: the writer re-emits it so
-        // vanilla keeps accepting the file after we re-save the run.
+        // Preserve the encounter tail verbatim (kept for diagnostics and
+        // possible future use; the writer now generates its own tail from
+        // the template prefix/suffix plus our ship's extended info, since
+        // a verbatim donor tail only loads while the ship still matches
+        // the donor's loadout). Captured FROM unknown_mu onward (including
+        // the mu int), matching VanillaSaveFormat.TEMPLATE_TAIL's
+        // convention.
         out.tail = data.copyOfRange(r.pos, data.size)
         return out
     }

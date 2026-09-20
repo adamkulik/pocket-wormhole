@@ -73,6 +73,23 @@ object VanillaSaveFormat {
     val TEMPLATE_TAIL: ByteArray = java.util.Base64.getDecoder().decode(
         "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIwAAAGV2ZW50X05FQlVMQV9QSVJBVEVfU01VR0dMRV9jMl90ZXh0/////wIAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAAAAAAAAAPgqAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP////8BAAAAAAAAAAAAAAAAAAAA6AMAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/////wAAAAAAAAAAAAAAAAAAAADoAwAAGPz//xj8////////AAAAAAAAAADgLgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/////AQAAAAAAAAAAAAAAAAAAAOgDAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP////8AAAAAAAAAAAAAAAAAAAAA6AMAABj8//8Y/P///////wAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAADB1AAAAAAAAAAAAAA=="
     )
+
+    /**
+     * TEMPLATE_TAIL split around the extended-ship-info section (offsets
+     * 131/387, measured by parsing the template - donor ship: fresh
+     * Kestrel, 2 weapons, no drones/hacking/mind/artillery).
+     *
+     * The tail's extended-ship-info section describes a ship's weapon
+     * modules, drone pods and hacking/mind state, and vanilla cross-checks
+     * it against the ship section (the weapon-module count must equal the
+     * ship's weapon list). Pasting the template verbatim therefore only
+     * works for a ship identical to the donor's - any other loadout
+     * desynced vanilla's loader mid-tail (the phone->vanilla freeze). The
+     * writer splices its own extended info between these two proven byte
+     * runs instead.
+     */
+    val TAIL_PREFIX: ByteArray = TEMPLATE_TAIL.copyOfRange(0, 131)
+    val TAIL_SUFFIX: ByteArray = TEMPLATE_TAIL.copyOfRange(387, TEMPLATE_TAIL.size)
 }
 
 class VanillaSaveByteWriter {

@@ -42,7 +42,7 @@ class PauseWindow(val game: InGameState, val close: () -> Unit) : Window() {
         val transfer = xyz.znix.xftl.sys.PlatformSpecific.INSTANCE.saveTransfer
         widgetTree.byId["export_save"]?.isVisible = transfer != null
         widgetTree.byId["import_save"]?.isVisible = transfer != null
-        (widgetTree.byId["export_label"] as? Label)?.text = "EXPORT SAVE"
+        (widgetTree.byId["export_label"] as? Label)?.text = if (atSectorStart()) "EXPORT SAVE" else "EXPORT AT SECTOR START"
         (widgetTree.byId["import_label"] as? Label)?.text = "IMPORT SAVE"
 
         // Set the difficulty label
@@ -157,9 +157,20 @@ class PauseWindow(val game: InGameState, val close: () -> Unit) : Window() {
         close()
     }
 
+    // Vanilla-format exports are only meaningful at a sector boundary: the
+    // importing engine regenerates the beacon layout, so only the sector's
+    // entry beacon is a stable landing point (the loader snaps to the same
+    // beacon on import, and the writer pins its export order around it).
+    private fun atSectorStart() =
+        game.currentBeacon === game.currentBeacon.sector.startBeacon
+
     // Button handlers
     private fun exportSaveClicked() {
         val transfer = xyz.znix.xftl.sys.PlatformSpecific.INSTANCE.saveTransfer ?: return
+        if (!atSectorStart()) {
+            (widgetTree.byId["export_label"] as? Label)?.text = "EXPORT AT SECTOR START"
+            return
+        }
         val path = game.mainGame.getVanillaSavePath()
         val bytes = if (java.nio.file.Files.exists(path)) {
             java.nio.file.Files.readAllBytes(path)

@@ -9,13 +9,19 @@ import xyz.znix.xftl.game.InGameState
 import xyz.znix.xftl.game.StoreData
 import xyz.znix.xftl.sector.Beacon
 import xyz.znix.xftl.layout.Door
+import xyz.znix.xftl.systems.Artillery
 import xyz.znix.xftl.systems.BackupBattery
 import xyz.znix.xftl.systems.Cloaking
 import xyz.znix.xftl.systems.Clonebay
 import xyz.znix.xftl.systems.Drones
+import xyz.znix.xftl.systems.Hacking
 import xyz.znix.xftl.systems.MainSystem
+import xyz.znix.xftl.systems.MindControl
 import xyz.znix.xftl.systems.Shields
 import xyz.znix.xftl.systems.SubSystem
+import xyz.znix.xftl.systems.Weapons
+import xyz.znix.xftl.weapons.AbstractWeaponBlueprint
+import xyz.znix.xftl.weapons.DroneBlueprint
 import java.io.OutputStream
 import kotlin.math.roundToInt
 
@@ -31,15 +37,6 @@ import kotlin.math.roundToInt
  * validated against real vanilla saves.
  */
 object VanillaSaveWriter {
-    // Sprite paths verified to exist in the vanilla dat (img/stars/*).
-    private val VERIFIED_SPRITES = listOf(
-        "stars/planet_populated_orange.png",
-        "stars/planet_gas_yellow.png",
-        "stars/planet_peach.png",
-        "stars/planet_populated_brown.png",
-        "stars/planet_populated_dark.png",
-    )
-
     fun write(game: InGameState, out: OutputStream) {
         out.use { it.write(writeToByteArray(game)) }
     }
@@ -88,48 +85,80 @@ object VanillaSaveWriter {
         w.int(sector.dangerZoneCentre.y)
         w.int(sector.fleetAdvanceModifier)
 
-        // 5. Beacon map state
+        // 5. Beacon map state. Our beacon indices carry no positional
+        // meaning (our generator picks grid cells at random), while
+        // vanilla's correlate with progression - its own fresh-arrival
+        // saves sit at index 1-2. Exports are therefore written through an
+        // export order: when the player stands at the sector's entry
+        // beacon (the supported transfer-at-boundary workflow), that
+        // beacon is placed in slot 1, so vanilla lands the run next to its
+        // own map entrance. All per-beacon state and quest indices below
+        // go through the same order so they stay coherent. Exact position
+        // pinning would require pinning vanilla's generator.
         val beacons = sector.beacons
-        val currentId = beacons.indexOf(game.currentBeacon)
+        val exportOrder: List<Beacon> = if (game.currentBeacon === sector.startBeacon && beacons.size >= 2) {
+            val others = beacons.filter { it !== sector.startBeacon }
+            listOf(others[0], sector.startBeacon) + others.drop(1)
+        } else {
+            beacons
+        }
+        val currentId = exportOrder.indexOf(game.currentBeacon)
         w.int(currentId)
-        w.bool(false) // waiting
-        w.int(0) // wait_event_seed
-        w.string("") // unknown_epsilon
+        // Per the exe: a "fleet warning text present" flag, the fleet's
+        // warning sentinel (-1 in real saves while no warning is active)
+        // and its warning text. The fleet's actual danger-zone position is
+        // carried by the danger-zone seeds above, so the fleet's advance
+        // survives the round-trip (verified: real saves keep the same
+        // dzx/dzy semantics).
+        w.bool(false)
+        w.int(-1)
+        w.string("")
         w.bool(sector.mapRevealed) // sector_hazard_visible
 
-        // Rebel flagship state
+        // Rebel flagship / fleet-pursuit state: active flag, fleet map
+        // position (clamped by the exe to sectorCount-3), jumping flag,
+        // retreating flag, base-turn counter. xftl's bosses only exist in
+        // the Last Stand sector, which maps 1:1 onto vanilla's flagship
+        // pursuit being active there.
         val boss = sector.bosses.firstOrNull()
         w.bool(boss?.beacon != null)
         w.int(boss?.nextBeacon?.let { beacons.indexOf(it) } ?: 0)
         w.bool(boss?.jumping ?: false)
         w.bool(false) // retreating
-        w.int(0) // flagship_base_turns
+        w.int(0) // base_turns
 
-        // Visited-route flags: cosmetic (draws the green travel route), so
-        // vanilla's exact semantics don't matter much. Real saves write a
-        // shorter list than the beacon count; we write one entry per beacon
-        // marking the visited ones.
-        w.int(beacons.size)
-        for (beacon in beacons) {
-            w.bool(beacon.visited)
+        // Visited-sector route: one bool per SectorInfo entry across the
+        // map's branching columns (matches real saves: ~20 entries). The
+        // exe's loader walks this list to rebuild its highest-sector-reached
+        // counter and sets its LAST STAND flag once that counter passes the
+        // final column (sector number > 7). The old code wrote the BEACON
+        // count with per-beacon visited flags here, which flagged deep
+        // columns - including the Last Stand - as visited and dropped even
+        // a sector-1 run into the endgame on load.
+        val sectorEntries = game.gameMap.sectors.flatten()
+        w.int(sectorEntries.size)
+        for (info in sectorEntries) {
+            w.bool(game.visitedSectors.contains(info))
         }
 
         w.int(sector.sectorNumber)
         w.bool(false) // hidden_crystal_world
 
-        // 6. Beacons
-        w.int(beacons.size)
-        for (beacon in beacons) {
+        // 6. Beacons (in export order - see above)
+        w.int(exportOrder.size)
+        for (beacon in exportOrder) {
             writeBeacon(w, game, beacon)
         }
 
         // 7. Quests. Quests sitting on beacons are identified by the beacon's
-        // event; delayed quests go to the distant-quest list.
+        // event; delayed quests go to the distant-quest list. Indexes are
+        // remapped through the export order so quests stay attached to the
+        // right exported beacon.
         val questBeacons = beacons.withIndex().filter { it.value.hasQuest && !it.value.visited }
         w.int(questBeacons.size)
-        for ((index, beacon) in questBeacons) {
+        for ((_, beacon) in questBeacons) {
             w.string(beacon.event.deserialisationId)
-            w.int(index)
+            w.int(exportOrder.indexOf(beacon))
         }
 
         val delayed = game.delayedQuests
@@ -138,17 +167,19 @@ object VanillaSaveWriter {
             w.string(quest.deserialisationId)
         }
 
-        w.int(0) // unknown_mu
-
-        // 8. Encounter tail: a byte-exact real-vanilla tail (the template,
-        // or the donor's own tail when this run was imported), since vanilla
-        // hangs on our invented minimal encoding.
-        val donorTail = game.vanillaTail
-        if (donorTail != null) {
-            w.raw(donorTail)
-        } else {
-            w.raw(VanillaSaveFormat.TEMPLATE_TAIL)
-        }
+        // 8. Encounter tail: the template's bytes are real vanilla output
+        // (proven to load), BUT its extended-ship-info section describes
+        // the DONOR's ship, and vanilla cross-checks that against the ship
+        // section (weapon-module count == weapon list length; drone pods
+        // per drone type). Pasting a whole template/donor tail verbatim
+        // only worked for a ship identical to the donor's - any other
+        // loadout desynced vanilla's loader mid-tail: the phone->vanilla
+        // freeze. Splice: proven prefix (mu, encounter, environment,
+        // projectiles) + OUR ship's extended info + proven suffix (nu,
+        // autofire, flagship, occupancy).
+        w.raw(VanillaSaveFormat.TAIL_PREFIX)
+        writeExtendedShipInfo(w, game, player)
+        w.raw(VanillaSaveFormat.TAIL_SUFFIX)
 
         return w.toByteArray()
     }
@@ -326,6 +357,130 @@ object VanillaSaveWriter {
         }
     }
 
+    /**
+     * The tail's per-ship section (vanilla's FUN_004a1830): deployed-drone
+     * flags/pods, hacking/mind state, one weapon module per weapon, one per
+     * artillery level, standalone drones. Everything is written from OUR
+     * ship's live state - the byte counts here are cross-checked by
+     * vanilla's loader against the ship section above.
+     */
+    private fun writeExtendedShipInfo(w: VanillaSaveByteWriter, game: InGameState, ship: Ship) {
+        // Deployed drones: (deployed, armed) per slot drone plus a pod for
+        // types with a flying body. In-flight drones are transient (dropped
+        // like projectiles), so both flags are false.
+        val dronesSystem = ship.systems.firstOrNull { it is Drones } as Drones?
+        val slotDrones = dronesSystem?.drones?.filterNotNull() ?: emptyList()
+        for (info in slotDrones) {
+            w.bool(false)
+            w.bool(false)
+            writeDronePod(w, info.type.type)
+        }
+
+        // Hacking: target + timing fields + a hacking pod.
+        val hacking = ship.systems.firstOrNull { it is Hacking }
+        if (hacking != null && hacking.energyLevels > 0) {
+            w.int(-1) // target room: none
+            w.int(0)
+            w.bool(false)
+            w.int(0)
+            w.int(0)
+            w.int(0)
+            w.bool(false)
+            writeDronePod(w, DroneBlueprint.DroneType.HACKING)
+        }
+
+        // Mind control: two scalars.
+        val mind = ship.systems.firstOrNull { it is MindControl }
+        if (mind != null && mind.energyLevels > 0) {
+            w.int(0)
+            w.int(0)
+        }
+
+        // Weapon modules - the count MUST equal the ship section's weapon
+        // list (vanilla reads exactly that many modules).
+        val weapons = ship.hardpoints.mapNotNull { it.weapon }
+        val weaponsSystem = ship.systems.firstOrNull { it is Weapons }
+        if (weaponsSystem != null && weaponsSystem.energyLevels > 0) {
+            w.int(weapons.size)
+            for (weapon in weapons) {
+                writeWeaponModule(w, (weapon.type.chargeTime * 1000).toInt())
+            }
+        }
+
+        // Artillery: one module per artillery level; the gun's blueprint id
+        // sits on the artillery hardpoint's spec (same lookup Artillery uses).
+        for (artillery in ship.artillery) {
+            if (artillery.energyLevels <= 0) continue
+            val bpId = artillery.configuration.spec.weapon
+            val chargeTime = if (bpId != null)
+                (game.blueprintManager[bpId] as? AbstractWeaponBlueprint)?.chargeTime ?: 10f
+            else 10f
+            writeWeaponModule(w, (chargeTime * 1000).toInt())
+        }
+
+        // Standalone (system-less) drones: none.
+        w.int(0)
+    }
+
+    /** A drone pod: transient flight state, written as inert defaults. */
+    private fun writeDronePod(w: VanillaSaveByteWriter, type: DroneBlueprint.DroneType) {
+        when (type) {
+            DroneBlueprint.DroneType.REPAIR, DroneBlueprint.DroneType.BATTLE -> return
+            else -> {}
+        }
+        // mourning, space, dest, pos x10, ticks x6, hops, pi, rho, overload,
+        // tau, upsilon, dpos x2, death anim (2 bools + 5 ints)
+        repeat(3 + 10 + 6 + 6 + 2) { w.int(0) }
+        w.bool(false); w.bool(false)
+        repeat(5) { w.int(0) }
+        when (type) {
+            DroneBlueprint.DroneType.BOARDER -> repeat(9) { w.int(0) }
+            DroneBlueprint.DroneType.HACKING -> {
+                repeat(4) { w.int(0) }
+                repeat(2) {
+                    w.bool(false); w.bool(false)
+                    repeat(5) { w.int(0) }
+                }
+            }
+            DroneBlueprint.DroneType.COMBAT,
+            DroneBlueprint.DroneType.SHIP_REPAIR -> repeat(5) { w.int(0) }
+            DroneBlueprint.DroneType.DEFENSE -> {}
+            DroneBlueprint.DroneType.SHIELD -> w.int(0)
+            DroneBlueprint.DroneType.REPAIR, DroneBlueprint.DroneType.BATTLE -> {}
+        }
+    }
+
+    /**
+     * A weapon module: per-gun charge/targeting state. The defaults match
+     * the template's fresh-loadout modules (the only bytes of this structure
+     * vanilla has ever been proven to accept from us).
+     */
+    private fun writeWeaponModule(w: VanillaSaveByteWriter, coolGoalMs: Int) {
+        w.int(0) // cool
+        w.int(coolGoalMs)
+        w.int(0) // subcool
+        w.int(0) // subgoal
+        w.int(0) // boost
+        w.int(0) // charge
+        w.int(0) // targets count
+        w.int(0) // prev targets count
+        w.bool(false) // autofire
+        w.bool(false) // fire_ready
+        w.int(-1) // target_id
+        // anim: (bool, bool, 5 ints)
+        w.bool(true); w.bool(false)
+        w.int(0); w.int(0); w.int(1000); w.int(0); w.int(0)
+        w.int(0) // protract
+        w.bool(false) // firing
+        w.bool(false) // phi
+        w.int(-1) // anim_charge
+        // charge_anim
+        w.bool(false); w.bool(false)
+        w.int(0); w.int(0); w.int(1000); w.int(-1000); w.int(-1000)
+        w.int(-1) // last_proj
+        w.int(0) // pending projectiles
+    }
+
     private fun writeCrew(w: VanillaSaveByteWriter, game: InGameState, member: LivingCrew) {
         w.string(member.info.name)
         w.string(member.blueprint.name)
@@ -445,24 +600,15 @@ object VanillaSaveWriter {
         w.int(0) // tempcapacity_divisor
     }
 
-    private inline fun <T> writeShelf(
-        w: VanillaSaveByteWriter,
-        type: Int,
-        items: List<T?>,
-        nameOf: (T) -> String
-    ) {
-        w.int(type)
-        for (index in 0 until 3) {
-            val item = items.getOrNull(index)
-            if (item == null) {
-                w.int(-1)
-            } else {
-                w.bool(true)
-                w.string(nameOf(item))
-                w.int(0)
-            }
-        }
-    }
+    // Sprite paths verified to exist in the vanilla dat (img/stars/*).
+    // Rotated per-beacon for variety.
+    private val VERIFIED_SPRITES = listOf(
+        "stars/planet_populated_orange.png",
+        "stars/planet_gas_yellow.png",
+        "stars/planet_peach.png",
+        "stars/planet_populated_brown.png",
+        "stars/planet_populated_dark.png",
+    )
 
     private fun writeBeacon(w: VanillaSaveByteWriter, game: InGameState, beacon: Beacon) {
         val visited = beacon.visited
@@ -506,15 +652,46 @@ object VanillaSaveWriter {
         // sections are left out entirely. Vanilla's parser reads all three
         // items unconditionally, so inventing terminators hangs it (found by
         // the freeze bisect).
-        // The store encoding proven to load in real vanilla (Q_H test):
-        // always 5 shelves, each with 3 slots, -1 terminators for empty.
-        w.int(5)
+        val shelves = ArrayList<Triple<Int, Int, List<String?>>>()
+        if (data.systems.any { it != null }) {
+            shelves.add(Triple(VanillaSaveFormat.SHELF_SYSTEM, data.systems.size,
+                data.systems.map { it?.name }))
+        }
+        if (data.weapons.any { it != null }) {
+            shelves.add(Triple(VanillaSaveFormat.SHELF_WEAPON, data.weapons.size,
+                data.weapons.map { it?.name }))
+        }
+        if (data.drones.any { it != null }) {
+            shelves.add(Triple(VanillaSaveFormat.SHELF_DRONE, data.drones.size,
+                data.drones.map { it?.name }))
+        }
+        if (data.augments.any { it != null }) {
+            shelves.add(Triple(VanillaSaveFormat.SHELF_AUGMENT, data.augments.size,
+                data.augments.map { it?.name }))
+        }
+        if (data.crew.any { it != null }) {
+            shelves.add(Triple(VanillaSaveFormat.SHELF_CREW, data.crew.size,
+                data.crew.map { it?.race?.name }))
+        }
 
-        writeShelf(w, VanillaSaveFormat.SHELF_SYSTEM, data.systems) { it.name }
-        writeShelf(w, VanillaSaveFormat.SHELF_WEAPON, data.weapons) { it.name }
-        writeShelf(w, VanillaSaveFormat.SHELF_DRONE, data.drones) { it.name }
-        writeShelf(w, VanillaSaveFormat.SHELF_AUGMENT, data.augments) { it.name }
-        writeShelf(w, VanillaSaveFormat.SHELF_CREW, data.crew) { it.race.name }
+        w.int(shelves.size)
+        for ((type, count, names) in shelves) {
+            w.int(type)
+            for (index in 0 until 3) {
+                val name = names.getOrNull(index)
+                if (name == null) {
+                    // Sold-out slot: vanilla keeps the item with avail=0; the
+                    // name is lost in xftl's model, so write a blank one.
+                    w.bool(false)
+                    w.string("")
+                    w.int(0)
+                } else {
+                    w.bool(true)
+                    w.string(name)
+                    w.int(0) // extra data
+                }
+            }
+        }
 
         w.int(data.availableResources.fuel)
         w.int(data.availableResources.missiles)
