@@ -40,9 +40,15 @@ class PauseWindow(val game: InGameState, val close: () -> Unit) : Window() {
         // expose the save directory directly (Android's SAF); on desktop the
         // continue.sav sits next to the other saves anyway.
         val transfer = xyz.znix.xftl.sys.PlatformSpecific.INSTANCE.saveTransfer
-        widgetTree.byId["export_save"]?.isVisible = transfer != null
+        // Vanilla-format exports are only meaningful at a sector boundary:
+        // the importing engine regenerates the beacon layout, so only the
+        // sector's entry beacon is a stable landing point. Hide the button
+        // everywhere else (the long explanation label did not fit).
+        val exportVisible = transfer != null && atSectorStart()
+        widgetTree.byId["export_save"]?.isVisible = exportVisible
+        widgetTree.byId["export_label"]?.isVisible = exportVisible
         widgetTree.byId["import_save"]?.isVisible = transfer != null
-        (widgetTree.byId["export_label"] as? Label)?.text = if (atSectorStart()) "EXPORT SAVE" else "EXPORT AT SECTOR START"
+        widgetTree.byId["import_label"]?.isVisible = transfer != null
         (widgetTree.byId["import_label"] as? Label)?.text = "IMPORT SAVE"
 
         // Set the difficulty label
@@ -167,10 +173,7 @@ class PauseWindow(val game: InGameState, val close: () -> Unit) : Window() {
     // Button handlers
     private fun exportSaveClicked() {
         val transfer = xyz.znix.xftl.sys.PlatformSpecific.INSTANCE.saveTransfer ?: return
-        if (!atSectorStart()) {
-            (widgetTree.byId["export_label"] as? Label)?.text = "EXPORT AT SECTOR START"
-            return
-        }
+        if (!atSectorStart()) return
         val path = game.mainGame.getVanillaSavePath()
         val bytes = if (java.nio.file.Files.exists(path)) {
             java.nio.file.Files.readAllBytes(path)
