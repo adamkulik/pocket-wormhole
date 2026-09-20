@@ -60,6 +60,35 @@ Everything lives in the app's private storage
 the run resumes automatically, exactly where you left it. Starting a new run
 or dying discards the saved one, as in vanilla FTL.
 
+## Moving runs between devices (EXPORT / IMPORT SAVE)
+
+The pause menu can **EXPORT** your run as a vanilla-compatible `continue.sav`
+(loadable by vanilla FTL 1.6.14+ with AE, or another Pocket Wormhole install)
+and **IMPORT** such a file back.
+
+> **⚠️ READ THIS BEFORE USING — these are hard limitations, not fine print:**
+>
+> - **Move runs at the start of a sector.** The EXPORT button only exists
+>   while you stand on the newly arrived sector's entry beacon, because that
+>   is the one state that transfers faithfully. There is no way to pin a
+>   mid-sector position across engines.
+> - **The map layout reshuffles on every transfer.** Ship, crew, weapons,
+>   scrap, sector number, visited route, stores, quests and fleet progress
+>   all carry over — but the beacon geometry is re-rolled by whichever
+>   engine imports the save, so everything sits in different places.
+> - **In-flight state is dropped**: an active battle (enemy ship and
+>   projectiles), open event dialogs, hacking effects and crew waiting in
+>   the clonebay do not survive a transfer.
+> - **Exports from v0.2.4 or older are broken** and will *hang vanilla FTL*
+>   on load. Re-export the run with v0.2.5 or newer.
+> - Lifetime profile statistics are zeroed in exports (vanilla keeps its own
+>   totals in its `prof.sav` anyway).
+> - `run-save.xml` — the engine-native autosave — is **not** a transfer
+>   format. It only works between Pocket Wormhole installs.
+
+In short: jump to a new sector, EXPORT, move the file, IMPORT (or drop it
+next to vanilla's saves), and continue there.
+
 ## Known limitations
 
 - XSLT-based mod patches are unsupported (Saxon doesn't run on Android);
