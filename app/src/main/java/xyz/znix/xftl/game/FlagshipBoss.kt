@@ -39,6 +39,15 @@ class FlagshipBoss private constructor(val sector: Sector, val game: InGameState
     private var runningAway: Boolean = false
     private var stage: Int = 1
 
+    /**
+     * The flagship from the player's last visit, if they jumped away from the
+     * fight mid-stage. Vanilla keeps the flagship's damage and remaining crew
+     * between retreats - only a destroyed stage rebuilds it (GitHub issue
+     * #86).
+     */
+    var stashedShip: Ship? = null
+        private set
+
     private var mapIconRotation: Float = (0f..10f).random(VisualRandom)
     private val flagshipIcon = game.getImg("img/map/map_icon_boss.png")
 
@@ -73,6 +82,14 @@ class FlagshipBoss private constructor(val sector: Sector, val game: InGameState
     }
 
     override fun createShip(): Ship {
+        // Returning to a fight we jumped away from: bring back the same ship,
+        // damage and surviving crew included. Vanilla replays no boss intro
+        // in this case.
+        stashedShip?.let {
+            stashedShip = null
+            return it
+        }
+
         // The ship name is in the format of BOSS_1_NORMAL_DLC
         var shipName = String.format("BOSS_%d_%s", stage, game.difficulty)
         if (game.content.enableAdvancedEdition) {
@@ -162,6 +179,9 @@ class FlagshipBoss private constructor(val sector: Sector, val game: InGameState
     }
 
     override fun bossShipKilled(enemy: Ship) {
+        // The stage was destroyed - the next one is a fresh ship.
+        stashedShip = null
+
         updateNextBeacon()
 
         // If we're not at the base, continue on our path there.
@@ -248,12 +268,41 @@ class FlagshipBoss private constructor(val sector: Sector, val game: InGameState
         return crew.firstOrNull()?.info
     }
 
+    /**
+     * Park the ship the player just jumped away from, so it can be restored
+     * when they come back (GitHub issue #86). Called by InGameState when
+     * leaving a boss fight.
+     */
+    override fun stashShip(ship: Ship) {
+        stashedShip = ship
+    }
+
+    /**
+     * Debug/testing hook: move this boss to the given beacon. Only touches
+     * testing state - the fight itself spawns when the player arrives.
+     */
+    fun debugTeleportTo(beacon: Beacon) {
+        realBeacon = beacon
+        updateNextBeacon()
+        jumping = false
+    }
+
     override fun saveToXML(elem: Element, refs: ObjectRefs) {
         SaveUtil.addAttrRef(elem, "beacon", refs, beacon)
         SaveUtil.addAttrRef(elem, "next", refs, nextBeacon)
         SaveUtil.addAttrBool(elem, "jumping", jumping)
         SaveUtil.addAttrBool(elem, "runningAway", runningAway)
         SaveUtil.addAttrInt(elem, "stage", stage)
+
+        // The ship the player retreated from mid-stage (GitHub issue #86).
+        // Registered first, exactly like saveGameState registers the live
+        // boss ship before saving it.
+        stashedShip?.let {
+            refs.register(it, "stashedBossShip")
+            val stashElem = Element("stashedShip")
+            it.saveToXML(stashElem, refs)
+            elem.addContent(stashElem)
+        }
 
         fun saveCrew(info: LivingCrewInfo?, name: String) {
             if (info == null)
@@ -300,6 +349,10 @@ class FlagshipBoss private constructor(val sector: Sector, val game: InGameState
         mainShipCrew.clear()
         for (crewElem in elem.getChildren("mainCrew")) {
             mainShipCrew += LivingCrewInfo.loadFromXMLWithRace(crewElem, human, game)
+        }
+
+        elem.getChild("stashedShip")?.let {
+            stashedShip = game.deserialiseSingleShip(it, refs, null)
         }
     }
 

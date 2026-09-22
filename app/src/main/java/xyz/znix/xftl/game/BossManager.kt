@@ -78,6 +78,14 @@ interface BossManager : ISerialReferencable {
      */
     fun bossShipKilled(enemy: Ship)
 
+    /**
+     * Park a ship the player just jumped away from mid-fight, so it can be
+     * restored (with its damage and surviving crew) if they return. Vanilla
+     * preserves the flagship's state between retreats (GitHub issue #86).
+     * Managers that don't support this may ignore the call.
+     */
+    fun stashShip(ship: Ship) {}
+
     // Serialisation
     fun saveToXML(elem: Element, refs: ObjectRefs)
     fun loadFromXML(elem: Element, refs: RefLoader)

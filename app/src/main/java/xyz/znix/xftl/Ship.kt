@@ -61,6 +61,15 @@ class Ship(
     val isPlayerShip: Boolean get() = type.isPlayerShip
     val isUsingBossUI: Boolean get() = boss?.useBossShipUI ?: false
     val isAutoScout: Boolean get() = type.isAutoScout
+
+    /**
+     * Crew-less ships that run as if their systems were manned, repairing
+     * damage as they go - vanilla's flagship becomes one when all its crew
+     * are killed ("the AI took control", the BOSS_AUTOMATED event; GitHub
+     * issue #84). Unlike [isAutoScout] this isn't from the blueprint - it
+     *'s a runtime state, so it needs serialising.
+     */
+    var isAutomated: Boolean = false
     val weaponSlots: Int? get() = customised?.weaponSlots ?: type.weaponSlots
     val droneSlots: Int? get() = customised?.droneSlots ?: type.droneSlots
 
@@ -225,7 +234,7 @@ class Ship(
         get() {
             // For the FTL to charge, the engines and piloting must
             // be working, and a pilot must be present.
-            val hasPilot = isAutoScout || friendlyCrew.any { it.room == piloting!!.room }
+            val hasPilot = isAutoScout || isAutomated || friendlyCrew.any { it.room == piloting!!.room }
             return engines!!.powerSelected > 0 && piloting!!.undamagedEnergy > 0 && hasPilot
                     && !engines!!.isHackActive && !piloting!!.isHackActive
         }
@@ -1309,8 +1318,11 @@ class Ship(
         // is a neutral projectile: 1 damage, 10% breach, 20% stun, ignores
         // regular shields, affected by evasion, and shootable by ANY
         // defence drone (including ours - a vanilla quirk).
+        // Only hull or system damage counts as "taking damage" (GitHub
+        // issue #101): an ion-only hit (e.g. an ion blast against the
+        // shields) deals neither and must not launch a shard.
         val enemy = sys.getEnemyOf(this)
-        val damageTaken = !hullArmorNegates || damage.effectiveSysDamage > 0
+        val damageTaken = (hullDamage > 0 && !hullArmorNegates) || damage.effectiveSysDamage > 0
         if (enemy != null && !enemy.isGone && damageTaken) {
             val shardChance = getAugmentValue(AugmentBlueprint.CRYSTAL_SHARDS)
             if (shardChance > 0f && Random.rollChance((shardChance * 100).toInt())) {
@@ -1948,6 +1960,7 @@ class Ship(
         SaveUtil.addTagFloat(elem, "escapeTimer", escapeTimer, null)
         SaveUtil.addTagInt(elem, "maxSuperShield", maxSuperShield, 5)
         SaveUtil.addTagInt(elem, "superShield", superShield, 0)
+        SaveUtil.addTagBoolIfTrue(elem, "automated", isAutomated)
 
         SaveUtil.addAttrRef(elem, "bossManager", refs, boss)
 
@@ -2113,6 +2126,7 @@ class Ship(
         surrenderHealth = SaveUtil.getOptionalTagInt(rootElem, "surrenderHealth") ?: 0
         escapeTimer = SaveUtil.getOptionalTagFloat(rootElem, "escapeTimer")
         maxSuperShield = SaveUtil.getOptionalTagInt(rootElem, "maxSuperShield") ?: 5
+        isAutomated = SaveUtil.getOptionalTagBool(rootElem, "automated") ?: false
 
         // This must be set after maxSuperShield to avoid it being wrongly clamped
         superShield = SaveUtil.getOptionalTagInt(rootElem, "superShield") ?: 0

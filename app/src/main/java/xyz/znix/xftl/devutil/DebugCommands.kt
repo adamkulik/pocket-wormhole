@@ -10,6 +10,7 @@ import xyz.znix.xftl.drones.AbstractIndoorsDrone
 import xyz.znix.xftl.f
 import xyz.znix.xftl.game.Achievement
 import xyz.znix.xftl.game.Difficulty
+import xyz.znix.xftl.game.FlagshipBoss
 import xyz.znix.xftl.game.GameOverWindow
 import xyz.znix.xftl.game.ShipFamily
 import xyz.znix.xftl.rendering.Colour
@@ -428,6 +429,41 @@ class DebugCommands(console: DebugConsole) : ConsoleCommandProvider(console) {
     private fun cmdSectors() {
         game.shipUI.openSectorMap()
         addLine("Sector map window opened.")
+    }
+
+    @ConsoleCommand(name = "boss")
+    @CmdHelp("Spawn the sector boss (flagship) at the current beacon")
+    private fun cmdBoss() {
+        val sector = game.currentBeacon.sector
+        val boss = sector.bosses.firstOrNull() as? FlagshipBoss ?: run {
+            val created = FlagshipBoss(sector, game, game.currentBeacon)
+            sector.bosses.add(created)
+            created
+        }
+
+        boss.debugTeleportTo(game.currentBeacon)
+        addLine("Flagship placed at the current beacon - jump away and back to fight it.")
+    }
+
+    @ConsoleCommand(name = "kill-ecrew")
+    @CmdHelp("Kill all crew aboard the enemy ship (including any boarding you)")
+    private fun cmdKillEnemyCrew() {
+        val enemy = game.enemy
+        if (enemy == null) {
+            addLine("No enemy ship")
+            return
+        }
+
+        var count = 0
+        for (crew in enemy.crew.mapNotNull { it as? LivingCrew }) {
+            if (crew.ownerShip != enemy)
+                continue
+
+            crew.health = 0f
+            count++
+        }
+
+        addLine("Killed $count enemy crewmembers")
     }
 
     @ConsoleCommand(name = "system")

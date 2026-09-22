@@ -98,7 +98,6 @@
     <ship_family>
         <ship id="PLAYER_SHIP_ANAEROBIC"/>
         <ship id="PLAYER_SHIP_ANAEROBIC_2"/>
-        <ship id="PLAYER_SHIP_ANAEROBIC_3"/>
 
         <ach id="ACH_LANIUS_ADVANCED"/>
         <ach id="ACH_LANIUS_SCRAP"/>
@@ -108,7 +107,6 @@
     <ship_family unlockId="8">
         <ship id="PLAYER_SHIP_CRYSTAL"/>
         <ship id="PLAYER_SHIP_CRYSTAL_2"/>
-        <ship id="PLAYER_SHIP_CRYSTAL_3"/>
 
         <ach id="ACH_CRYSTAL_SHARD"/>
         <ach id="ACH_CRYSTAL_LOCKDOWN"/>

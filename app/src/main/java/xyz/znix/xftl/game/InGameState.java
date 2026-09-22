@@ -1233,26 +1233,7 @@ public class InGameState extends MainGame.GameState {
             // Check if the enemy crew is dead (including any aboard the player ship).
             // Note we check the crew owners, so that mind-controlling the last
             // crew doesn't break it.
-            boolean anyCrewLeft = enemy.hasCrewOwnedByShip(enemy);
-            boolean anyBoardersLeft = player.hasCrewOwnedByAnyOtherShip();
-            if (!anyCrewLeft && !anyBoardersLeft && !enemy.isAutoScout() && enemyIsHostile) {
-                if (enemy.getSpec() != null) {
-                    IEvent event = enemy.getSpec().getDeadCrew();
-                    if (event != null)
-                        showEventDialogue(event.resolve(), Random.Default.nextInt());
-                } else if (enemy.getBoss() != null) {
-                    // TODO turn the enemy into an autoscout
-                    // Event event = eventManager.get("BOSS_AUTOMATED").resolve();
-                    // showEventDialogue(event);
-                }
-
-                setEnemyIsHostile(false);
-
-                // If we jump back, they shouldn't re-appear.
-                // This also means there won't be a danger mark
-                // on the map.
-                currentBeacon.setShip(null);
-            }
+            checkCrewKillDefeat();
         } else {
             player.setOpponentCloakActive(false);
         }
@@ -1316,6 +1297,14 @@ public class InGameState extends MainGame.GameState {
 
     public void setCurrentBeacon(Beacon currentBeacon) {
         boolean beaconChanged = this.currentBeacon == null || this.currentBeacon != currentBeacon;
+
+        // Leaving a boss fight mid-stage: keep the ship. Vanilla preserves the
+        // flagship's damage and surviving crew between retreats - only a
+        // destroyed stage rebuilds it (GitHub issue #86).
+        if (enemy != null && enemy.getBoss() != null) {
+            enemy.resetAfterJump();
+            enemy.getBoss().stashShip(enemy);
+        }
 
         if (this.currentBeacon == null || this.currentBeacon.getSector() != currentBeacon.getSector()) {
             SectorType sectorType = currentBeacon.getSector().getType();
@@ -1512,7 +1501,11 @@ public class InGameState extends MainGame.GameState {
 
         if (enemy != null) {
             enemyAI = new ShipAI(enemy, Objects.requireNonNull(player));
-            hostileShipUI = new HostileShipUI(this, enemy);
+            // Don't create HostileShipUI in automated tests - it loads fonts,
+            // which need a GL context (rendering never runs in tests).
+            if (!isRunningAutomatedTest()) {
+                hostileShipUI = new HostileShipUI(this, enemy);
+            }
             enemy.enemyShipUpdated();
         } else {
             enemyAI = null;
@@ -1534,6 +1527,50 @@ public class InGameState extends MainGame.GameState {
                     continue;
 
                 drone.setPowered(false);
+            }
+        }
+    }
+
+    /**
+     * Fire the crew-kill defeat (deadCrew event, or the flagship automation)
+     * when the enemy ship has no living crew left. Runs every update - it's
+     * public so that automated tests can call it directly.
+     */
+    public void checkCrewKillDefeat() {
+        if (enemy == null || !enemyIsHostile)
+            return;
+
+        boolean anyCrewLeft = enemy.hasCrewOwnedByShip(enemy);
+        boolean anyBoardersLeft = player.hasCrewOwnedByAnyOtherShip();
+
+        // A functioning clonebay keeps the fight going - the crew-kill defeat
+        // only fires once the clonebay is destroyed (or absent). GitHub issue
+        // #76, per the wiki's Boarding/Clone Bay pages.
+        Clonebay clones = enemy.getClonebay();
+        boolean clonebayOperational = clones != null && !clones.getBroken();
+
+        if (!anyCrewLeft && !anyBoardersLeft && !clonebayOperational && !enemy.isAutoScout() && !enemy.isAutomated() && enemyIsHostile) {
+            if (enemy.getBoss() != null) {
+                // Vanilla: killing the flagship's crew doesn't defeat it -
+                // "the AI took control" (the BOSS_AUTOMATED event): the ship
+                // stays hostile, its undamaged systems count as manned and
+                // damaged systems auto-repair (GitHub issue #84).
+                enemy.setAutomated(true);
+                Event event = eventManager.get("BOSS_AUTOMATED").resolve();
+                showEventDialogue(event, Random.Default.nextInt());
+            } else {
+                if (enemy.getSpec() != null) {
+                    IEvent event = enemy.getSpec().getDeadCrew();
+                    if (event != null)
+                        showEventDialogue(event.resolve(), Random.Default.nextInt());
+                }
+
+                setEnemyIsHostile(false);
+
+                // If we jump back, they shouldn't re-appear.
+                // This also means there won't be a danger mark
+                // on the map.
+                currentBeacon.setShip(null);
             }
         }
     }

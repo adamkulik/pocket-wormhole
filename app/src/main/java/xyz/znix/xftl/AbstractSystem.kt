@@ -148,6 +148,12 @@ abstract class AbstractSystem(val blueprint: SystemBlueprint) {
         } else if (ship.isAutoScout && room!!.breaches.all { it == null }) {
             // 8% per second is the human speed, it's 1/3 of that for the auto repair
             repair(0.08f / 3 * dt)
+        } else if (ship.isAutomated && room!!.breaches.all { it == null } && room!!.fires.all { it == null }) {
+            // The automated flagship (GitHub issue #84) repairs at the same
+            // rate, but unlike auto-scouts fire blocks the repair too - the
+            // wiki: "damaged systems are all progressively repaired at a set
+            // rate, except those with fire or a breach in their room".
+            repair(0.08f / 3 * dt)
         } else if (room?.crew?.none { it.mode == AbstractCrew.SlotType.CREW } == true) {
             // No-one is in the room
             repairProgress = 0f
@@ -568,7 +574,9 @@ abstract class AbstractSystem(val blueprint: SystemBlueprint) {
         // It seems there's a fake crewmember in every room?
         // This only applies to fully-repaired systems, I think.
         // https://www.reddit.com/r/ftlgame/comments/2e30zc/question_re_autoscouts/
-        if (ship.isAutoScout && !damaged)
+        // The automated flagship counts too - "undamaged systems are treated
+        // as manned" (wiki: Rebel Flagship; GitHub issue #84).
+        if ((ship.isAutoScout || ship.isAutomated) && !damaged)
             return SkillLevel.BASE
 
         return manningCrew?.getSkillLevel(skill)

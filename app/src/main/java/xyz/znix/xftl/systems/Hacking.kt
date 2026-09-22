@@ -135,7 +135,15 @@ class Hacking(blueprint: SystemBlueprint) : MainSystem(blueprint) {
         if (projectile != null) {
             // Is the projectile gone?
             if (!ship.projectiles.contains(projectile) && !projectile.target.ship.projectiles.contains(projectile)) {
+                // If it was shot down while flying to the target, the system
+                // goes on cooldown before another drone can be launched
+                // (GitHub issue #103). The wiki only says "a short delay";
+                // we use the same 20s as the post-pulse cooldown.
+                val destroyedInFlight = !projectile.hasLanded
                 this.projectile = null
+
+                if (destroyedInFlight)
+                    ionTimer += Cloaking.COOLDOWN
             }
             if (!ship.sys.isShipPresent(projectile.target.ship)) {
                 this.projectile = null
@@ -167,6 +175,12 @@ class Hacking(blueprint: SystemBlueprint) : MainSystem(blueprint) {
         // to select this via the player UI, unless hacking is hit
         // while you're selecting a room.
         if (powerSelected == 0)
+            return
+
+        // Also respect the ion/hack/cooldown lock (GitHub issue #103: the
+        // post-destruction cooldown runs through the ion timer, so this
+        // covers both the player's button and the AI's launch path).
+        if (isPowerLocked)
             return
 
         // Block hacking empty rooms

@@ -59,7 +59,10 @@ class Clonebay(blueprint: SystemBlueprint) : MainSystem(blueprint) {
     private val cloneSound by onInit { it.sounds.getSample("cloneArrive") }
     private val offSound by onInit { it.sounds.getLoop("cloneBroken") }
 
-    private val hiddenCrewFont by onInit { it.getFont("JustinFont10") }
+    // Fonts can't be loaded in automated tests (no GL context) - it's only
+    // needed when drawing the "+N" queue count, so look it up on use.
+    private val hiddenCrewFont: SILFontLoader?
+        get() = if (ship.sys.isRunningAutomatedTest) null else ship.sys.getFont("JustinFont10")
 
     override fun update(dt: Float) {
         super.update(dt)
@@ -217,7 +220,7 @@ class Clonebay(blueprint: SystemBlueprint) : MainSystem(blueprint) {
                 val hiddenCrew = queue.size - shownCrew
                 val numStr = "+$hiddenCrew"
 
-                hiddenCrewFont.drawString(windowX + 11f, windowY + 15f, numStr, Colour.white)
+                hiddenCrewFont?.drawString(windowX + 11f, windowY + 15f, numStr, Colour.white)
             } else {
                 // Draw the crewmember portrait
                 val crew = queue[index]

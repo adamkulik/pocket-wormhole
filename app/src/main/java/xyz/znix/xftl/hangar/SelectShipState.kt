@@ -301,11 +301,17 @@ class SelectShipState(private val datafile: Datafile, private val main: MainGame
         fun updateTypeButton(id: String, idx: Int) {
             val button = shipSelector.byId[id] as UIKitButton
 
+            // A family may only list variants that exist as blueprints - e.g.
+            // there's no Crystal or Lanius type C (GitHub issue #108).
+            val variantExists = family?.ships?.getOrNull(idx)?.let { shipId ->
+                ships.any { it.name == shipId }
+            } == true
+
             if (idx == typeId) {
                 // Disable to prevent clicking, but still show as selected.
                 button.forceSelected = true
                 button.disabled = true
-            } else if (family == null || idx >= family.ships.size) {
+            } else if (family == null || !variantExists) {
                 button.forceSelected = false
                 button.disabled = true
             } else {
