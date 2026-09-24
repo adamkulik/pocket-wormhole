@@ -185,6 +185,26 @@ class MainActivity : Activity() {
         root.requestFocus()
     }
 
+    override fun onPause() {
+        super.onPause()
+
+        // GitHub issues #96/#94: losing focus must never leave an unpaused
+        // battlefield, nor a mixer running into static. Request the pause
+        // menu first (the in-flight frame picks the flag up), mute SoftAL
+        // so the mixer can't underrun the starved music stream, then
+        // properly suspend the render thread.
+        container?.autoPauseRequested = true
+        org.lwjgl.openal.SoftAL.get().pauseOutput()
+        surfaceView?.onPause()
+    }
+
+    override fun onResume() {
+        super.onResume()
+
+        surfaceView?.onResume()
+        org.lwjgl.openal.SoftAL.get().resumeOutput()
+    }
+
     @Deprecated("Deprecated in Java")
     @Suppress("DEPRECATION")
     override fun onBackPressed() {

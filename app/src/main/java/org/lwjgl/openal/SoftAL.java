@@ -45,6 +45,11 @@ public final class SoftAL {
     private AudioTrack track;
     private Thread mixerThread;
     private volatile boolean running;
+
+    // True while the app is backgrounded (GitHub issue #94): the mixer
+    // stops consuming so it can't underrun a starved music stream into
+    // static, and nothing keeps playing over other apps.
+    private volatile boolean outputPaused;
     private final short[] mixBuf = new short[CHUNK_FRAMES * 2];
     private final float[] accBuf = new float[CHUNK_FRAMES * 2];
 
@@ -114,6 +119,33 @@ public final class SoftAL {
         closeDump();
     }
 
+    /**
+     * Called when the app loses focus: pause the speaker output and stop
+     * mixing. Freezes all sources at their current positions, so music
+     * resumes seamlessly - and the mixer can't underrun a starved music
+     * stream into static while the game thread is frozen (GitHub issue
+     * #94).
+     */
+    public void pauseOutput() {
+        synchronized (lock) {
+            outputPaused = true;
+            if (track != null) {
+                track.pause();
+                track.flush();
+            }
+        }
+    }
+
+    /** Undo [pauseOutput]. */
+    public void resumeOutput() {
+        synchronized (lock) {
+            outputPaused = false;
+            if (track != null) {
+                track.play();
+            }
+        }
+    }
+
     private static void startDumpIfNeeded() {
         if (dumpDir == null || !new java.io.File(dumpDir, "dump_audio").exists()) return;
         try {
@@ -170,6 +202,10 @@ public final class SoftAL {
 
     private void mixLoop() {
         while (running) {
+            if (outputPaused) {
+                try { Thread.sleep(20); } catch (InterruptedException ignored) { }
+                continue;
+            }
             try {
                 mixChunk();
             } catch (Throwable t) {

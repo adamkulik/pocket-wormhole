@@ -1962,6 +1962,22 @@ public class InGameState extends MainGame.GameState {
     }
 
     /**
+     * Called when the app loses focus (GitHub issue #96): open the pause
+     * menu so returning to the app never resumes an unpaused battlefield.
+     * One-way: it never closes or navigates anything - if any window is
+     * already up (dialogue, game over, pause) the game is frozen and this
+     * does nothing.
+     */
+    public void autoPause() {
+        if (mainGame == null)
+            return;  // automated tests have no main game
+
+        if (!isPaused()) {
+            shipUI.showPauseWindow();
+        }
+    }
+
+    /**
      * The screen position of the enemy ship, for UI code that needs to
      * hit-test rooms on it. Only valid while an enemy is present.
      */

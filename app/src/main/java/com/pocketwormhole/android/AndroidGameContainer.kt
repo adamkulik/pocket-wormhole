@@ -12,7 +12,7 @@ import org.newdawn.slick.MouseListener
 import xyz.znix.xftl.rendering.Cursor
 import xyz.znix.xftl.rendering.Graphics
 import xyz.znix.xftl.rendering.ShaderProgramme
-import xyz.znix.xftl.sys.Game
+import xyz.znix.xftl.game.MainGame
 import xyz.znix.xftl.sys.GameContainer
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
@@ -22,7 +22,7 @@ import javax.microedition.khronos.opengles.GL10
  * renderer, replacing the desktop GLFW/LWJGL container.
  */
 class AndroidGameContainer(
-    private val game: Game,
+    private val game: MainGame,
     override val input: AndroidInput,
     private val finishCallback: () -> Unit
 ) : GameContainer {
@@ -33,6 +33,15 @@ class AndroidGameContainer(
     private val g = Graphics()
     private var lastNanos = System.nanoTime()
     private var started = false
+
+    /**
+     * Set by the activity when the app loses focus (GitHub issue #96);
+     * the next frame opens the pause menu before the render thread
+     * suspends, so returning to the app never resumes an unpaused
+     * battlefield.
+     */
+    @Volatile
+    var autoPauseRequested = false
 
     /** Physical surface size, for viewport letterboxing. */
     var surfaceW: Int = GAME_W
@@ -92,6 +101,15 @@ class AndroidGameContainer(
         }
 
         override fun onDrawFrame(gl: GL10?) {
+            if (autoPauseRequested) {
+                autoPauseRequested = false
+                try {
+                    game.autoPauseIfInFlight()
+                } catch (ex: Throwable) {
+                    android.util.Log.e(TAG, "auto-pause on focus loss failed", ex)
+                }
+            }
+
             val thisTime = System.nanoTime()
             val deltaSec = (thisTime - lastNanos) / 1_000_000_000f
             lastNanos = thisTime

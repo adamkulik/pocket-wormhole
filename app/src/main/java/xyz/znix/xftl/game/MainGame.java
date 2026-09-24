@@ -222,6 +222,18 @@ public class MainGame implements Game {
         startNewGame(state.getPlayer().getName(), state.getDifficulty(), state.getPlayer().getCustomised());
     }
 
+    /**
+     * Called by the Android activity when the app loses focus (GitHub
+     * issue #96): open the pause menu so returning to the app never
+     * resumes an unpaused battlefield. One-way - it never closes or
+     * navigates anything. No-op outside a run.
+     */
+    public void autoPauseIfInFlight() {
+        if (currentState instanceof InGameState) {
+            ((InGameState) currentState).autoPause();
+        }
+    }
+
     public void loadSavedGame(Document savedGame) {
         InGameState inGameState = new InGameState(this, content, savedGame);
         setCurrentState(inGameState);
