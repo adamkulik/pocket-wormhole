@@ -258,6 +258,40 @@ abstract class AbstractCrew(
     private val extinguishLoop by lazy { game.sounds.getLoop("extinguish") }
     private val brawlingLoop by lazy { game.sounds.getLoop("brawling") }
 
+    // Rock crew don't use the generic repair loop: vanilla plays their
+    // 'thud' sounds instead (user-pinned by ear against vanilla 1.6.14,
+    // GitHub issue #90 - no sounds.xml entry or ogg names it, this is a
+    // runtime-composed race sound like the death sounds). A random thud
+    // every REPAIR_THUD_CADENCE seconds reads as a continuous loop: all
+    // three vanilla thud samples are exactly 2s long.
+    private val rockRepairThuds by lazy {
+        listOf("rockThud1", "rockThud2", "rockThud3").mapNotNull { game.sounds.getSampleOrWarn(it) }
+    }
+    private var repairThudTimer = 0f
+
+    /**
+     * Keep the repair sound going this frame. Most races use the generic
+     * repair loop; Rocks play a random thud (see [rockRepairThuds]). Like
+     * [LoopHandle.continueLoopPlayerOnly], thuds are only audible on the
+     * player's own ship.
+     */
+    private fun continueRepairSound(dt: Float) {
+        if (this is CrewRock) {
+            if (rockRepairThuds.isEmpty())
+                return
+            if (!room.ship.isPlayerShip)
+                return
+
+            repairThudTimer -= dt
+            if (repairThudTimer <= 0f) {
+                rockRepairThuds.random().play()
+                repairThudTimer += REPAIR_THUD_CADENCE
+            }
+        } else {
+            repairLoop.continueLoopPlayerOnly(room.ship)
+        }
+    }
+
     val screenX: Int get() = pixelPosition.x
     val screenY: Int
         get() {
@@ -658,7 +692,7 @@ abstract class AbstractCrew(
         currentBreachSlot = selectFireOrBreach(currentBreachSlot, room.breaches)
         if (currentBreachSlot != -1) {
             currentAction = Action.REPAIRING_BREACH
-            repairLoop.continueLoopPlayerOnly(room.ship)
+            continueRepairSound(dt)
 
             val currentBreach = room.breaches[currentBreachSlot]!!
             currentBreach.health -= BreachInstance.CREW_REPAIR_RATE * repairSpeed * dt
@@ -675,7 +709,7 @@ abstract class AbstractCrew(
         system?.let { sys ->
             if (sys.damaged && canRepair) {
                 currentAction = Action.REPAIRING
-                repairLoop.continueLoopPlayerOnly(room.ship)
+                continueRepairSound(dt)
                 // The base repair speed is 8% per second, or 12.5 seconds to
                 // repair one bar of damage.
                 val didRepair = sys.repair(repairSpeed * 0.08f * dt)
@@ -1765,6 +1799,12 @@ abstract class AbstractCrew(
          * fraction of max health.
          */
         const val LOW_HEALTH_WARNING_HP = 25
+
+        // How often a repairing Rock's random thud sound replays. The thud
+        // samples are 2s long but the audible hit is at the front, so pace
+        // them faster than that or the repair reads as silence between hits
+        // (tuned by ear against vanilla; nudge if needed).
+        const val REPAIR_THUD_CADENCE = 1f
 
         // The per-frame time; a full loop of the healing animation takes
         // 11 * this many seconds.

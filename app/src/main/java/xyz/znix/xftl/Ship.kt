@@ -830,7 +830,14 @@ class Ship(
      */
     val crewVisibleThroughHull: Boolean
         get() {
+            // A living player-owned Slug reveals the crew of whichever ship
+            // it is aboard - including one of your Slugs boarding the enemy
+            // ship (GitHub issue #106; wiki Slugs: "Reveals live enemy crew").
+            // Ship.crew lists only the crew physically standing aboard, so
+            // boarding Slugs are found in the enemy ship's list.
             if (sys.player?.crew?.any { it is CrewSlug && it.ownerShip === sys.player } == true)
+                return true
+            if (sys.enemy?.crew?.any { it is CrewSlug && it.ownerShip === sys.player } == true)
                 return true
 
             // The scanner only senses lifeforms aboard enemy vessels.

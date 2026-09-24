@@ -147,6 +147,16 @@ data class Room(val ship: Ship, val id: Int, val x: Int, val y: Int, val width: 
             }
         }
 
+        // A cloaked ship hides its rooms from the player (vanilla: the
+        // "mind-control at fight start while paused" trick exists precisely
+        // because the cloak takes the view away - wiki Mind Control; mind
+        // control "requires view of enemy crew"). The player's own ship
+        // never hides: crew-sensed crews keep counting for mind control via
+        // Ship.crewVisibleThroughHull, which is deliberately separate.
+        if (!ship.isPlayerShip && ship.isCloakActive) {
+            playerHasVision = false
+        }
+
         if (ship.sys.debugFlags.showEverything.set) {
             playerHasVision = true
         }

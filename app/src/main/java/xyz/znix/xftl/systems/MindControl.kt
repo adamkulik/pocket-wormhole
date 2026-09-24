@@ -138,6 +138,42 @@ class MindControl(blueprint: SystemBlueprint) : MainSystem(blueprint) {
         return active && crew == controlledCrew
     }
 
+    /**
+     * The effect of an enemy hacking pulse disrupting this Mind Control
+     * system (GitHub issue #79; wiki Hacking): the disruption "temporarily
+     * turns one random enemy into an ally, and removes enemy mind control
+     * from allies". So any of the hacker's crew this system was controlling
+     * is freed, and one of this ship's own crew is mind-controlled for the
+     * hacker's benefit - LivingCrew's mode flip while controlled makes them
+     * fight against their own ship, i.e. for the hacker.
+     *
+     * Vanilla quirk (wiki Mind Control, game bugs): automated ships never
+     * trigger this effect.
+     */
+    fun hackedDisrupt(hacker: Ship) {
+        if (hacker.isAutomated)
+            return
+
+        // Free any of the hacker's crew we were controlling.
+        controlledCrew?.mindControlledBy = null
+        controlledCrew = null
+        timeRemaining = null
+
+        // Take over a random one of this ship's crew.
+        val suitable = ship.crew.filterIsInstance(LivingCrew::class.java)
+            .filter { it.mindControlledBy == null }
+            .filter { !it.isMindControlResistant }
+        if (suitable.isEmpty())
+            return
+
+        val crew = suitable.random()
+        crew.mindControlledBy = this
+        controlledCrew = crew
+        timeRemaining = duration
+
+        startSound.play()
+    }
+
     override fun makeExtraButtons(powerPos: IPoint): List<Button> {
         button = MindControlButton(powerPos)
         return listOf(button!!)

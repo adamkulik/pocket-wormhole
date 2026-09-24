@@ -22,6 +22,7 @@ import xyz.znix.xftl.weapons.DroneBlueprint
 import xyz.znix.xftl.weapons.IProjectile
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.random.Random
 
 class Hacking(blueprint: SystemBlueprint) : MainSystem(blueprint) {
     override val sortingType: SortingType get() = SortingType.HACKING
@@ -242,6 +243,29 @@ class Hacking(blueprint: SystemBlueprint) : MainSystem(blueprint) {
         projectile = null
     }
 
+    /**
+     * The effect of an enemy hacking pulse disrupting this Hacking system
+     * (GitHub issue #83; wiki Hacking): the disruption has a chance to
+     * destroy the attached hacking drone, increasing with the disrupting
+     * system's power level. Losing the drone ends this system's hack and
+     * puts it into the post-drone cooldown.
+     */
+    fun hackedPulseDestroyDrone(disruptLevel: Int) {
+        val projectile = projectile ?: return
+        if (!projectile.hasLanded)
+            return
+
+        // The exact vanilla chances are unpinned - the wiki only says higher
+        // level hacking has a higher chance. Scale 25/50/75% by level for
+        // now, and tune if the user's vanilla experience disagrees.
+        if (Random.nextFloat() >= disruptLevel * 0.25f)
+            return
+
+        projectile.destroyByDisrupt()
+        this.projectile = null
+        ionTimer += Cloaking.COOLDOWN
+    }
+
     fun startHackingPulse() {
         if (isPowerLocked || powerSelected == 0)
             return
@@ -254,6 +278,14 @@ class Hacking(blueprint: SystemBlueprint) : MainSystem(blueprint) {
 
         // Start the hacking pulse
         this@Hacking.timeRemaining = duration
+
+        // The pulse also applies per-system disruption effects (wiki
+        // Hacking): mind control turns a random enemy crew into an ally,
+        // and a hacking-vs-hacking pulse can destroy the attached drone.
+        when (val target = projectile?.target?.system) {
+            is MindControl -> target.hackedDisrupt(ship)
+            is Hacking -> target.hackedPulseDestroyDrone(powerSupplied)
+        }
 
         startSound.play()
     }
@@ -477,6 +509,14 @@ class Hacking(blueprint: SystemBlueprint) : MainSystem(blueprint) {
 
             // Play the landing sound
             hacking.landSound.play()
+        }
+
+        /**
+         * The drone was destroyed by an enemy hacking disruption pulse
+         * (GitHub issue #83) - remove it from play.
+         */
+        fun destroyByDisrupt() {
+            dead = true
         }
 
         override fun hitOtherProjectile(currentSpace: Ship) {
