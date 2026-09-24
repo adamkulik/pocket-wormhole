@@ -1,6 +1,7 @@
 package xyz.znix.xftl.ai
 
 import xyz.znix.xftl.Ship
+import xyz.znix.xftl.augments.AugmentBlueprint
 import xyz.znix.xftl.layout.Room
 import xyz.znix.xftl.weapons.AbstractWeaponInstance
 import xyz.znix.xftl.weapons.BeamBlueprint
@@ -80,7 +81,14 @@ class ShipAI(val ship: Ship, val player: Ship) {
         val escapeTimer = ship.escapeTimer
         if (escapeTimer != null) {
             if (ship.canChargeFTL) {
-                ship.escapeTimer = escapeTimer - dt
+                // The player's FTL Jammer scrambles this ship's FTL computer,
+                // slowing the escape countdown by the augment's value - vanilla
+                // (value=2): "doubling the time it takes for them to jump".
+                // Slowing the countdown rather than inflating the timer keeps
+                // timer-value comparisons (e.g. crew AI) vanilla-consistent.
+                val jammer = player.getAugmentValue(AugmentBlueprint.FTL_JAMMER)
+                val rate = if (jammer > 0f) dt / jammer else dt
+                ship.escapeTimer = escapeTimer - rate
             }
 
             // SlickGame will check the escape timer, and remove

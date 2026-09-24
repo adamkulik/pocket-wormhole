@@ -182,6 +182,7 @@ class BlueprintManager {
             AugmentBlueprint.HULL_ARMOR -> AugmentBlueprint(elem)
             AugmentBlueprint.ADV_HULL_ARMOR -> AugmentBlueprint(elem)
             AugmentBlueprint.EXPLOSIVE_REPLICATOR -> AugmentBlueprint(elem)
+            AugmentBlueprint.FTL_JAMMER -> AugmentBlueprint(elem)
 
             // Adv. FTL Navigation's mechanic (jumping to visited beacons)
             // is implemented by the jump map; the stasis pod is an event

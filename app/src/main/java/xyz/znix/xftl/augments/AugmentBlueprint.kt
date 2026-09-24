@@ -52,6 +52,7 @@ open class AugmentBlueprint(elem: Element) : Blueprint(elem) {
         const val HULL_ARMOR: String = "HULL_ARMOR"
         const val ADV_HULL_ARMOR: String = "ADV_HULL_ARMOR"
         const val EXPLOSIVE_REPLICATOR: String = "EXPLOSIVE_REPLICATOR"
+        const val FTL_JAMMER: String = "FTL_JAMMER"
 
         /**
          * Lifeform Scanner: senses the crew aboard enemy ships through the
