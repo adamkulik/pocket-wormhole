@@ -18,10 +18,10 @@ class Engines(blueprint: SystemBlueprint) : MainSystem(blueprint) {
 
     val evasion: Int
         get() {
-            if (powerSelected == 0)
+            if (powerSupplied == 0)
                 return 0
 
-            val base = EVASIONS[powerSelected - 1]
+            val base = EVASIONS[powerSupplied - 1]
             val bonus = getSkillLevel(Skill.ENGINES)?.let { SKILL_BONUSES[it.ordinal] } ?: 0
 
             return base + bonus
@@ -32,17 +32,17 @@ class Engines(blueprint: SystemBlueprint) : MainSystem(blueprint) {
      */
     val chargeRate: Float
         get() {
-            if (powerSelected == 0)
+            if (powerSupplied == 0)
                 return 0f
 
             // TODO manning bonus of 1.1, 1.17 and 1.25 times for different skill levels
-            return CHARGE_RATES[powerSelected - 1]
+            return CHARGE_RATES[powerSupplied - 1]
         }
 
     val evasionMultiplier: Float
         get() {
             // If engines is off or hacked, you get no evasion
-            if (powerSelected == 0 || isHackActive)
+            if (powerSupplied == 0 || isHackActive)
                 return 0f
 
             return 1f
@@ -54,7 +54,7 @@ class Engines(blueprint: SystemBlueprint) : MainSystem(blueprint) {
         super.powerStateChanged()
 
         // Play the sound effect when the engines are turned on and off
-        val enginesOn = powerSelected > 0
+        val enginesOn = powerSupplied > 0
 
         // Don't play sounds while we're being deserialised
         if (ship.sys.isCurrentlyLoadingSave) {

@@ -50,6 +50,21 @@ abstract class MainSystem(blueprint: SystemBlueprint) : AbstractSystem(blueprint
     private val selectedPowerSources = HashMap<EnergySource, Int>()
 
     /**
+     * The power this system is actually running at: the sum of everything in
+     * [selectedPowerSources]. This is at most [powerSelected] - the two differ
+     * when the ship's power supply can't keep up, e.g. in an ion storm, where
+     * the demand keeps the player's selection (so it restores automatically
+     * when the storm passes) while only the supplied power functions
+     * (GitHub issue #95; wiki: Environmental Hazards - "Power will be removed
+     * automatically from systems").
+     *
+     * All gameplay behaviour must read THIS, not [powerSelected] - that's the
+     * demand, used for button state, power-bar highlights and re-powering.
+     */
+    var powerSupplied: Int = 0
+        protected set
+
+    /**
      * The power sources that were in use before [consumePowerFirst] was called.
      *
      * This must only be used by [consumePowerFirst] and [consumePowerSecond].
@@ -421,6 +436,10 @@ abstract class MainSystem(blueprint: SystemBlueprint) : AbstractSystem(blueprint
             .sumOf { it.value }
 
         powerSelected = max(demand, powerSelected.coerceIn(0, undamagedEnergy))
+
+        // The functional power level: everything we actually got allocated,
+        // including per-system sources like Zoltan bars.
+        powerSupplied = selectedPowerSources.values.sum()
 
         // Store our forced power value, which we can't decrease below
         forcedPower = selectedPowerSources.entries.filter { it.key.isPerSystem }.sumOf { it.value }

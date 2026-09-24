@@ -75,7 +75,7 @@ class WeaponPowerManager(private val system: MainSystem, private val items: Item
             if (!items.isItemPowered(slot))
                 continue
 
-            if (system.powerSelected >= currentPower)
+            if (system.powerSupplied >= currentPower)
                 break
 
             // Force-turn-off the item, even if we have ion damage.
@@ -87,7 +87,7 @@ class WeaponPowerManager(private val system: MainSystem, private val items: Item
 
         // If the system has too much power - more than the items are
         // using - then get rid of that excess.
-        if (system.powerSelected != currentPower) {
+        if (system.powerSupplied != currentPower) {
             items.setSystemPower(currentPower)
         }
     }

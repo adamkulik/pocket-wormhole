@@ -227,7 +227,7 @@ class Ship(
      */
     var generationSeed: Int? = null
     val isFtlCharged get() = ftlChargeProgress >= 1f
-    val isFtlReady get() = isFtlCharged && engines!!.powerSelected > 0
+    val isFtlReady get() = isFtlCharged && engines!!.powerSupplied > 0
 
     // This is for both the player and enemies
     val canChargeFTL: Boolean
@@ -235,7 +235,7 @@ class Ship(
             // For the FTL to charge, the engines and piloting must
             // be working, and a pilot must be present.
             val hasPilot = isAutoScout || isAutomated || friendlyCrew.any { it.room == piloting!!.room }
-            return engines!!.powerSelected > 0 && piloting!!.undamagedEnergy > 0 && hasPilot
+            return engines!!.powerSupplied > 0 && piloting!!.undamagedEnergy > 0 && hasPilot
                     && !engines!!.isHackActive && !piloting!!.isHackActive
         }
 
@@ -305,7 +305,7 @@ class Ship(
         get() {
             var used = 0
             for (room in rooms) {
-                used += (room.system as? MainSystem ?: continue).powerSelected
+                used += (room.system as? MainSystem ?: continue).powerSupplied
             }
             return used
         }

@@ -178,7 +178,7 @@ class PulsarEnvironment(game: InGameState, beacon: Beacon) : AbstractEnvironment
 
         // Always attack shields if they're up
         val shields = ship.shields
-        if (shields != null && shields.powerSelected > 0) {
+        if (shields != null && shields.powerSupplied > 0) {
             dealSystemIon(shields, resistDamage)
         } else {
             dealSystemIon(ship.systems.random(), resistDamage)
@@ -189,7 +189,7 @@ class PulsarEnvironment(game: InGameState, beacon: Beacon) : AbstractEnvironment
 
     private fun dealSystemIon(system: AbstractSystem, resist: Boolean) {
         val currentPower = when (system) {
-            is MainSystem -> system.powerSelected
+            is MainSystem -> system.powerSupplied
             else -> (system as SubSystem).effectivePower
         }
 

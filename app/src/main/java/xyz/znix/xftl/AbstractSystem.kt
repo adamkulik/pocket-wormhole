@@ -331,7 +331,7 @@ abstract class AbstractSystem(val blueprint: SystemBlueprint) {
         get() = when {
             damagedEnergyLevels == energyLevels -> "red"
             damagedEnergyLevels > 0 -> "orange"
-            this is MainSystem && powerSelected == 0 -> "grey"
+            this is MainSystem && powerSupplied == 0 -> "grey"
             else -> "green"
         }
 

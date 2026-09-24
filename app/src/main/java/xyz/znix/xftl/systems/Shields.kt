@@ -16,6 +16,15 @@ class Shields(blueprint: SystemBlueprint) : MainSystem(blueprint) {
 
     val selectedShieldBars: Int get() = powerSelected / 2
 
+    /**
+     * The bubbles this system is actually running at: half the supplied
+     * power, rounded down (a lone bar runs nothing). During ion storms this
+     * drops below [selectedShieldBars], popping the excess bubbles until the
+     * storm passes (GitHub issue #95; wiki: "Power will be removed
+     * automatically from systems").
+     */
+    val suppliedShieldBars: Int get() = powerSupplied / 2
+
     var activeShields: Int = 0
         set(value) {
             val old = field
@@ -49,12 +58,16 @@ class Shields(blueprint: SystemBlueprint) : MainSystem(blueprint) {
             return
         }
 
-        // Check if our power has been reduced
+        // Check if our power has been reduced - damage, or an ion storm
+        // cutting the reactor's output (GitHub issue #95).
         if (activeShields > selectedShieldBars) {
             activeShields = selectedShieldBars
         }
+        if (activeShields > suppliedShieldBars) {
+            activeShields = suppliedShieldBars
+        }
 
-        if (activeShields == selectedShieldBars) {
+        if (activeShields >= minOf(selectedShieldBars, suppliedShieldBars)) {
             rechargeTimer = 0f
             return
         }

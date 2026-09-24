@@ -39,7 +39,7 @@ class Artillery(blueprint: SystemBlueprint) : MainSystem(blueprint) {
     }
 
     // The blueprint's cooldown is correct for a level-2 artillery system.
-    private val cooldown: Float get() = weapon.chargeTime * (1.5f - powerSelected * 0.25f)
+    private val cooldown: Float get() = weapon.chargeTime * (1.5f - powerSupplied * 0.25f)
 
     private val hardpoint by lazy {
         // Find out what our index is, in all the artillery systems specified
@@ -70,7 +70,7 @@ class Artillery(blueprint: SystemBlueprint) : MainSystem(blueprint) {
     override fun update(dt: Float) {
         super.update(dt)
 
-        if (powerSelected <= 0) {
+        if (powerSupplied <= 0) {
             chargeProgress -= dt / DISCHARGE_TIME
 
             // Make the beam disappear if we were shooting when we were turned off.
@@ -138,7 +138,7 @@ class Artillery(blueprint: SystemBlueprint) : MainSystem(blueprint) {
         val boxX = x + 22 - 6
         val boxY = y - 53 - 6
 
-        val imageId = max(0, powerSelected - 1)
+        val imageId = max(0, powerSupplied - 1)
 
         // Draw the image of the box the charge bar sits in
         barImages[imageId].draw(boxX, boxY)

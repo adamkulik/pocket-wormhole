@@ -26,10 +26,10 @@ class Clonebay(blueprint: SystemBlueprint) : MainSystem(blueprint) {
 
     private val cloneDuration: Float
         get() {
-            return CLONE_DURATIONS.getOrNull(powerSelected - 1) ?: CLONE_DURATIONS[0]
+            return CLONE_DURATIONS.getOrNull(powerSupplied - 1) ?: CLONE_DURATIONS[0]
         }
 
-    private val isEnabled: Boolean get() = powerSelected > 0 && !isHackActive
+    private val isEnabled: Boolean get() = powerSupplied > 0 && !isHackActive
     private val isDying: Boolean get() = !isEnabled && !hasBackupDNA
 
     private val hasBackupDNA: Boolean get() = ship.hasAugment(AugmentBlueprint.BACKUP_DNA)

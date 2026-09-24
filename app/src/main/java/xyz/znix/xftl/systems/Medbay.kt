@@ -22,9 +22,9 @@ class Medbay(blueprint: SystemBlueprint) : MainSystem(blueprint) {
     override fun update(dt: Float) {
         super.update(dt)
 
-        var healthPerSec = when (powerSelected) {
+        var healthPerSec = when (powerSupplied) {
             0 -> 0f
-            else -> 6.4f * speedForLevel(powerSelected - 1)
+            else -> 6.4f * speedForLevel(powerSupplied - 1)
         }
 
         // Hacking hurts the friendly crew, and rather quickly.

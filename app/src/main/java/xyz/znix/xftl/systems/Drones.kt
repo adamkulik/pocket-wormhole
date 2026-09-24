@@ -80,7 +80,7 @@ class Drones(blueprint: SystemBlueprint) : MainSystem(blueprint) {
         }
 
         // If a drone has turned itself on or off, find out why and fix it.
-        if (powerSelected != powerManager.currentPower) {
+        if (powerSupplied != powerManager.currentPower) {
             powerStateChanged()
         }
 

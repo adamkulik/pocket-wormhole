@@ -19,13 +19,13 @@ class Oxygen(blueprint: SystemBlueprint) : MainSystem(blueprint) {
             if (isHackActive)
                 return -(0.06f - ROOM_DRAIN_RATE)
 
-            if (powerSelected == 0)
+            if (powerSupplied == 0)
                 return 0f
 
             // The UI is wrong, the refill rates are 1,4,7
             // Note we add 2, since for level 1 we have to offset the
             // drain rate, then also refill at a rate equal to the drain rate.
-            val multiplier = 2 + (powerSelected - 1) * REFILL_SCALING
+            val multiplier = 2 + (powerSupplied - 1) * REFILL_SCALING
             return multiplier * ROOM_DRAIN_RATE
         }
 

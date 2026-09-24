@@ -37,7 +37,7 @@ class Cloaking(blueprint: SystemBlueprint) : MainSystem(blueprint) {
 
     // Note we clamp it to a minimum of one power, to avoid divide-by-zero errors
     // in unexpected conditions.
-    val duration: Float get() = max(powerSelected, 1) * TIME_PER_POWER
+    val duration: Float get() = max(powerSupplied, 1) * TIME_PER_POWER
 
     // Used for managing the fade-in and fade-out animations
     private var animationTimer: Float = 0f
@@ -81,7 +81,7 @@ class Cloaking(blueprint: SystemBlueprint) : MainSystem(blueprint) {
         if (isPowerLocked)
             return
 
-        if (powerSelected == 0)
+        if (powerSupplied == 0)
             return
 
         // Block cloaking while we're already cloaked
@@ -132,7 +132,7 @@ class Cloaking(blueprint: SystemBlueprint) : MainSystem(blueprint) {
             // We have to check for powerSelected here, since the above
             // won't work if the system is fully broken since duration is
             // always at least 5 seconds.
-            if (timeRemaining!! <= 0 || powerSelected == 0) {
+            if (timeRemaining!! <= 0 || powerSupplied == 0) {
                 timeRemaining = null
 
                 // Don't apply ion damage - this means we hold onto

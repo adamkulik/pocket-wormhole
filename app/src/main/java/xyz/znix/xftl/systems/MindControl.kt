@@ -42,7 +42,7 @@ class MindControl(blueprint: SystemBlueprint) : MainSystem(blueprint) {
 
     val duration: Float
         get() {
-            return when (powerSelected) {
+            return when (powerSupplied) {
                 // From the wiki
                 0 -> 0.001f // Dummy value
                 1 -> 14f

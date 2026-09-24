@@ -139,7 +139,7 @@ class Teleporter(blueprint: SystemBlueprint) : MainSystem(blueprint) {
         teleportSound.play()
 
         // Ion-stun for 20s at 1 power, 15s at 2, and 10s at 3.
-        ionTimer += cooldownTime(powerSelected).f
+        ionTimer += cooldownTime(powerSupplied).f
 
         // Render the teleport pads blue until the ion timer runs out.
         // This prevents an ion weapon making the pads go blue.
@@ -173,7 +173,7 @@ class Teleporter(blueprint: SystemBlueprint) : MainSystem(blueprint) {
         }
 
         val padImage = when {
-            powerSelected == 0 -> padOffImage
+            powerSupplied == 0 -> padOffImage
             onCooldown -> padActiveImage
             else -> padOnImage
         }

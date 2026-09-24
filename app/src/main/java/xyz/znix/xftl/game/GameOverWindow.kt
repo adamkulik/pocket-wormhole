@@ -92,7 +92,8 @@ class GameOverWindow(private val game: InGameState, val outcome: Outcome) : Wind
     }
 
     private fun statsClicked() {
-        TODO("Not yet implemented")
+        // Vanilla opens the stats screen here; that screen isn't implemented
+        // upstream yet. The button must not crash the game (GitHub issue #93).
     }
 
     private fun quitClicked() {

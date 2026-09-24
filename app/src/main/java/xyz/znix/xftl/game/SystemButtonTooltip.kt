@@ -12,7 +12,7 @@ import xyz.znix.xftl.systems.*
 class SystemButtonTooltip(val game: InGameState, val system: AbstractSystem) : DelayedTooltip(game) {
     override fun getText(): String {
         val power = when (system) {
-            is MainSystem -> system.powerSelected
+            is MainSystem -> system.powerSupplied
             else -> system.undamagedEnergy
         }
 

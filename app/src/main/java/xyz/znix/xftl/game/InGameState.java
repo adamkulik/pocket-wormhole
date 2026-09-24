@@ -2317,7 +2317,12 @@ public class InGameState extends MainGame.GameState {
 
         // Apply the hull damage. Vanilla plays its eventDamage explosion
         // (a large explosion sample) once for the damage an event deals.
-        if (!resources.getDamage().isEmpty()) {
+        // Negative amounts are hull REPAIRS - vanilla plays nothing for
+        // those, and playing the damage boom for a repair was GitHub
+        // issue #80.
+        boolean anyDamage = resources.getDamage().stream()
+                .anyMatch(damage -> damage.getAmount() > 0);
+        if (anyDamage) {
             FTLSound eventDamage = getSounds().getSampleOrWarn("eventDamage");
             if (eventDamage != null) {
                 eventDamage.play();

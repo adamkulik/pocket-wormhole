@@ -170,7 +170,7 @@ class FriendlyCrewAI(private val ship: Ship) {
                 crew is LivingCrew &&
                 medbay != null &&
                 crew.health / crew.maxHealth < healingThreshold &&
-                medbay.powerSelected > 0 &&
+                medbay.powerSupplied > 0 &&
                 medbayDangerous == false
             ) {
                 // Try to start pathfinding there immediately, and if there's
@@ -532,7 +532,7 @@ class HealingTask(ai: FriendlyCrewAI, room: Room) : AITask(ai, room) {
     override fun nextTask(crew: AbstractCrew): AITask? {
         val medbay = room.system as Medbay
 
-        if (medbay.isHackActive || crew.health == crew.maxHealth || medbay.powerSelected == 0)
+        if (medbay.isHackActive || crew.health == crew.maxHealth || medbay.powerSupplied == 0)
             return null
 
         return this

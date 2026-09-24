@@ -36,7 +36,7 @@ class Hacking(blueprint: SystemBlueprint) : MainSystem(blueprint) {
      * This controls passive effects like locking doors
      * and disabling a room's console.
      */
-    val isPoweredUp: Boolean get() = powerSelected != 0
+    val isPoweredUp: Boolean get() = powerSupplied != 0
 
     /**
      * If true, the main hacking pulse is currently active.
@@ -51,7 +51,7 @@ class Hacking(blueprint: SystemBlueprint) : MainSystem(blueprint) {
 
     private var timeRemaining: Float? = null
 
-    private val duration get() = 1f + powerSelected.coerceAtLeast(1) * 3f
+    private val duration get() = 1f + powerSupplied.coerceAtLeast(1) * 3f
 
     // If the player selects a target, the drone isn't deployed
     // until the next update, so you can cancel it.
@@ -121,7 +121,7 @@ class Hacking(blueprint: SystemBlueprint) : MainSystem(blueprint) {
             // We have to check for powerSelected here, since the above
             // won't work if the system is fully broken since duration is
             // never limited to zero.
-            if (timeRemaining!! <= 0 || powerSelected == 0) {
+            if (timeRemaining!! <= 0 || powerSupplied == 0) {
                 timeRemaining = null
 
                 // Don't apply ion damage - this means we hold onto
@@ -174,7 +174,7 @@ class Hacking(blueprint: SystemBlueprint) : MainSystem(blueprint) {
         // Block hacking while we're turned off. It's not possible
         // to select this via the player UI, unless hacking is hit
         // while you're selecting a room.
-        if (powerSelected == 0)
+        if (powerSupplied == 0)
             return
 
         // Also respect the ion/hack/cooldown lock (GitHub issue #103: the
@@ -318,7 +318,7 @@ class Hacking(blueprint: SystemBlueprint) : MainSystem(blueprint) {
             if (isPowerLocked)
                 return
 
-            if (powerSelected == 0)
+            if (powerSupplied == 0)
                 return
 
             if (projectile == null) {
@@ -394,7 +394,7 @@ class Hacking(blueprint: SystemBlueprint) : MainSystem(blueprint) {
                 // And when the system power is turned off - this is important as
                 // it's how the defence drone bypass exploit works.
                 // TODO add an option to disable this.
-                if (hacking.powerSelected == 0)
+                if (hacking.powerSupplied == 0)
                     return 0
 
                 // Standard 16x multiplier for FTL time units to seconds.
@@ -411,7 +411,7 @@ class Hacking(blueprint: SystemBlueprint) : MainSystem(blueprint) {
                 !extendAnimation.isStopped -> extendAnimation
 
                 // Once we've landed, use the powered-up image if that's true
-                hacking.powerSelected == 0 -> offImage
+                hacking.powerSupplied == 0 -> offImage
                 else -> onImage
             }
 
