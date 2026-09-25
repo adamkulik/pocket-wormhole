@@ -36,6 +36,8 @@ public final class SoftAL {
     private static int mixDumpBytes;
     private static int dumpedBuffers;
 
+    private static long lastStallLog;
+
     private final Object lock = new Object();
 
     private final HashMap<Integer, Buffer> buffers = new HashMap<>();
@@ -52,6 +54,8 @@ public final class SoftAL {
     private volatile boolean outputPaused;
     private final short[] mixBuf = new short[CHUNK_FRAMES * 2];
     private final float[] accBuf = new float[CHUNK_FRAMES * 2];
+    /** Total output frames handed to the AudioTrack since the last flush. */
+    private long writtenFrames;
 
     private SoftAL() {
     }
@@ -132,6 +136,7 @@ public final class SoftAL {
             if (track != null) {
                 track.pause();
                 track.flush();
+                writtenFrames = 0; // flush() resets the playhead too
             }
         }
     }
@@ -219,6 +224,7 @@ public final class SoftAL {
 
     private void mixChunk() {
         // Mix one chunk
+        long t0 = System.nanoTime();
         java.util.Arrays.fill(accBuf, 0f);
 
         synchronized (lock) {
@@ -227,6 +233,16 @@ public final class SoftAL {
                     s.mix(accBuf, CHUNK_FRAMES);
                 }
             }
+        }
+
+        // Diagnostics: the lock is held by the game thread while it hands
+        // decoded PCM over, and by nothing else for long. A stall here means
+        // mixing stopped - AudioTrack runs dry and that's heard as a click.
+        long stallMs = (System.nanoTime() - t0) / 1_000_000;
+        if (stallMs >= 15 && System.currentTimeMillis() - lastStallLog > 2_000) {
+            lastStallLog = System.currentTimeMillis();
+            android.util.Log.w("XFTL", "SoftAL mixer stalled " + stallMs
+                    + "ms on the audio lock (buffer decode/upload on another thread?)");
         }
 
         for (int i = 0; i < accBuf.length; i++) {
@@ -239,8 +255,32 @@ public final class SoftAL {
         int written = 0;
         while (written < mixBuf.length) {
             int n = track.write(mixBuf, written, mixBuf.length - written);
-            if (n <= 0) break;
+            if (n <= 0) {
+                // Dropping the rest of the chunk is itself a click; say so.
+                if (System.currentTimeMillis() - lastStallLog > 2_000) {
+                    lastStallLog = System.currentTimeMillis();
+                    android.util.Log.w("XFTL", "SoftAL track.write returned " + n
+                            + " - dropped a chunk");
+                }
+                break;
+            }
             written += n;
+        }
+
+        // Underrun detector: if the playhead has consumed nearly everything
+        // written, the track ran dry between chunks - heard as a click.
+        // (getPlaybackHeadPosition is monotonic frames since play(); the
+        // flush() in pauseOutput resets it along with writtenFrames.)
+        if (written == mixBuf.length) {
+            writtenFrames += CHUNK_FRAMES;
+            long head = track.getPlaybackHeadPosition() & 0xFFFFFFFFL;
+            long aheadFrames = writtenFrames - head;
+            if (aheadFrames < CHUNK_FRAMES / 2 && writtenFrames > OUTPUT_RATE
+                    && System.currentTimeMillis() - lastStallLog > 2_000) {
+                lastStallLog = System.currentTimeMillis();
+                android.util.Log.w("XFTL", "SoftAL UNDERRUN: playhead " + head
+                        + " vs written " + writtenFrames + " (ahead " + aheadFrames + " frames)");
+            }
         }
 
         if (dumping) dumpMixChunk(mixBuf);
@@ -273,10 +313,28 @@ public final class SoftAL {
     }
 
     public void bufferData(int id, int format, ByteBuffer data, int rate) {
+        Buffer b;
         synchronized (lock) {
-            Buffer b = buffers.get(id);
-            if (b == null) return;
-            b.setData(format, data, rate);
+            b = buffers.get(id);
+        }
+        if (b == null)
+            return;
+
+        // Decode OUTSIDE the mixer's lock. This runs on the game thread on
+        // every first play of a sample and on every streamed music section
+        // refill; the decode is a per-byte walk that's slow on direct
+        // buffers, and holding the lock through it blocked mixing for its
+        // whole duration - starving AudioTrack into clicks on slower
+        // devices. Only the final field publish takes the lock.
+        long t0 = System.nanoTime();
+        Buffer.Loaded loaded = Buffer.decode(format, data, rate, dumping);
+        long decodeMs = (System.nanoTime() - t0) / 1_000_000;
+        if (decodeMs >= 10)
+            android.util.Log.w("XFTL", "Sound decode took " + decodeMs + "ms ("
+                    + loaded.pcm.length / Math.max(1, loaded.channels) + " frames) - ran off the audio lock");
+
+        synchronized (lock) {
+            b.publish(loaded);
         }
     }
 
@@ -317,6 +375,31 @@ public final class SoftAL {
         public float durationSec;
 
         public void setData(int format, ByteBuffer data, int rate) {
+            publish(decode(format, data, rate, dumping));
+        }
+
+        /** Fully decoded buffer contents, published to the mixer in one go. */
+        public static final class Loaded {
+            public final int channels;
+            public final int bitsPerSample;
+            public final int sampleRate;
+            public final short[] pcm;
+            public final float durationSec;
+
+            Loaded(int channels, int bitsPerSample, int sampleRate, short[] pcm) {
+                this.channels = channels;
+                this.bitsPerSample = bitsPerSample;
+                this.sampleRate = sampleRate;
+                this.pcm = pcm;
+                int frames = channels == 0 ? 0 : pcm.length / channels;
+                this.durationSec = frames / (float) sampleRate;
+            }
+        }
+
+        /** Decodes the incoming data. Pure: touches no mixer-shared state. */
+        public static Loaded decode(int format, ByteBuffer data, int rate, boolean dumping) {
+            int channels;
+            int bitsPerSample;
             switch (format) {
                 case AL10.AL_FORMAT_MONO8:
                     channels = 1;
@@ -337,40 +420,41 @@ public final class SoftAL {
                 default:
                     throw new IllegalArgumentException("Unknown AL format " + format);
             }
-            sampleRate = rate;
+            int sampleRate = rate;
 
             ByteBuffer d = data.duplicate();
+            // One bulk copy: per-byte get() calls on a direct buffer are
+            // comparatively expensive, and this runs every music section.
+            byte[] raw = new byte[d.remaining()];
+            d.get(raw);
+
+            short[] out;
             if (bitsPerSample == 16) {
                 // OpenAL PCM16 is little-endian; decode explicitly so we don't
                 // depend on the buffer's byte-order views behaving as expected
                 // across JVMs (asShortBuffer() produced byte-swapped data on
                 // device, which played as pure static).
-                short[] out = new short[d.remaining() / 2];
+                out = new short[raw.length / 2];
                 if (dumping && dumpedBuffers < 3) {
-                    byte[] first = new byte[Math.min(16, d.remaining())];
-                    d.mark();
-                    d.get(first);
-                    d.reset();
                     StringBuilder hexb = new StringBuilder("raw bytes: ");
-                    for (byte b : first) hexb.append(String.format("%02x ", b));
+                    for (int i = 0; i < Math.min(16, raw.length); i++)
+                        hexb.append(String.format("%02x ", raw[i]));
                     android.util.Log.i("XFTL", hexb.toString());
                 }
                 for (int i = 0; i < out.length; i++) {
-                    out[i] = (short) ((d.get() & 0xFF) | (d.get() << 8));
+                    out[i] = (short) ((raw[2 * i] & 0xFF) | (raw[2 * i + 1] << 8));
                 }
-                pcm = out;
             } else {
-                short[] out = new short[d.remaining()];
+                out = new short[raw.length];
                 for (int i = 0; i < out.length; i++) {
                     // unsigned 8-bit -> signed 16-bit
-                    out[i] = (short) ((d.get() & 0xFF) << 8);
+                    out[i] = (short) ((raw[i] & 0xFF) << 8);
                 }
-                pcm = out;
             }
-            int frames = channels == 0 ? 0 : pcm.length / channels;
-            durationSec = frames / (float) sampleRate;
 
-            if (dumping && pcm.length > 4000) {
+            if (dumping && out.length > 4000) {
+                int frames = channels == 0 ? 0 : out.length / channels;
+                float durationSec = frames / (float) sampleRate;
                 android.util.Log.i("XFTL", "SoftAL buffer: " + sampleRate + "Hz " + channels
                         + "ch " + bitsPerSample + "bit " + frames + " frames ("
                         + durationSec + "s)");
@@ -378,8 +462,19 @@ public final class SoftAL {
                 StringBuilder sb = new StringBuilder("SoftAL buffer from: ");
                 for (int i = 1; i < Math.min(st.length, 8); i++) sb.append(st[i]).append(" | ");
                 android.util.Log.i("XFTL", sb.toString());
-                dumpBufferPcm(pcm, sampleRate, channels);
+                dumpBufferPcm(out, sampleRate, channels);
             }
+
+            return new Loaded(channels, bitsPerSample, sampleRate, out);
+        }
+
+        /** Swap fully-decoded contents in. Called under SoftAL.lock. */
+        public void publish(Loaded loaded) {
+            channels = loaded.channels;
+            bitsPerSample = loaded.bitsPerSample;
+            sampleRate = loaded.sampleRate;
+            pcm = loaded.pcm;
+            durationSec = loaded.durationSec;
         }
     }
 
