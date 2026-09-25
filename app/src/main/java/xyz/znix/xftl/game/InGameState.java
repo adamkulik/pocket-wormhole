@@ -1978,6 +1978,15 @@ public class InGameState extends MainGame.GameState {
     }
 
     /**
+     * The Android letterbox pause button: a quick pause, identical to
+     * the space-bar PAUSE hotkey - freezes the game without opening the
+     * pause menu (the vanilla PAUSED indicator shows while frozen).
+     */
+    public void toggleQuickPause() {
+        paused = !paused;
+    }
+
+    /**
      * The screen position of the enemy ship, for UI code that needs to
      * hit-test rooms on it. Only valid while an enemy is present.
      */

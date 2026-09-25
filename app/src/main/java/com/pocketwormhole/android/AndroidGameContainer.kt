@@ -1,5 +1,6 @@
 package com.pocketwormhole.android
 
+import android.graphics.RectF
 import android.opengl.EGL14
 import android.opengl.EGLConfig as AospEGLConfig
 import android.opengl.GLES30
@@ -9,6 +10,7 @@ import xyz.znix.xftl.rendering.BulkColourRenderer
 import xyz.znix.xftl.rendering.BulkImageRenderer
 import org.newdawn.slick.KeyListener
 import org.newdawn.slick.MouseListener
+import xyz.znix.xftl.rendering.Colour
 import xyz.znix.xftl.rendering.Cursor
 import xyz.znix.xftl.rendering.Graphics
 import xyz.znix.xftl.rendering.ShaderProgramme
@@ -42,6 +44,33 @@ class AndroidGameContainer(
      */
     @Volatile
     var autoPauseRequested = false
+
+    /**
+     * Set by the view when the letterbox pause button was tapped; consumed
+     * on the GL thread at the top of the next frame.
+     */
+    @Volatile
+    private var pauseToggleRequested = false
+
+    /**
+     * The letterbox pause button's tappable rect in surface pixels, or
+     * null while it's hidden (not in flight / no usable bar). Written on
+     * the GL thread every frame, read on the UI thread by the touch path.
+     */
+    @Volatile
+    var pauseButtonHitRect: RectF? = null
+        private set
+
+    /** The letterboxed game-area viewport, in surface pixels. */
+    private var viewX = 0
+    private var viewY = 0
+    private var viewW = GAME_W
+    private var viewH = GAME_H
+
+    /** Called from the UI thread when the pause button is tapped. */
+    fun requestPauseToggle() {
+        pauseToggleRequested = true
+    }
 
     /** Physical surface size, for viewport letterboxing. */
     var surfaceW: Int = GAME_W
@@ -110,6 +139,15 @@ class AndroidGameContainer(
                 }
             }
 
+            if (pauseToggleRequested) {
+                pauseToggleRequested = false
+                try {
+                    game.togglePauseFromTouch()
+                } catch (ex: Throwable) {
+                    android.util.Log.e(TAG, "letterbox pause toggle failed", ex)
+                }
+            }
+
             val thisTime = System.nanoTime()
             val deltaSec = (thisTime - lastNanos) / 1_000_000_000f
             lastNanos = thisTime
@@ -149,6 +187,14 @@ class AndroidGameContainer(
                 // pending; clear the stack or every future frame fails the
                 // engine's checkNoPushedTransforms (stale-frame flicker).
                 g.recoverFromAbortedRender()
+            }
+
+            // Draw the touch pause button into the letterbox bar; the
+            // blit below carries it to the screen.
+            try {
+                drawPauseOverlay()
+            } catch (ex: Throwable) {
+                android.util.Log.e(TAG, "letterbox pause overlay failed", ex)
             }
 
             // Blit the finished frame to the default (window) framebuffer
@@ -276,6 +322,12 @@ class AndroidGameContainer(
         val viewX = (surfaceW - viewW) / 2
         val viewY = (surfaceH - viewH) / 2
 
+        // Remember the letterbox geometry for the pause button overlay.
+        this.viewX = viewX
+        this.viewY = viewY
+        this.viewW = viewW
+        this.viewH = viewH
+
         GLES30.glViewport(viewX, viewY, viewW, viewH)
 
         val scale = if (surfaceAspect > gameAspect) GAME_H.toFloat() / viewH else GAME_W.toFloat() / viewW
@@ -293,6 +345,99 @@ class AndroidGameContainer(
         )
     }
 
+    /**
+     * Draws the touch pause button into the letterbox bar. The game
+     * viewport clips anything outside the 16:9 area, so this switches to
+     * a full-surface viewport and temporarily rescales the pixel-to-NDC
+     * mapping to the surface size - overlay coordinates are then plain
+     * surface pixels, exactly as engine draws are canvas pixels.
+     */
+    private fun drawPauseOverlay() {
+        val visual = computePauseButtonRect()
+
+        // Publish (or hide) the hit rect for the UI thread: the visual
+        // rect inflated for easier tapping, clamped to the letterbox bar
+        // so the button can never steal taps aimed at the game area.
+        pauseButtonHitRect = if (visual == null) null else RectF(visual).apply {
+            inset(-HIT_INFLATE_PX, -HIT_INFLATE_PX)
+            intersect(buttonBandRect())
+        }
+
+        visual ?: return
+
+        // The engine may have left these tests on; the overlay draws raw
+        // quads and the next frame's clear re-establishes state anyway.
+        GLES30.glDisable(GLES30.GL_SCISSOR_TEST)
+        GLES30.glDisable(GLES30.GL_STENCIL_TEST)
+        GLES30.glDisable(GLES30.GL_DEPTH_TEST)
+        GLES30.glViewport(0, 0, surfaceW, surfaceH)
+
+        val oldW = ShaderProgramme.SHADER_SCREEN_SIZE.x
+        val oldH = ShaderProgramme.SHADER_SCREEN_SIZE.y
+        ShaderProgramme.SHADER_SCREEN_SIZE.set(surfaceW, surfaceH)
+        g.loadIdentityMatrix()
+
+        // The pause glyph: two bars, like every media player's.
+        g.colour = PAUSE_COLOUR
+        val barW = visual.width() * 0.16f
+        val barH = visual.height() * 0.5f
+        val gap = visual.width() * 0.20f
+        val cx = visual.centerX()
+        val cy = visual.centerY()
+        g.fillRect(cx - gap / 2 - barW, cy - barH / 2, barW, barH)
+        g.fillRect(cx + gap / 2, cy - barH / 2, barW, barH)
+
+        ShaderProgramme.SHADER_SCREEN_SIZE.set(oldW, oldH)
+    }
+
+    /**
+     * The pause button's visual rect in surface pixels, or null when it
+     * is hidden: outside a run, or when the letterbox bar is too narrow
+     * to hold it (16:9-ish screens - the in-game top-bar menu button is
+     * the pause affordance there).
+     */
+    private fun computePauseButtonRect(): RectF? {
+        if (!game.isInFlight())
+            return null
+
+        val sideBarW = viewX
+        if (sideBarW >= MIN_BAR_PX) {
+            // sensorLandscape phones: right-hand bar, vertically centred
+            // (thumb-reachable). The surface excludes any camera-cutout
+            // inset (S24 Ultra in HD+: 1496x720 -> a 108px bar), so the
+            // glyph never collides with the camera hole; size yields to
+            // the bar width instead of a hard floor so cutout-inset
+            // devices still get the button.
+            val size = minOf(surfaceH * BUTTON_SIZE_FRAC, sideBarW * BAR_FIT_FRAC)
+                .coerceIn(MIN_BUTTON_PX, MAX_BUTTON_PX)
+            val x = surfaceW - sideBarW + (sideBarW - size) / 2f
+            val y = (surfaceH - size) / 2f
+            return RectF(x, y, x + size, y + size)
+        }
+
+        val topBottomBarH = viewY
+        if (topBottomBarH >= MIN_BAR_PX) {
+            // Portrait-ish surfaces: bottom bar, right-aligned.
+            val size = minOf(surfaceW * BUTTON_SIZE_FRAC, topBottomBarH * BAR_FIT_FRAC)
+                .coerceIn(MIN_BUTTON_PX, MAX_BUTTON_PX)
+            val x = surfaceW - size - 16f
+            val y = surfaceH - topBottomBarH + (topBottomBarH - size) / 2f
+            return RectF(x, y, x + size, y + size)
+        }
+
+        return null
+    }
+
+    /** The letterbox band the button lives in, for hit-rect clamping. */
+    private fun buttonBandRect(): RectF {
+        val surfaceWf = surfaceW.toFloat()
+        val surfaceHf = surfaceH.toFloat()
+        return if (viewX >= MIN_BAR_PX)
+            RectF(surfaceWf - viewX, 0f, surfaceWf, surfaceHf)
+        else
+            RectF(0f, surfaceHf - viewY, surfaceWf, surfaceHf)
+    }
+
     override fun exit() {
         game.shutdown()
         finishCallback()
@@ -306,5 +451,17 @@ class AndroidGameContainer(
         const val GAME_W = 1280
         const val GAME_H = 720
         private const val TAG = "XFTL"
+
+        // Letterbox pause button: bars narrower than MIN_BAR_PX hide it;
+        // otherwise its visual size follows the surface's short axis but
+        // yields to the bar width (cutout insets shrink it - S24 Ultra
+        // HD+ has a 108px bar).
+        private const val MIN_BAR_PX = 72
+        private const val MIN_BUTTON_PX = 56f
+        private const val MAX_BUTTON_PX = 150f
+        private const val BUTTON_SIZE_FRAC = 0.11f
+        private const val BAR_FIT_FRAC = 0.72f
+        private const val HIT_INFLATE_PX = 24f
+        private val PAUSE_COLOUR = Colour(200, 200, 200, 220)
     }
 }

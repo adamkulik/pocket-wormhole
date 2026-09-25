@@ -234,6 +234,25 @@ public class MainGame implements Game {
         }
     }
 
+    /**
+     * The Android letterbox pause button: quick-pause, identical to the
+     * space-bar PAUSE hotkey (freezes the game; no pause menu). No-op
+     * outside a run (main menu, hangar).
+     */
+    public void togglePauseFromTouch() {
+        if (currentState instanceof InGameState) {
+            ((InGameState) currentState).toggleQuickPause();
+        }
+    }
+
+    /**
+     * True while a run is in flight (the Android letterbox pause button
+     * only shows then).
+     */
+    public boolean isInFlight() {
+        return currentState instanceof InGameState;
+    }
+
     public void loadSavedGame(Document savedGame) {
         InGameState inGameState = new InGameState(this, content, savedGame);
         setCurrentState(inGameState);
