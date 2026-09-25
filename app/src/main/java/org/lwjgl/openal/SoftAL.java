@@ -407,6 +407,14 @@ public final class SoftAL {
         public final ArrayDeque<QueuedBuffer> queue = new ArrayDeque<>();
 
         /**
+         * Cached first-unprocessed queue entry (see [findHead]) - the old
+         * per-frame queue scan allocated an iterator 44,100 times a second
+         * per streaming source, and the resulting GC churn stalled the
+         * mixer thread enough to underrun AudioTrack on slower devices.
+         */
+        private QueuedBuffer currentQueued;
+
+        /**
          * Seconds of audio (at output rate) already unqueued from the current
          * playback run - subtracted from SEC_OFFSET like OpenAL does when a
          * processed buffer is removed.
@@ -471,6 +479,7 @@ public final class SoftAL {
                 for (QueuedBuffer qb : queue) {
                     qb.processed = true;
                 }
+                currentQueued = null;
             }
         }
 
@@ -479,6 +488,7 @@ public final class SoftAL {
                 staticBufferId = bufferId;
                 staticPos = 0;
                 queue.clear();
+                currentQueued = null;
                 if (bufferId != AL10.AL_NONE) {
                     state = AL10.AL_STOPPED;
                 }
@@ -540,6 +550,7 @@ public final class SoftAL {
                 for (QueuedBuffer qb : queue) {
                     qb.processed = false;
                 }
+                currentQueued = null;
                 state = AL10.AL_PLAYING;
             }
         }
@@ -568,6 +579,28 @@ public final class SoftAL {
         }
 
         /**
+         * The first unprocessed queued buffer, or null if the queue has run
+         * dry. Cached: scanning per output frame allocated an iterator at
+         * the sample rate.
+         */
+        private QueuedBuffer findHead() {
+            QueuedBuffer cached = currentQueued;
+            if (cached != null && !cached.processed)
+                return cached;
+
+            java.util.Iterator<QueuedBuffer> it = queue.iterator();
+            while (it.hasNext()) {
+                QueuedBuffer qb = it.next();
+                if (!qb.processed) {
+                    currentQueued = qb;
+                    return qb;
+                }
+            }
+            currentQueued = null;
+            return null;
+        }
+
+        /**
          * Mixes a single output frame into acc at the given offset.
          * Returns false if the source has run out of audio entirely.
          */
@@ -575,65 +608,65 @@ public final class SoftAL {
             Buffer b;
             boolean isStatic;
 
-            // Find the first non-processed queued buffer (the current one).
-            // Processed buffers stay in the queue until the engine unqueues
-            // them, matching OpenAL semantics.
-            QueuedBuffer head = null;
-            java.util.Iterator<QueuedBuffer> it = queue.iterator();
-            while (it.hasNext()) {
-                QueuedBuffer qb = it.next();
-                if (!qb.processed) {
-                    head = qb;
-                    break;
+            // Advance past finished queued buffers and mix this frame IN THE
+            // SAME call - returning early used to leave the frame silent,
+            // inserting an audible click at every streamed section boundary
+            // (roughly every 0.4s of music, reported as a faint click on
+            // headphones / crackle on device speakers).
+            while (true) {
+                QueuedBuffer head = findHead();
+
+                if (staticBufferId != 0) {
+                    b = getBuffer(staticBufferId);
+                    isStatic = true;
+                } else if (head != null) {
+                    b = getBuffer(head.bufferId);
+                    if (b == null) {
+                        // Buffer was deleted; skip this queued buffer
+                        head.processed = true;
+                        currentQueued = null;
+                        continue;
+                    }
+                    isStatic = false;
+                } else {
+                    // Queue empty, or everything in it has finished
+                    android.util.Log.d("XFTL", "mix: src " + id + " queue exhausted ("
+                            + queue.size() + " entries) -> STOPPED");
+                    state = AL10.AL_STOPPED;
+                    return false;
                 }
-            }
 
-            if (staticBufferId != 0) {
-                b = getBuffer(staticBufferId);
-                isStatic = true;
-            } else if (head != null) {
-                b = getBuffer(head.bufferId);
-                if (b == null) {
-                    // Buffer was deleted; skip this queued buffer
-                    head.processed = true;
-                    return true;
+                if (b == null || b.channels == 0) {
+                    android.util.Log.d("XFTL", "mix: src " + id + " null/empty buffer -> STOPPED");
+                    state = AL10.AL_STOPPED;
+                    return false;
                 }
-                isStatic = false;
-            } else {
-                // Queue empty, or everything in it has finished
-                android.util.Log.d("XFTL", "mix: src " + id + " queue exhausted ("
-                        + queue.size() + " entries) -> STOPPED");
-                state = AL10.AL_STOPPED;
-                return false;
-            }
 
-            if (b == null || b.channels == 0) {
-                android.util.Log.d("XFTL", "mix: src " + id + " null/empty buffer -> STOPPED");
-                state = AL10.AL_STOPPED;
-                return false;
-            }
+                int framesInBuffer = b.pcm.length / b.channels;
+                double pos = isStatic ? staticPos : queuePos;
 
-            int framesInBuffer = b.pcm.length / b.channels;
-            double pos = isStatic ? staticPos : queuePos;
+                if (pos < framesInBuffer)
+                    break; // audio available: mix it below
 
-            if (pos >= framesInBuffer) {
                 if (isStatic) {
                     if (looping) {
                         staticPos = 0;
-                        pos = 0;
-                    } else {
-                        state = AL10.AL_STOPPED;
-                        return false;
+                        break; // loop straight back to frame 0
                     }
-                } else {
-                    // Finished this queued buffer
-                    head.processed = true;
-                    queuePos = 0;
-                    return true; // next frame mixes from the following buffer
+                    state = AL10.AL_STOPPED;
+                    return false;
                 }
+
+                // Finished this queued buffer: mark it processed, advance,
+                // and retry within the same output frame.
+                head.processed = true;
+                currentQueued = null;
+                queuePos = 0;
             }
 
             // Read sample (linear interpolation), resampling from buffer rate
+            int framesInBuffer = b.pcm.length / b.channels;
+            double pos = isStatic ? staticPos : queuePos;
             double bufferStep = (double) b.sampleRate / OUTPUT_RATE * pitch;
             int i0 = (int) pos;
             double frac = pos - i0;
