@@ -2021,6 +2021,85 @@ public class InGameState extends MainGame.GameState {
         paused = !paused;
     }
 
+    // ------------------------------------------------------------------
+    // The remaining Android letterbox buttons (open/close doors, save /
+    // return crew stations). All are no-ops while a modal window (pause
+    // menu, event dialogue...) is open - the letterbox buttons must not
+    // act through windows - but they DO work while quick-paused, like
+    // direct door taps do.
+
+    public void letterboxOpenAllDoors() {
+        if (shipUI != null && !shipUI.isWindowOpen())
+            shipUI.openAllDoors();
+    }
+
+    public void letterboxCloseAllDoors() {
+        if (shipUI != null && !shipUI.isWindowOpen())
+            shipUI.closeAllDoors();
+    }
+
+    /**
+     * Snapshot of where a crewmember was when the letterbox SAVE button
+     * was pressed. The room may belong to the enemy ship (a boarding
+     * crewmember's "station" is where they were posted there).
+     */
+    private static final class StationSave {
+        final AbstractCrew crew;
+        final Room room;
+
+        StationSave(AbstractCrew crew, Room room) {
+            this.crew = crew;
+            this.room = room;
+        }
+    }
+
+    // Transient - never serialised; Save+Quit / a jump clears it.
+    private final ArrayList<StationSave> savedStations = new ArrayList<>();
+
+    /**
+     * Remember where every living, player-controllable crewmember
+     * currently is, so the RETURN button can send them back here.
+     */
+    public void letterboxSaveStations() {
+        if (shipUI != null && shipUI.isWindowOpen())
+            return;
+
+        savedStations.clear();
+        for (LivingCrew crew : getPlayerCrew()) {
+            if (!crew.getPlayerControllable())
+                continue;
+            if (crew.getCurrentAction() == AbstractCrew.Action.DYING)
+                continue;
+            savedStations.add(new StationSave(crew, crew.getRoom()));
+        }
+    }
+
+    /**
+     * Send everyone back to where they were when SAVE was pressed.
+     * Crewmembers whose saved room is on a ship they're no longer aboard
+     * (the enemy died and jumped away, etc.) are skipped.
+     */
+    public void letterboxReturnStations() {
+        if (shipUI != null && shipUI.isWindowOpen())
+            return;
+
+        for (StationSave save : savedStations) {
+            AbstractCrew crew = save.crew;
+            if (crew.getCurrentAction() == AbstractCrew.Action.DYING)
+                continue;
+            if (!crew.getPlayerControllable())
+                continue;
+            if (crew.getRoom().getShip() != save.room.getShip())
+                continue;
+            crew.setTargetRoom(save.room);
+        }
+    }
+
+    /** Whether the SAVE button's lit art should show (stations stored). */
+    public boolean hasSavedStations() {
+        return !savedStations.isEmpty();
+    }
+
     /**
      * The screen position of the enemy ship, for UI code that needs to
      * hit-test rooms on it. Only valid while an enemy is present.

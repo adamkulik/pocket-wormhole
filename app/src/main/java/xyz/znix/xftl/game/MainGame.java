@@ -245,6 +245,54 @@ public class MainGame implements Game {
         }
     }
 
+    // The remaining Android letterbox buttons (open/close all doors,
+    // save/return crew stations). All no-op outside a run.
+    public void letterboxOpenAllDoors() {
+        if (currentState instanceof InGameState)
+            ((InGameState) currentState).letterboxOpenAllDoors();
+    }
+
+    public void letterboxCloseAllDoors() {
+        if (currentState instanceof InGameState)
+            ((InGameState) currentState).letterboxCloseAllDoors();
+    }
+
+    public void letterboxSaveStations() {
+        if (currentState instanceof InGameState)
+            ((InGameState) currentState).letterboxSaveStations();
+    }
+
+    public void letterboxReturnStations() {
+        if (currentState instanceof InGameState)
+            ((InGameState) currentState).letterboxReturnStations();
+    }
+
+    /** Whether the letterbox SAVE-stations button should draw its lit art. */
+    public boolean hasSavedStationsForOverlay() {
+        return currentState instanceof InGameState &&
+                ((InGameState) currentState).hasSavedStations();
+    }
+
+    /** Whether the letterbox door buttons should draw dimmed (inoperable). */
+    public boolean doorsOperableForOverlay() {
+        if (!(currentState instanceof InGameState))
+            return false;
+        InGameState state = (InGameState) currentState;
+        if (state.getPlayer() == null)
+            return false;
+        return state.getPlayer().getAreDoorsOperable();
+    }
+
+    /**
+     * The in-flight state for the letterbox overlay's button art, or null
+     * when the overlay shows nothing. The overlay runs on the GL thread
+     * after game.render, so lazy image loads here are safe.
+     */
+    @Nullable
+    public InGameState letterboxOverlayState() {
+        return currentState instanceof InGameState ? (InGameState) currentState : null;
+    }
+
     /**
      * True while a run is in flight (the Android letterbox pause button
      * only shows then).

@@ -14,7 +14,9 @@ import xyz.znix.xftl.rendering.Colour
 import xyz.znix.xftl.rendering.Cursor
 import xyz.znix.xftl.rendering.Graphics
 import xyz.znix.xftl.rendering.ShaderProgramme
+import xyz.znix.xftl.game.InGameState
 import xyz.znix.xftl.game.MainGame
+import xyz.znix.xftl.rendering.Image
 import xyz.znix.xftl.sys.GameContainer
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
@@ -46,19 +48,19 @@ class AndroidGameContainer(
     var autoPauseRequested = false
 
     /**
-     * Set by the view when the letterbox pause button was tapped; consumed
-     * on the GL thread at the top of the next frame.
+     * Set by the view when a letterbox button was tapped; consumed on the
+     * GL thread at the top of the next frame.
      */
     @Volatile
-    private var pauseToggleRequested = false
+    private var pendingLetterboxAction: LetterboxAction? = null
 
     /**
-     * The letterbox pause button's tappable rect in surface pixels, or
-     * null while it's hidden (not in flight / no usable bar). Written on
+     * The letterbox buttons' tappable rects in surface pixels, or empty
+     * while they're hidden (not in flight / no usable bar). Written on
      * the GL thread every frame, read on the UI thread by the touch path.
      */
     @Volatile
-    var pauseButtonHitRect: RectF? = null
+    var letterboxButtons: List<LetterboxButton> = emptyList()
         private set
 
     /** The letterboxed game-area viewport, in surface pixels. */
@@ -67,9 +69,9 @@ class AndroidGameContainer(
     private var viewW = GAME_W
     private var viewH = GAME_H
 
-    /** Called from the UI thread when the pause button is tapped. */
-    fun requestPauseToggle() {
-        pauseToggleRequested = true
+    /** Called from the UI thread when a letterbox button is tapped. */
+    fun requestLetterboxAction(action: LetterboxAction) {
+        pendingLetterboxAction = action
     }
 
     /** Physical surface size, for viewport letterboxing. */
@@ -139,12 +141,19 @@ class AndroidGameContainer(
                 }
             }
 
-            if (pauseToggleRequested) {
-                pauseToggleRequested = false
+            val queuedAction = pendingLetterboxAction
+            if (queuedAction != null) {
+                pendingLetterboxAction = null
                 try {
-                    game.togglePauseFromTouch()
+                    when (queuedAction) {
+                        LetterboxAction.PAUSE_TOGGLE -> game.togglePauseFromTouch()
+                        LetterboxAction.OPEN_DOORS -> game.letterboxOpenAllDoors()
+                        LetterboxAction.CLOSE_DOORS -> game.letterboxCloseAllDoors()
+                        LetterboxAction.SAVE_STATIONS -> game.letterboxSaveStations()
+                        LetterboxAction.RETURN_STATIONS -> game.letterboxReturnStations()
+                    }
                 } catch (ex: Throwable) {
-                    android.util.Log.e(TAG, "letterbox pause toggle failed", ex)
+                    android.util.Log.e(TAG, "letterbox button action failed", ex)
                 }
             }
 
@@ -189,12 +198,12 @@ class AndroidGameContainer(
                 g.recoverFromAbortedRender()
             }
 
-            // Draw the touch pause button into the letterbox bar; the
-            // blit below carries it to the screen.
+            // Draw the letterbox buttons into the bars; the blit below
+            // carries them to the screen.
             try {
-                drawPauseOverlay()
+                drawLetterboxOverlay()
             } catch (ex: Throwable) {
-                android.util.Log.e(TAG, "letterbox pause overlay failed", ex)
+                android.util.Log.e(TAG, "letterbox button overlay failed", ex)
             }
 
             // Blit the finished frame to the default (window) framebuffer
@@ -322,7 +331,7 @@ class AndroidGameContainer(
         val viewX = (surfaceW - viewW) / 2
         val viewY = (surfaceH - viewH) / 2
 
-        // Remember the letterbox geometry for the pause button overlay.
+        // Remember the letterbox geometry for the buttons overlay.
         this.viewX = viewX
         this.viewY = viewY
         this.viewW = viewW
@@ -346,24 +355,30 @@ class AndroidGameContainer(
     }
 
     /**
-     * Draws the touch pause button into the letterbox bar. The game
-     * viewport clips anything outside the 16:9 area, so this switches to
-     * a full-surface viewport and temporarily rescales the pixel-to-NDC
-     * mapping to the surface size - overlay coordinates are then plain
-     * surface pixels, exactly as engine draws are canvas pixels.
+     * Draws the letterbox buttons into the bars. The game viewport clips
+     * anything outside the 16:9 area, so this switches to a full-surface
+     * viewport and temporarily rescales the pixel-to-NDC mapping to the
+     * surface size - overlay coordinates are then plain surface pixels,
+     * exactly as engine draws are canvas pixels.
      */
-    private fun drawPauseOverlay() {
-        val visual = computePauseButtonRect()
+    private fun drawLetterboxOverlay() {
+        val defs = computeLetterboxButtons()
 
-        // Publish (or hide) the hit rect for the UI thread: the visual
-        // rect inflated for easier tapping, clamped to the letterbox bar
-        // so the button can never steal taps aimed at the game area.
-        pauseButtonHitRect = if (visual == null) null else RectF(visual).apply {
-            inset(-HIT_INFLATE_PX, -HIT_INFLATE_PX)
-            intersect(buttonBandRect())
+        // Publish (or hide) the hit rects for the UI thread: each visual
+        // rect inflated for easier tapping, clamped to its own letterbox
+        // band so the buttons can never steal taps aimed at the game area.
+        letterboxButtons = defs.map { (action, visual) ->
+            val band = bandRectFor(visual)
+            val hit = RectF(visual).apply {
+                inset(-HIT_INFLATE_PX, -HIT_INFLATE_PX)
+                intersect(band)
+            }
+            LetterboxButton(action, hit)
         }
 
-        visual ?: return
+        if (defs.isEmpty()) return
+        val state = game.letterboxOverlayState() ?: return
+        val art = letterboxArt(state) ?: return
 
         // The engine may have left these tests on; the overlay draws raw
         // quads and the next frame's clear re-establishes state anyway.
@@ -377,70 +392,176 @@ class AndroidGameContainer(
         ShaderProgramme.SHADER_SCREEN_SIZE.set(surfaceW, surfaceH)
         g.loadIdentityMatrix()
 
-        // The pause glyph: two bars, like every media player's.
-        g.colour = PAUSE_COLOUR
-        val barW = visual.width() * 0.16f
-        val barH = visual.height() * 0.5f
-        val gap = visual.width() * 0.20f
-        val cx = visual.centerX()
-        val cy = visual.centerY()
-        g.fillRect(cx - gap / 2 - barW, cy - barH / 2, barW, barH)
-        g.fillRect(cx + gap / 2, cy - barH / 2, barW, barH)
+        val doorsOperable = game.doorsOperableForOverlay()
+        val stationsSaved = game.hasSavedStationsForOverlay()
+        for ((action, rect) in defs) {
+            val cx = rect.centerX()
+            val cy = rect.centerY()
+            when (action) {
+                LetterboxAction.PAUSE_TOGGLE -> {
+                    // The pause glyph: two bars, like every media player's
+                    // (the PAUSED banner art was tried here and reverted -
+                    // the plain glyph is what the user wants).
+                    g.colour = PAUSE_COLOUR
+                    val barW = rect.width() * 0.16f
+                    val barH = rect.height() * 0.5f
+                    val gap = rect.width() * 0.20f
+                    g.fillRect(cx - gap / 2 - barW, cy - barH / 2, barW, barH)
+                    g.fillRect(cx + gap / 2, cy - barH / 2, barW, barH)
+                }
+                LetterboxAction.OPEN_DOORS -> drawFitted(
+                    art.doorOpen, cx, cy, rect.width(),
+                    if (doorsOperable) BUTTON_TINT else BUTTON_TINT_DIM
+                )
+                LetterboxAction.CLOSE_DOORS -> drawFitted(
+                    art.doorClose, cx, cy, rect.width(),
+                    if (doorsOperable) BUTTON_TINT else BUTTON_TINT_DIM
+                )
+                LetterboxAction.SAVE_STATIONS -> drawFitted(
+                    if (stationsSaved) art.assignOn else art.assignOff,
+                    cx, cy, rect.width(), BUTTON_TINT
+                )
+                LetterboxAction.RETURN_STATIONS -> drawFitted(
+                    art.returnOff, cx, cy, rect.width(),
+                    if (stationsSaved) BUTTON_TINT else BUTTON_TINT_DIM
+                )
+            }
+        }
 
         ShaderProgramme.SHADER_SCREEN_SIZE.set(oldW, oldH)
     }
 
+    /** Draw an image aspect-fit inside a box centred on (cx, cy). */
+    private fun drawFitted(img: Image, cx: Float, cy: Float, box: Float, filter: Colour) {
+        val s = box / maxOf(img.width, img.height)
+        val w = img.width * s
+        val h = img.height * s
+        img.draw(cx - w / 2f, cy - h / 2f, w, h, filter)
+    }
+
     /**
-     * The pause button's visual rect in surface pixels, or null when it
-     * is hidden: outside a run, or when the letterbox bar is too narrow
-     * to hold it (16:9-ish screens - the in-game top-bar menu button is
-     * the pause affordance there).
+     * The letterbox buttons' visual rects in surface pixels, or empty
+     * when hidden: outside a run, or when no letterbox bar is wide
+     * enough (16:9-ish screens - the in-game top-bar menu button is the
+     * pause affordance there).
+     *
+     * Layout (user-specified): right bar top-to-bottom PAUSE / OPEN ALL
+     * DOORS / CLOSE ALL DOORS; left bar's top slot is reserved (L1, not
+     * used yet) with SAVE STATIONS / RETURN TO STATIONS below it.
      */
-    private fun computePauseButtonRect(): RectF? {
+    private fun computeLetterboxButtons(): List<Pair<LetterboxAction, RectF>> {
         if (!game.isInFlight())
-            return null
+            return emptyList()
 
         val sideBarW = viewX
         if (sideBarW >= MIN_BAR_PX) {
-            // sensorLandscape phones: right-hand bar, vertically centred
-            // (thumb-reachable). The surface excludes any camera-cutout
-            // inset (S24 Ultra in HD+: 1496x720 -> a 108px bar), so the
-            // glyph never collides with the camera hole; size yields to
-            // the bar width instead of a hard floor so cutout-inset
-            // devices still get the button.
+            // sensorLandscape phones: two columns in the side bars. The
+            // surface excludes any camera-cutout inset (S24 Ultra in HD+:
+            // 1496x720 -> a 108px bar), so the buttons never collide with
+            // the camera hole; size yields to the bar width instead of a
+            // hard floor so cutout-inset devices still get buttons.
             val size = minOf(surfaceH * BUTTON_SIZE_FRAC, sideBarW * BAR_FIT_FRAC)
                 .coerceIn(MIN_BUTTON_PX, MAX_BUTTON_PX)
-            val x = surfaceW - sideBarW + (sideBarW - size) / 2f
-            val y = (surfaceH - size) / 2f
-            return RectF(x, y, x + size, y + size)
+            val gap = (surfaceH - 3 * size) / 4f
+            fun slotY(i: Int) = gap * (i + 1) + i * size
+            val rightX = surfaceW - sideBarW + (sideBarW - size) / 2f
+            val leftX = (sideBarW - size) / 2f
+            return listOf(
+                LetterboxAction.PAUSE_TOGGLE to RectF(rightX, slotY(0), rightX + size, slotY(0) + size),
+                LetterboxAction.OPEN_DOORS to RectF(rightX, slotY(1), rightX + size, slotY(1) + size),
+                LetterboxAction.CLOSE_DOORS to RectF(rightX, slotY(2), rightX + size, slotY(2) + size),
+                // L1 (top-left) is reserved for a future button.
+                LetterboxAction.SAVE_STATIONS to RectF(leftX, slotY(1), leftX + size, slotY(1) + size),
+                LetterboxAction.RETURN_STATIONS to RectF(leftX, slotY(2), leftX + size, slotY(2) + size),
+            )
         }
 
-        val topBottomBarH = viewY
-        if (topBottomBarH >= MIN_BAR_PX) {
-            // Portrait-ish surfaces: bottom bar, right-aligned.
-            val size = minOf(surfaceW * BUTTON_SIZE_FRAC, topBottomBarH * BAR_FIT_FRAC)
+        val bottomBarH = viewY
+        if (bottomBarH >= MIN_BAR_PX) {
+            // Portrait-ish surfaces: one row, right-aligned in the bar.
+            val size = minOf(surfaceW * BUTTON_SIZE_FRAC, bottomBarH * BAR_FIT_FRAC)
                 .coerceIn(MIN_BUTTON_PX, MAX_BUTTON_PX)
-            val x = surfaceW - size - 16f
-            val y = surfaceH - topBottomBarH + (topBottomBarH - size) / 2f
-            return RectF(x, y, x + size, y + size)
+            val order = listOf(
+                LetterboxAction.PAUSE_TOGGLE,
+                LetterboxAction.OPEN_DOORS,
+                LetterboxAction.CLOSE_DOORS,
+                LetterboxAction.SAVE_STATIONS,
+                LetterboxAction.RETURN_STATIONS,
+            )
+            val spacing = size + 12f
+            var x = surfaceW - order.size * size - (order.size - 1) * 12f - 16f
+            val y = surfaceH - bottomBarH + (bottomBarH - size) / 2f
+            return order.map { action ->
+                val r = RectF(x, y, x + size, y + size)
+                x += spacing
+                action to r
+            }
         }
 
-        return null
+        return emptyList()
     }
 
-    /** The letterbox band the button lives in, for hit-rect clamping. */
-    private fun buttonBandRect(): RectF {
+    /** The letterbox band a button's visual rect lives in, for hit-rect clamping. */
+    private fun bandRectFor(visual: RectF): RectF {
         val surfaceWf = surfaceW.toFloat()
         val surfaceHf = surfaceH.toFloat()
-        return if (viewX >= MIN_BAR_PX)
-            RectF(surfaceWf - viewX, 0f, surfaceWf, surfaceHf)
-        else
-            RectF(0f, surfaceHf - viewY, surfaceWf, surfaceHf)
+        val cx = visual.centerX()
+        return when {
+            cx < viewX -> RectF(0f, 0f, viewX.toFloat(), surfaceHf)
+            cx > surfaceWf - viewX -> RectF(surfaceWf - viewX, 0f, surfaceWf, surfaceHf)
+            else -> RectF(0f, surfaceHf - viewY, surfaceWf, surfaceHf)
+        }
     }
 
     override fun exit() {
         game.shutdown()
         finishCallback()
+    }
+
+    /**
+     * The overlay's button art, built once per in-flight InGameState (its
+     * own image cache owns the textures and frees them on shutdown).
+     */
+    private var overlayArtState: Any? = null
+    private var overlayArt: LetterboxArt? = null
+
+    private class LetterboxArt(
+        val assignOff: Image,
+        val assignOn: Image,
+        val returnOff: Image,
+        val doorOpen: Image,
+        val doorClose: Image,
+    )
+
+    private fun letterboxArt(state: InGameState): LetterboxArt? {
+        if (overlayArtState === state && overlayArt != null)
+            return overlayArt
+        try {
+            val art = LetterboxArt(
+                assignOff = state.getImg("img/ipad/statusUI/button_station_assign_off.png"),
+                assignOn = state.getImg("img/ipad/statusUI/button_station_assign_on.png"),
+                returnOff = state.getImg("img/ipad/statusUI/button_station_return_off.png"),
+                // The door glyphs live in the button-state variants
+                // (_off/_on/_select2) - there is no plain
+                // button_door_top/bottom.png, and a missing getImg name
+                // silently returns the nullResource hazard-stripe
+                // texture. Crop the 32x32 normal-state (_on) glyphs:
+                // top plate = close all, bottom plate = open all
+                // (Doors.kt's DoorButton ctor args).
+                doorOpen = state.getImg("img/systemUI/button_door_bottom_on.png")
+                    .getSubImage(4, 27, 32, 32),
+                doorClose = state.getImg("img/systemUI/button_door_top_on.png")
+                    .getSubImage(4, 4, 32, 32),
+            )
+            overlayArtState = state
+            overlayArt = art
+            return art
+        } catch (ex: Throwable) {
+            android.util.Log.w(TAG, "letterbox overlay art load failed", ex)
+            overlayArtState = null
+            overlayArt = null
+            return null
+        }
     }
 
     override fun setCursor(cursor: Cursor?) {
@@ -452,16 +573,31 @@ class AndroidGameContainer(
         const val GAME_H = 720
         private const val TAG = "XFTL"
 
-        // Letterbox pause button: bars narrower than MIN_BAR_PX hide it;
-        // otherwise its visual size follows the surface's short axis but
+        // Letterbox buttons: bars narrower than MIN_BAR_PX hide them;
+        // otherwise their visual size follows the surface's short axis but
         // yields to the bar width (cutout insets shrink it - S24 Ultra
-        // HD+ has a 108px bar).
+        // HD+ has a 108px bar). Three buttons stack per bar, so the size
+        // fraction is smaller than the old single-pause-button one.
         private const val MIN_BAR_PX = 72
-        private const val MIN_BUTTON_PX = 56f
-        private const val MAX_BUTTON_PX = 150f
-        private const val BUTTON_SIZE_FRAC = 0.11f
+        private const val MIN_BUTTON_PX = 44f
+        private const val MAX_BUTTON_PX = 120f
+        private const val BUTTON_SIZE_FRAC = 0.085f
         private const val BAR_FIT_FRAC = 0.72f
         private const val HIT_INFLATE_PX = 24f
+        private val BUTTON_TINT = Colour(255, 255, 255, 235)
+        private val BUTTON_TINT_DIM = Colour(255, 255, 255, 100)
         private val PAUSE_COLOUR = Colour(200, 200, 200, 220)
     }
 }
+
+/** What a letterbox button does when tapped. */
+enum class LetterboxAction {
+    PAUSE_TOGGLE,
+    OPEN_DOORS,
+    CLOSE_DOORS,
+    SAVE_STATIONS,
+    RETURN_STATIONS,
+}
+
+/** A letterbox button's action + tappable rect in surface pixels. */
+data class LetterboxButton(val action: LetterboxAction, val rect: RectF)

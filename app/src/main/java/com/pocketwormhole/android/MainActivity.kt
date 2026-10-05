@@ -418,11 +418,12 @@ class GameSurfaceView(
         }
     }
 
-    // The pointer currently pressing the letterbox pause button, or -1.
-    private var pausePressPointerId = -1
+    // The letterbox button currently pressed (its action + pointer id), or null.
+    private var pressAction: LetterboxAction? = null
+    private var pressPointerId = -1
 
     override fun onTouchEvent(event: android.view.MotionEvent): Boolean {
-        if (handlePauseButtonTouch(event)) {
+        if (handleLetterboxTouch(event)) {
             performClick()
             return true
         }
@@ -432,54 +433,60 @@ class GameSurfaceView(
     }
 
     /**
-     * Intercepts touches on the letterbox pause button before they can
-     * reach the game input. Returns true while the event belongs to the
-     * button (including whole gestures that started on it), so a button
-     * tap can never click through to the game.
+     * Intercepts touches on the letterbox buttons before they can reach
+     * the game input. Returns true while the event belongs to a button
+     * (including whole gestures that started on one), so a button tap can
+     * never click through to the game.
      */
-    private fun handlePauseButtonTouch(event: android.view.MotionEvent): Boolean {
-        val rect = container.pauseButtonHitRect
-        if (rect == null && pausePressPointerId < 0)
+    private fun handleLetterboxTouch(event: android.view.MotionEvent): Boolean {
+        val buttons = container.letterboxButtons
+        if (buttons.isEmpty() && pressAction == null)
             return false
 
         when (event.actionMasked) {
             android.view.MotionEvent.ACTION_DOWN -> {
-                if (rect != null && rect.contains(event.x, event.y)) {
-                    pausePressPointerId = event.getPointerId(0)
+                val hit = buttons.firstOrNull { it.rect.contains(event.x, event.y) }
+                if (hit != null) {
+                    pressAction = hit.action
+                    pressPointerId = event.getPointerId(0)
                     performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
                     return true
                 }
                 return false
             }
             android.view.MotionEvent.ACTION_MOVE -> {
-                if (pausePressPointerId < 0)
-                    return false
-                val i = event.findPointerIndex(pausePressPointerId)
-                if (i >= 0 && (rect == null || !rect.contains(event.getX(i), event.getY(i)))) {
+                val action = pressAction ?: return false
+                val i = event.findPointerIndex(pressPointerId)
+                val button = buttons.firstOrNull { it.action == action }
+                if (i >= 0 && (button == null || !button.rect.contains(event.getX(i), event.getY(i)))) {
                     // Slid off the button: cancel the press; later events
                     // fall through to the game input again.
-                    pausePressPointerId = -1
+                    pressAction = null
+                    pressPointerId = -1
                 }
                 return true
             }
             android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
-                val wasOurs = pausePressPointerId >= 0
-                if (wasOurs) {
-                    val i = event.findPointerIndex(pausePressPointerId)
+                val action = pressAction
+                val wasOurs = action != null
+                if (action != null) {
+                    val i = event.findPointerIndex(pressPointerId)
+                    val button = buttons.firstOrNull { it.action == action }
                     if (event.actionMasked == android.view.MotionEvent.ACTION_UP &&
-                        i >= 0 && rect != null && rect.contains(event.getX(i), event.getY(i))
+                        i >= 0 && button != null && button.rect.contains(event.getX(i), event.getY(i))
                     ) {
-                        android.util.Log.i("XFTL", "Letterbox pause button tapped")
-                        container.requestPauseToggle()
+                        android.util.Log.i("XFTL", "Letterbox button tapped: $action")
+                        container.requestLetterboxAction(action)
                     }
-                    pausePressPointerId = -1
+                    pressAction = null
+                    pressPointerId = -1
                 }
                 return wasOurs
             }
         }
         // Other events of a gesture we own (a second finger etc.) are
         // swallowed so they can't confuse the game input mid-press.
-        return pausePressPointerId >= 0
+        return pressAction != null
     }
 
     override fun onPause() {
