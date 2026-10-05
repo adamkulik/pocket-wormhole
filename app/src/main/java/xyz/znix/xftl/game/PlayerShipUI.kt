@@ -61,6 +61,16 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
     private var selectWeaponClickEvent: RoomClickListener? = null
     private var targetingSelectedWeapon: Int? = null
 
+    /**
+     * Touch disarm-on-empty-tap: true when the most recent [mouseClick]
+     * press was consumed by a UI element (windows, weapon/drone/system
+     * buttons, the power popup, doors) rather than falling through to
+     * empty space. InGameState reads this so an armed weapon/system picker
+     * is only disarmed by tapping genuinely empty space.
+     */
+    var lastClickConsumedUi = false
+        private set
+
     private val selectedCrew: MutableList<AbstractCrew> = ArrayList()
 
     /**
@@ -587,18 +597,23 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
     }
 
     fun mouseClick(button: Int, x: Int, y: Int, playerShipPosition: IPoint) {
+        lastClickConsumedUi = false
+
         pauseWindow?.let { win ->
+            lastClickConsumedUi = true
             win.mouseClick(button, x, y)
             return
         }
 
         currentWindow?.let { win ->
+            lastClickConsumedUi = true
             win.mouseClick(button, x, y)
             return
         }
 
         // When we're in beam targeting mode, block other mouse input.
         if (beamTargeting != null) {
+            lastClickConsumedUi = true
             if (button == Input.MOUSE_LEFT_BUTTON) {
                 targetBeamWeapon()
             } else if (button == Input.MOUSE_RIGHT_BUTTON) {
@@ -612,18 +627,26 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
         // toggles act, taps anywhere else close it. This must run BEFORE the
         // button loops below, otherwise the strip buttons underneath the
         // panel would swallow its taps.
-        if (popupClick(button, x, y))
+        if (popupClick(button, x, y)) {
+            lastClickConsumedUi = true
             return
+        }
 
         // System-strip buttons are in the scaled bar space on touch; hit
         // them first (they're drawn on top of the strip art).
         for (btn in systemsBarButtons) {
             val (bx, by) = toBarSpace(x, y)
-            if (btn.mouseDown(button, bx, by)) return
+            if (btn.mouseDown(button, bx, by)) {
+                lastClickConsumedUi = true
+                return
+            }
         }
 
         for (btn in buttons) {
-            if (btn.mouseDown(button, x, y)) return
+            if (btn.mouseDown(button, x, y)) {
+                lastClickConsumedUi = true
+                return
+            }
         }
 
         // Check if we're clicking on a door
@@ -631,8 +654,10 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
             val doorPos = screenToShipRender(x, y, playerShipPosition)
             for (door in ship.doors) {
                 val hit = door.click(doorPos.x, doorPos.y)
-                if (hit)
+                if (hit) {
+                    lastClickConsumedUi = true
                     return
+                }
             }
         }
 
@@ -697,6 +722,14 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
         // crewmember to re-select and stay in the mode, tap empty space
         // to deselect and leave it).
         if (roomSelectionMode && button == Input.MOUSE_LEFT_BUTTON) {
+            // A tap in a door's (widened) hit area toggled the door on the
+            // PRESS - mouseClick's doors loop runs first - so swallow the
+            // release here instead of ALSO ordering the selected crew to
+            // the room behind the door (issue #53).
+            val doorTapPos = screenToShipRender(x, y, playerShipPosition)
+            if (ship.doors.any { it.isPointInHitArea(doorTapPos.x, doorTapPos.y) })
+                return
+
             if (handleRoomSelectionTap(x, y, playerShipPosition)) {
                 // The move action is complete: deselect and unpause.
                 selectedCrew.clear()

@@ -30,6 +30,7 @@ import xyz.znix.xftl.shipgen.EnemyShipSpec;
 import xyz.znix.xftl.shipgen.ShipGenerator;
 import xyz.znix.xftl.sys.GameContainer;
 import xyz.znix.xftl.sys.Input;
+import xyz.znix.xftl.sys.PlatformSpecific;
 import xyz.znix.xftl.sys.ResourceContext;
 import xyz.znix.xftl.systems.*;
 import xyz.znix.xftl.ui.SpecDeserialiser;
@@ -77,6 +78,16 @@ public class InGameState extends MainGame.GameState {
     private Room hoveredRoom;
     private RoomClickListener clickEvent;
     private final boolean[] mouseDownPrev = new boolean[3];
+
+    // Touch disarm-on-empty-tap: state of the current left press, so a
+    // release that never hit a targetable room (or any UI) cancels the
+    // armed weapon/system picker, iPad-style. pressClickEvent is the
+    // listener armed when the press went down - the release only disarms
+    // if it's still the SAME listener, so re-arming a different weapon
+    // mid-press is never undone.
+    private RoomClickListener pressClickEvent;
+    private boolean pressClickedRoom;
+    private boolean pressConsumedUi;
 
     /**
      * The input device from the most recent update() call. Lets UI code read
@@ -854,9 +865,32 @@ public class InGameState extends MainGame.GameState {
                     rightClicked = true;
                 }
 
+                if (i == Input.MOUSE_LEFT_BUTTON) {
+                    pressClickEvent = clickEvent;
+                    pressClickedRoom = false;
+                    pressConsumedUi = false;
+                }
+
                 shipUI.mouseClick(i, in.getMouseX(), in.getMouseY(), playerShipOffset);
+
+                if (i == Input.MOUSE_LEFT_BUTTON) {
+                    pressConsumedUi = shipUI.getLastClickConsumedUi();
+                }
             } else if (prev && !now) {
                 shipUI.mouseUp(i, in.getMouseX(), in.getMouseY(), playerShipOffset);
+
+                // Tap on empty space while a weapon/system picker is armed:
+                // cancel it, like the iPad port (and like the right-click
+                // path above on desktop). A tap that hit a targetable room
+                // already fired roomClicked (pressClickedRoom); a tap that
+                // hit UI was consumed (pressConsumedUi); and a tap that
+                // armed a DIFFERENT picker left a new listener in
+                // clickEvent - none of those cancel here.
+                if (i == Input.MOUSE_LEFT_BUTTON && PlatformSpecific.INSTANCE.isTouchUi()
+                        && clickEvent != null && clickEvent == pressClickEvent
+                        && !pressClickedRoom && !pressConsumedUi) {
+                    clickEvent = null;
+                }
             }
             mouseDownPrev[i] = now;
         }
@@ -928,6 +962,7 @@ public class InGameState extends MainGame.GameState {
         if (hoveredRoom != null && clickEvent != null && mouseDownPrev[Input.MOUSE_LEFT_BUTTON]) {
             var prev = clickEvent;
             clickEvent = null;
+            pressClickedRoom = true;
             prev.roomClicked(hoveredRoom, container);
         }
     }

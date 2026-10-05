@@ -14,6 +14,7 @@ import xyz.znix.xftl.math.RoomPoint
 import xyz.znix.xftl.rendering.Colour
 import xyz.znix.xftl.rendering.Graphics
 import xyz.znix.xftl.savegame.SaveUtil
+import xyz.znix.xftl.sys.PlatformSpecific
 import kotlin.math.abs
 import kotlin.math.max
 
@@ -222,13 +223,21 @@ data class Door(val position: ConstPoint, val left: Room?, val right: Room?, val
     }
 
     fun updateMouseHover(x: Int, y: Int) {
+        hovered = isPointInHitArea(x, y)
+    }
+
+    /**
+     * Non-mutating hit test with the same accept set as [click]: true when
+     * a click at this ship-space point would toggle this door. Used by the
+     * touch room-selection mode to not treat a door tap as a crew move.
+     */
+    fun isPointInHitArea(x: Int, y: Int): Boolean {
         // Broken and hacked doors can't be controlled by the player, and
         // neither can any door at all while the doors system is inoperable
         // (broken/ionised/hacked/powered down/absent) - vanilla then refuses
         // to open or close anything, so don't even highlight the doors.
         if (isBroken || isHacked || !ship.areDoorsOperable) {
-            hovered = false
-            return
+            return false
         }
 
         var centreX = offsetX
@@ -240,16 +249,19 @@ data class Door(val position: ConstPoint, val left: Room?, val right: Room?, val
             centreX += ROOM_SIZE / 2
         }
 
-        hovered = false
-
-        val hoverRange = 10
+        // Touch layouts widen the hit area: a 10px radius around the door
+        // centre is a tiny tap target (issue #53 - "feels like an ad's
+        // close button"). 18 keeps doors on a shared wall non-overlapping
+        // (centres are ROOM_SIZE = 35px apart). The visual highlight is
+        // unchanged - only the invisible hit box grows.
+        val hoverRange = if (PlatformSpecific.INSTANCE.isTouchUi) 18 else 10
 
         if (x !in centreX - hoverRange..centreX + hoverRange)
-            return
+            return false
         if (y !in centreY - hoverRange..centreY + hoverRange)
-            return
+            return false
 
-        hovered = true
+        return true
     }
 
     fun click(x: Int, y: Int): Boolean {
