@@ -73,11 +73,30 @@ class DialogueWindow private constructor(val game: InGameState, val playerShip: 
 
     constructor(game: InGameState, playerShip: Ship, startingEvent: Event?, seed: Int, close: () -> Unit)
             : this(game, playerShip, close) {
+        setupStartingEvent(startingEvent, seed, null)
+    }
+
+    /**
+     * The first-run tip (issue #58) is rendered as an extra paragraph
+     * after the event text, above the options - vanilla appends it to the
+     * intro dialogue the same way, and [extraText] is the native mechanism
+     * for extra paragraphs there.
+     */
+    constructor(
+        game: InGameState, playerShip: Ship, startingEvent: Event?, seed: Int,
+        firstRunTip: String?, close: () -> Unit
+    ) : this(game, playerShip, close) {
+        setupStartingEvent(startingEvent, seed, firstRunTip)
+    }
+
+    private fun setupStartingEvent(startingEvent: Event?, seed: Int, firstRunTip: String?) {
 
         // Starting event can be null to get the window open before adding
         // a synthetic event.
         if (startingEvent != null) {
             loadEvent(EvaluatedEvent(startingEvent, game, null, seed))
+            if (firstRunTip != null)
+                extraText += "\n\n" + firstRunTip
         } else {
             // We have to set this for serialisation, and although it should
             // never be observed, it's still worth adding the continue event

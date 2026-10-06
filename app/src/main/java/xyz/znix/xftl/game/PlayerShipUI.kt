@@ -2312,14 +2312,14 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
         }
     }
 
-    fun showEventDialogue(event: Event, seed: Int) {
-        openEventDialogue(event, seed)
+    fun showEventDialogue(event: Event, seed: Int, firstRunTip: String? = null) {
+        openEventDialogue(event, seed, firstRunTip)
     }
 
-    private fun openEventDialogue(event: Event?, seed: Int) {
+    private fun openEventDialogue(event: Event?, seed: Int, firstRunTip: String? = null) {
         var hasImmediatelyClosed = false
 
-        currentWindow = DialogueWindow(game, ship, event, seed) {
+        currentWindow = DialogueWindow(game, ship, event, seed, firstRunTip) {
             hasImmediatelyClosed = true
             eventDialogueClosed()
         }

@@ -183,7 +183,17 @@ public class InGameState extends MainGame.GameState {
 
         // Show the starting beacon dialogue, since it wasn't displayed earlier
         // due to shipUI not existing yet.
-        showEventDialogue(currentBeacon.getEvent(), Random.Default.nextInt());
+        //
+        // The first run of a profile gets the vanilla tip appended to the
+        // intro dialogue's text (issue #58) - it teaches how to open the
+        // in-game menu, and vanilla renders it inside that dialogue.
+        String firstRunTip = null;
+        if (mainGame != null && !mainGame.getProfile().getFirstRunTipShown()) {
+            firstRunTip = getTranslator().get(PlatformSpecific.INSTANCE.isTouchUi()
+                    ? "first_run_tip_ipad" : "first_run_tip_pc");
+            mainGame.getProfile().markFirstRunTipShown();
+        }
+        showEventDialogue(currentBeacon.getEvent(), Random.Default.nextInt(), firstRunTip);
     }
 
     /**
@@ -2762,9 +2772,13 @@ public class InGameState extends MainGame.GameState {
     }
 
     void showEventDialogue(Event event, int seed) {
+        showEventDialogue(event, seed, null);
+    }
+
+    void showEventDialogue(Event event, int seed, String firstRunTip) {
         // The UI is null for automated tests
         if (shipUI != null) {
-            shipUI.showEventDialogue(event, seed);
+            shipUI.showEventDialogue(event, seed, firstRunTip);
         }
     }
 

@@ -50,6 +50,14 @@ class SaveProfile private constructor() {
     var soundVolume: Float = 1f
 
     /**
+     * Whether the first-run tip (how to open the in-game menu, issue #58)
+     * has been shown. Shown once per profile, at the start of the first
+     * new game.
+     */
+    var firstRunTipShown = false
+        private set
+
+    /**
      * Set to true if this profile needs saving.
      */
     var dirty = false
@@ -120,6 +128,15 @@ class SaveProfile private constructor() {
         dirty = true
     }
 
+    /**
+     * Record that the first-run tip (issue #58) has been displayed, so it
+     * won't be shown again for this profile.
+     */
+    fun markFirstRunTipShown() {
+        firstRunTipShown = true
+        dirty = true
+    }
+
     fun resetHotkeyToDefault(action: Hotkey) {
         keybinds.remove(action.id)
         dirty = true
@@ -159,6 +176,9 @@ class SaveProfile private constructor() {
         root.addContent(volumes)
         volumes.setAttribute("sfx", soundVolume.toString())
         volumes.setAttribute("music", musicVolume.toString())
+
+        if (firstRunTipShown)
+            root.addContent(Element("firstRunTipShown"))
 
         return doc
     }
@@ -207,6 +227,8 @@ class SaveProfile private constructor() {
             soundVolume = volumes.getAttributeValue("sfx").toFloat()
             musicVolume = volumes.getAttributeValue("music").toFloat()
         }
+
+        firstRunTipShown = root.getChild("firstRunTipShown") != null
     }
 
     class AchievementUnlockInfo(val difficulty: Difficulty)
