@@ -27,6 +27,11 @@ class SelectShipState(private val datafile: Datafile, private val main: MainGame
     val mousePos = Point(0, 0)
     val shipOffset = Point(0, 0)
 
+    // Where the hangar centres each ship's hull art (measured against
+    // vanilla 1.6.14, issue #109 - see the render code that uses it).
+    private val HANGAR_SHIP_CENTRE_X = 630
+    private val HANGAR_SHIP_CENTRE_Y = 210
+
     private val shipSelectorPos = ConstPoint(20, 50)
 
     // This is the size of the game window, not the full screen - but 'window'
@@ -150,8 +155,17 @@ class SelectShipState(private val datafile: Datafile, private val main: MainGame
         editFileControls.draw(g)
 
         g.pushTransform()
-        shipOffset.x = 250 - currentBlueprint.hullOffset.x
-        shipOffset.y = 100 - currentBlueprint.hullOffset.y
+        // Centre each ship's hull art at a fixed hangar point, measured
+        // against vanilla 1.6.14 (issue #109): the art's centre sits at
+        // ~(630,210), all ships fitting (306,12)-(953,407). Anchoring the
+        // hull image's top-left (the old code) misplaces ships relative
+        // to each other, because hullbox offsets vary hugely between
+        // layouts (Kestrel -59,-103; Zoltan -216,-92; Lanius -153,-164).
+        // The hull image is centred on the art, so centring the IMAGE
+        // centres the ship.
+        val hullImg = currentBlueprint.hullImage.firstNotNullOf { getImgOrNull(it) }
+        shipOffset.x = Math.round(HANGAR_SHIP_CENTRE_X - currentBlueprint.hullOffset.x - hullImg.width / 2f)
+        shipOffset.y = Math.round(HANGAR_SHIP_CENTRE_Y - currentBlueprint.hullOffset.y - hullImg.height / 2f)
         g.translate(shipOffset.x.f, shipOffset.y.f)
         current.draw(g, this, false)
         editor.editorWidth = container.width - shipOffset.x
