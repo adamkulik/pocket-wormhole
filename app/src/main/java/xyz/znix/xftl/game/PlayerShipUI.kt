@@ -649,8 +649,13 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
             }
         }
 
-        // Check if we're clicking on a door
-        if (button == Input.MOUSE_LEFT_BUTTON) {
+        // Check if we're clicking on a door. NOT while the touch
+        // room-selection mode is active (crew are selected): there the
+        // tap must pick a room for the selected crew, and with the
+        // widened door hit areas a press near a door toggled the door
+        // AND swallowed the crew move (issue #53 follow-up: while crew
+        // are selected, doors are simply untouchable).
+        if (button == Input.MOUSE_LEFT_BUTTON && !roomSelectionMode) {
             val doorPos = screenToShipRender(x, y, playerShipPosition)
             for (door in ship.doors) {
                 val hit = door.click(doorPos.x, doorPos.y)
@@ -722,14 +727,10 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
         // crewmember to re-select and stay in the mode, tap empty space
         // to deselect and leave it).
         if (roomSelectionMode && button == Input.MOUSE_LEFT_BUTTON) {
-            // A tap in a door's (widened) hit area toggled the door on the
-            // PRESS - mouseClick's doors loop runs first - so swallow the
-            // release here instead of ALSO ordering the selected crew to
-            // the room behind the door (issue #53).
-            val doorTapPos = screenToShipRender(x, y, playerShipPosition)
-            if (ship.doors.any { it.isPointInHitArea(doorTapPos.x, doorTapPos.y) })
-                return
-
+            // Doors never toggle in this mode (see mouseClick), so every
+            // tap is a room pick - including taps on or behind a door's
+            // (widened) hit area. The old door-area swallow here ate the
+            // crew move (issue #53 follow-up).
             if (handleRoomSelectionTap(x, y, playerShipPosition)) {
                 // The move action is complete: deselect and unpause.
                 selectedCrew.clear()
@@ -2230,9 +2231,13 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
 
         updateHoveredCrew(x, y, playerShipPosition)
 
-        // Update the door hover markers
-        for (door in ship.doors) {
-            door.updateMouseHover(x - playerShipPosition.x, y - playerShipPosition.y)
+        // Update the door hover markers. Not in touch room-selection
+        // mode - doors can't be toggled there, so don't highlight them
+        // as if they could be.
+        if (!roomSelectionMode) {
+            for (door in ship.doors) {
+                door.updateMouseHover(x - playerShipPosition.x, y - playerShipPosition.y)
+            }
         }
     }
 
