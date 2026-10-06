@@ -12,6 +12,7 @@ import xyz.znix.xftl.drones.AbstractDrone
 import xyz.znix.xftl.environment.PulsarEnvironment
 import xyz.znix.xftl.environment.SunEnvironment
 import xyz.znix.xftl.game.InGameState.RoomClickListener
+import xyz.znix.xftl.layout.Door
 import xyz.znix.xftl.layout.Room
 import xyz.znix.xftl.math.ConstPoint
 import xyz.znix.xftl.math.IPoint
@@ -404,6 +405,17 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
     private val isCrewSelectionPoint: Boolean
         get() = crewSelectionRectangle?.let { it.first.distToSq(it.second) < SELECTION_BOX_SIZE } ?: false
 
+    /**
+     * Touch-only: when a press lands in a door's widened hit area but a
+     * crewmember is CLOSER to the touch (standing in/near the doorway),
+     * the crew wins and the door doesn't toggle. The crewmember is kept
+     * here so the release can select them even if the tap missed their
+     * sprite bounds (it can land in the door's hit area but off the
+     * sprite), and so the door doesn't highlight under the parked touch
+     * while it isn't tappable.
+     */
+    private var ambiguousCrewPick: AbstractCrew? = null
+
     // Non-null when the player is aiming a beam weapon
     private var beamTargeting: SelectedTarget.BeamAim? = null
         set(value) {
@@ -596,8 +608,16 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
         )
     }
 
+    /** Squared Euclidean distance, for comparing which object a touch is closer to. */
+    private fun distSq(x1: Float, y1: Float, x2: Float, y2: Float): Float {
+        val dx = x2 - x1
+        val dy = y2 - y1
+        return dx * dx + dy * dy
+    }
+
     fun mouseClick(button: Int, x: Int, y: Int, playerShipPosition: IPoint) {
         lastClickConsumedUi = false
+        ambiguousCrewPick = null
 
         pauseWindow?.let { win ->
             lastClickConsumedUi = true
@@ -655,11 +675,52 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
         // widened door hit areas a press near a door toggled the door
         // AND swallowed the crew move (issue #53 follow-up: while crew
         // are selected, doors are simply untouchable).
+        //
+        // Ambiguity (touch): a crewmember standing in or beside a doorway
+        // sits inside the door's widened hit area, so the tap could mean
+        // either. Resolve by distance to the exact touch point: whichever
+        // of the door centre / crew sprite centre is closer wins. If the
+        // crew wins, the door doesn't toggle and the release below
+        // selects them (ambiguousCrewPick).
         if (button == Input.MOUSE_LEFT_BUTTON && !roomSelectionMode) {
             val doorPos = screenToShipRender(x, y, playerShipPosition)
+
+            // Nearest tappable door under the touch (ship-space coords).
+            var nearestDoor: Door? = null
+            var nearestDoorDist = Float.MAX_VALUE
             for (door in ship.doors) {
-                val hit = door.click(doorPos.x, doorPos.y)
-                if (hit) {
+                if (!door.isPointInHitArea(doorPos.x, doorPos.y))
+                    continue
+                val d = distSq(doorPos.x.f, doorPos.y.f,
+                    door.pixelCentre.x.f, door.pixelCentre.y.f)
+                if (d < nearestDoorDist) {
+                    nearestDoor = door
+                    nearestDoorDist = d
+                }
+            }
+
+            if (nearestDoor != null) {
+                // Nearest controllable crew aboard this ship (same accept
+                // set as the selection flow; sprite centre in ship space).
+                var nearestCrew: AbstractCrew? = null
+                var nearestCrewDist = Float.MAX_VALUE
+                for (crew in ship.friendlyCrew) {
+                    if (!crew.playerControllable)
+                        continue
+                    val d = distSq(doorPos.x.f, doorPos.y.f,
+                        crew.screenX + crew.icon.width / 2f,
+                        crew.screenY + crew.icon.height / 2f)
+                    if (d < nearestCrewDist) {
+                        nearestCrew = crew
+                        nearestCrewDist = d
+                    }
+                }
+
+                if (nearestCrew != null && nearestCrewDist < nearestDoorDist) {
+                    // The crewmember is closer: don't toggle the door; the
+                    // press falls through to crew selection.
+                    ambiguousCrewPick = nearestCrew
+                } else if (nearestDoor.click(doorPos.x, doorPos.y)) {
                     lastClickConsumedUi = true
                     return
                 }
@@ -746,7 +807,16 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
             updateHoveredCrew(x, y, playerShipPosition)
 
             selectedCrew.clear()
-            selectedCrew.addAll(hoveredCrew)
+            if (hoveredCrew.isEmpty() && isCrewSelectionPoint) {
+                // Touch ambiguity resolution: the press resolved to a
+                // crewmember over a door, but the tap point (which can sit
+                // in the door's widened hit area) missed their sprite
+                // bounds - select the resolved crewmember anyway. Point
+                // taps only: a drag that boxed nothing selects nothing.
+                ambiguousCrewPick?.let { selectedCrew.add(it) }
+            } else {
+                selectedCrew.addAll(hoveredCrew)
+            }
 
             crewSelectionRectangle = null
         }
@@ -2233,8 +2303,9 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
 
         // Update the door hover markers. Not in touch room-selection
         // mode - doors can't be toggled there, so don't highlight them
-        // as if they could be.
-        if (!roomSelectionMode) {
+        // as if they could be. Also not while an ambiguity resolution
+        // picked a crewmember over the door under the touch.
+        if (!roomSelectionMode && ambiguousCrewPick == null) {
             for (door in ship.doors) {
                 door.updateMouseHover(x - playerShipPosition.x, y - playerShipPosition.y)
             }
