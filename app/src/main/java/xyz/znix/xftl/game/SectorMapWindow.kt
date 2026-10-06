@@ -298,20 +298,44 @@ class SectorMapWindow(private val game: InGameState, private val selectedCallbac
             else -> nextSectors
         }
 
-        // Check if the sector icons are hovered
-        for (sector in clickable) {
-            getSectorPos(sector, pos)
+        // Check if the sector icons are hovered.
+        //
+        // Touch: closest-point - resolve the tap to the NEAREST sector
+        // circle within a finger-sized radius. The desktop box test below
+        // can't grow: the circles are only 50px apart vertically, and the
+        // boxes resolve overlaps by iteration order. Nearest-centre has
+        // neither problem, and tap-to-arm shows which sector got armed
+        // before the second tap commits the jump.
+        if (PlatformSpecific.INSTANCE.isTouchUi) {
+            val touchRadius = 20
+            var best: GameMap.SectorInfo? = null
+            var bestDistSq = touchRadius * touchRadius
+            for (sector in clickable) {
+                getSectorPos(sector, pos)
+                val dx = p.x - (pos.x + SECTOR_RADIUS)
+                val dy = p.y - (pos.y + SECTOR_RADIUS)
+                val d = dx * dx + dy * dy
+                if (d < bestDistSq) {
+                    bestDistSq = d
+                    best = sector
+                }
+            }
+            hoveredSector = best
+        } else {
+            for (sector in clickable) {
+                getSectorPos(sector, pos)
 
-            // Add in a small margin to make the selection feel a bit more reliable
-            val margin = 5
+                // Add in a small margin to make the selection feel a bit more reliable
+                val margin = 5
 
-            // Check if we're hovering over this beacon?
-            if (p.x !in pos.x - margin..pos.x + SECTOR_RADIUS * 2 + margin)
-                continue
-            if (p.y !in pos.y - margin..pos.y + SECTOR_RADIUS * 2 + margin)
-                continue
+                // Check if we're hovering over this beacon?
+                if (p.x !in pos.x - margin..pos.x + SECTOR_RADIUS * 2 + margin)
+                    continue
+                if (p.y !in pos.y - margin..pos.y + SECTOR_RADIUS * 2 + margin)
+                    continue
 
-            hoveredSector = sector
+                hoveredSector = sector
+            }
         }
 
         // Check if one of the name boxes is hovered

@@ -618,7 +618,14 @@ class JumpWindow(val game: InGameState, showSectorMap: () -> Unit, val jump: (Be
             Pair(it, dist)
         }.minByOrNull { it.second } ?: return
 
-        val hoverDist = 12
+        // Touch: the 12px desktop radius is smaller than the 32px diamond
+        // art, so taps on the art's edge missed entirely. On touch, accept
+        // anything within a finger-sized radius and keep the nearest-
+        // beacon resolution: beacons sit on a 110px grid, so a fixed box
+        // this size would overlap neighbours, but closest-point has no
+        // ambiguous zone and tap-to-arm shows which beacon got armed
+        // before the second tap commits the jump.
+        val hoverDist = if (PlatformSpecific.INSTANCE.isTouchUi) 24 else 12
         if (closest.second > hoverDist * hoverDist)
             return
 
