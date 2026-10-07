@@ -267,16 +267,40 @@ class Event(
 
     val environment: Beacon.EnvironmentType?
 
+    /**
+     * The Anti-Ship Battery carried by events with
+     * `<environment type="PDS">` (issue #77): which ship the ASB fires
+     * at. Vanilla always specifies the target; PLAYER is the fallback.
+     * The PDS environment is NOT an ambient hazard (vanilla: "ASBs are
+     * not considered an Environmental Hazard"), so [environment] stays
+     * null for PDS events.
+     */
+    val asbTarget: ASBTarget?
+
     init {
-        environment = when (val env = elem.getChild("environment")?.requireAttributeValue("type")) {
+        val env = elem.getChild("environment")
+        val envType = env?.requireAttributeValue("type")
+        environment = when (envType) {
             "asteroid" -> Beacon.EnvironmentType.ASTEROID
             "nebula" -> Beacon.EnvironmentType.NEBULA
             "pulsar" -> Beacon.EnvironmentType.PULSAR
             "storm" -> Beacon.EnvironmentType.ION_STORM
             "sun" -> Beacon.EnvironmentType.SUN
-            "PDS" -> null // TODO implement PDS/ASBs
+            // PDS events carry an ASB instead (see asbTarget); they have
+            // no ambient environment - a PDS event on a nebula beacon
+            // (NO_FUEL_FLEET_DLC) removes the nebula, per vanilla.
+            "PDS" -> null
             null -> null
-            else -> error("Unknown environment $env")
+            else -> error("Unknown environment $envType")
+        }
+
+        asbTarget = when (envType) {
+            "PDS" -> when (env?.getAttributeValue("target")) {
+                "enemy" -> ASBTarget.ENEMY
+                "all" -> ASBTarget.ALL
+                else -> ASBTarget.PLAYER
+            }
+            else -> null
         }
     }
 
@@ -401,6 +425,11 @@ class Event(
             "text", "choice"
         )
     }
+}
+
+/** Which ship an Anti-Ship Battery (issue #77) fires at. */
+enum class ASBTarget {
+    PLAYER, ENEMY, ALL
 }
 
 class EventList(val name: String, events: List<Lazy<IEvent>>) : IEvent {

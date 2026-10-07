@@ -9,6 +9,7 @@ import xyz.znix.xftl.crew.*
 import xyz.znix.xftl.drones.AbstractIndoorsDrone
 import xyz.znix.xftl.f
 import xyz.znix.xftl.game.Achievement
+import xyz.znix.xftl.game.ASBController
 import xyz.znix.xftl.game.Difficulty
 import xyz.znix.xftl.game.FlagshipBoss
 import xyz.znix.xftl.game.GameOverWindow
@@ -1267,6 +1268,61 @@ class DebugCommands(console: DebugConsole) : ConsoleCommandProvider(console) {
         // Same idea and notes as the reload-console command. Read its comment.
         game.reloadDebugFlags()
         addLine("Reloaded debug flags")
+    }
+
+    @ConsoleCommand(name = "asbfont")
+    @CmdHelp(
+        "Set the ASB label font (issue #77 font hunt; candidates: " +
+                "JustinFont8, JustinFont10, JustinFont11Bold, JustinFont12Bold, " +
+                "HL1, HL2, c&c, c&cnew, num_font)"
+    )
+    private fun cmdAsbFont(@ParName("font") fontName: String) {
+        try {
+            game.getFont(fontName)
+        } catch (t: Throwable) {
+            addLine("Unknown font '$fontName': $t")
+            return
+        }
+        ASBController.debugLabelFont = fontName
+        addLine("ASB label font: $fontName")
+    }
+
+    @ConsoleCommand(name = "asbbanner")
+    @CmdHelp(
+        "Set the ASB TARGET LOCKED banner font and force-show it for 6s " +
+                "(same candidates as asbfont)"
+    )
+    private fun cmdAsbBanner(@ParName("font") fontName: String) {
+        try {
+            game.getFont(fontName)
+        } catch (t: Throwable) {
+            addLine("Unknown font '$fontName': $t")
+            return
+        }
+        ASBController.debugBannerFont = fontName
+        ASBController.debugBannerTimer = 6f
+        addLine("ASB banner font: $fontName (banner force-shown for 6s)")
+    }
+
+    @ConsoleCommand(name = "asbsound")
+    @CmdHelp(
+        "Set the ASB lock-alarm sound ('list' prints candidates; issue #77 sound hunt). " +
+                "Plays a preview immediately."
+    )
+    private fun cmdAsbSound(@ParName("sound") soundName: String) {
+        if (soundName == "list") {
+            addLine("Candidates: warning, environWarning, surgeWarning, " +
+                    "hullBreach, eventDamage, lowCrewHealth")
+            return
+        }
+        val sample = game.sounds.getSampleOrWarn(soundName)
+        if (sample == null) {
+            addLine("No such sound: $soundName")
+            return
+        }
+        ASBController.debugAlarmSound = soundName
+        sample.play()
+        addLine("ASB alarm sound: $soundName (previewed; plays at the next LOCKED banner too)")
     }
 
     @ConsoleCommand(name = "help")

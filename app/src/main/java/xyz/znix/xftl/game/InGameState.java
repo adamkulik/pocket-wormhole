@@ -99,6 +99,9 @@ public class InGameState extends MainGame.GameState {
     private ITooltipProvider lastFameTooltip;
 
     private PlayerShipUI shipUI;
+
+    // The Anti-Ship Battery hazard for the current beacon (issue #77).
+    private final ASBController asb = new ASBController(this);
     private HostileShipUI hostileShipUI;
 
     private boolean enemyIsHostile;
@@ -251,6 +254,20 @@ public class InGameState extends MainGame.GameState {
                 getSounds().switchMusicList(sectorTracks);
             }
         }
+
+        // Re-arm the ASB after loading a mid-fight save (issue #77): the
+        // loadEventShip arming hook doesn't run for deserialised enemies.
+        // Fleet-elite beacons are overtaken; their ASB applies unless it's
+        // a nebula beacon or the exit beacon on easy (the same exceptions
+        // the FLEET_EASY* event picks encode).
+        ASBTarget loadedAsb = currentBeacon.getEvent().getAsbTarget();
+        if (loadedAsb == null && currentBeacon.getState() == Beacon.State.OVERTAKEN
+                && currentBeacon.getEnvironmentType() != Beacon.EnvironmentType.NEBULA
+                && !(currentBeacon.isExit() && difficulty == Difficulty.EASY)) {
+            loadedAsb = ASBTarget.PLAYER;
+        }
+        if (loadedAsb != null)
+            asb.arm(loadedAsb, false);
 
         updatePlayerCrew();
     }
@@ -1133,6 +1150,9 @@ public class InGameState extends MainGame.GameState {
             hostileShipUI.render(container, g, hoveredRoom, enemyInteriorVisible, enemyIsHostile);
         }
 
+        // Draw the ASB HUD danger icon + warning banner (issue #77).
+        asb.renderWarnings(g);
+
         // Draw the paused text before the UI, so the UI goes on top.
         if (paused) {
             Image pauseImg = getImg("img/Text_pause2.png");
@@ -1217,6 +1237,9 @@ public class InGameState extends MainGame.GameState {
      */
     public void updateGameState(float dt) {
         currentBeacon.getEnvironment(this).update(dt);
+
+        // Tick the Anti-Ship Battery hazard (issue #77).
+        asb.update(dt);
 
         if (shipUI != null)
             shipUI.update();
@@ -1431,6 +1454,10 @@ public class InGameState extends MainGame.GameState {
         // Fly the ship in, like vanilla does when arriving at a beacon
         // (this includes the first beacon of a run and loading a game).
         if (beaconChanged) {
+            // The ASB state is beacon-level (issue #77) - a new beacon
+            // means an unarmed battery until an event arms it again.
+            asb.disarm();
+
             playerFlyIn = 1f;
 
             // Arrival chime (issue #16), timed with the arrival animation.
@@ -1527,6 +1554,14 @@ public class InGameState extends MainGame.GameState {
                 mainGame.writeRunSave();
             }
         }
+
+        // Arm the Anti-Ship Battery for events with a PDS environment
+        // (issue #77): the fleet-elite fights, the out-of-fuel fleet
+        // encounter, the Lanius assist, PDS_TEST and the like. A new
+        // hostile battle restarts the vanilla 15-20s warning cycle.
+        ASBTarget asbTarget = event.getAsbTarget();
+        if (asbTarget != null)
+            asb.arm(asbTarget, Boolean.TRUE.equals(hostileState));
     }
 
     // For use by the debug console

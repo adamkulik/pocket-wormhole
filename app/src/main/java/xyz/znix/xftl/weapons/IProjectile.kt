@@ -135,6 +135,8 @@ interface IProjectile {
                 VengeanceShardProjectile.SERIALISATION_TYPE ->
                     VengeanceShardProjectile.loadFromXML(elem, refs, callback)
 
+                ASBProjectile.SERIALISATION_TYPE -> ASBProjectile.loadFromXML(elem, refs, callback)
+
                 else -> {
                     error("Invalid serialised projectile with serialisation type '$serialisationType'")
                 }
