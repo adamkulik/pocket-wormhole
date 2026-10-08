@@ -2,6 +2,7 @@ package xyz.znix.xftl.game
 
 import xyz.znix.xftl.*
 import xyz.znix.xftl.augments.AugmentBlueprint
+import xyz.znix.xftl.crew.LivingCrew
 import xyz.znix.xftl.math.ConstPoint
 import xyz.znix.xftl.math.Direction
 import xyz.znix.xftl.math.IPoint
@@ -13,6 +14,8 @@ import xyz.znix.xftl.sector.Beacon
 import xyz.znix.xftl.sector.Sector
 import xyz.znix.xftl.sys.Input
 import xyz.znix.xftl.sys.PlatformSpecific
+import xyz.znix.xftl.ui.Label
+import xyz.znix.xftl.ui.WidgetContainer
 import kotlin.math.atan2
 import kotlin.math.max
 import kotlin.math.roundToInt
@@ -24,6 +27,10 @@ import kotlin.random.Random
 // for us atm.
 class JumpWindow(val game: InGameState, showSectorMap: () -> Unit, val jump: (Beacon?) -> Unit) : Window() {
     override val size = ConstPoint(752, 534)
+
+    // Constructor-param callback promoted to a property so methods can
+    // invoke it (the NEXT SECTOR confirm gate, issue #98).
+    private val showSectorMapCallback = showSectorMap
 
     // Touch ergonomics: the map window is scaled up 1.2x and moved up.
     // The CANCEL button hangs below the declared window rect (local y
@@ -116,6 +123,20 @@ class JumpWindow(val game: InGameState, showSectorMap: () -> Unit, val jump: (Be
 
     var hovered: Beacon? = null
 
+    // Leave-crew confirmation (GitHub issue #98): vanilla asks "Are you
+    // sure? Your crew is still aboard the enemy ship." (text_misc.xml
+    // confirm_leave_crew) when you jump away while your crew are aboard
+    // the enemy ship. YES jumps and abandons them - they are lost and the
+    // clone bay cannot revive them - NO returns to the map. Reuses the
+    // game's standard YES/NO confirm widget, like ShipWindow's crew
+    // dismissal.
+    private val leaveCrewWidget: WidgetContainer = game.uiLoader.load("confirm").mainWidget
+    private val leaveCrewWidgetPos = Point(0, 0)
+    private var leaveCrewConfirm = false
+    private var pendingJumpBeacon: Beacon? = null
+    private var preConfirmButtons: List<Button> = emptyList()
+    private var leaveCrewButtons: List<Button> = emptyList()
+
     private var playerRotation: Float = (0f..10f).random(VisualRandom)
 
     private val outOfFuel: Boolean get() = game.player.fuelCount == 0
@@ -143,7 +164,7 @@ class JumpWindow(val game: InGameState, showSectorMap: () -> Unit, val jump: (Be
         nextSectorButton = Buttons.BasicButton(
             game, ConstPoint(size.x - 12 - nsButtonWidth, 12),
             ConstPoint(nsButtonWidth, 36), nsText,
-            3, font, 27, showSectorMap
+            3, font, 27, ::nextSectorClicked
         )
 
         // Upstream 9037aed accidentally gated the clickable button on being
@@ -158,6 +179,18 @@ class JumpWindow(val game: InGameState, showSectorMap: () -> Unit, val jump: (Be
         drawNoFuelUI(noFuelButtons)
         if (outOfFuel)
             buttons += noFuelButtons
+
+        // Set up the leave-crew confirm box (issue #98). Same layout dance
+        // as ShipWindow's dismiss box: set the message, re-fit the widget.
+        (leaveCrewWidget.byId["message"] as Label).text = game.translator["confirm_leave_crew"]
+        leaveCrewWidget.root.updateSizes()
+        leaveCrewWidget.root.expandToParent(ConstPoint.ZERO)
+        leaveCrewWidget.root.updateLayout()
+        // Centre it over the map.
+        leaveCrewWidgetPos.x = (size.x - leaveCrewWidget.root.size.x) / 2
+        leaveCrewWidgetPos.y = (size.y - leaveCrewWidget.root.size.y) / 2
+        leaveCrewWidget.addButtonListener("yes") { confirmLeaveCrew() }
+        leaveCrewWidget.addButtonListener("no") { closeLeaveCrewConfirm() }
     }
 
     /**
@@ -498,6 +531,16 @@ class JumpWindow(val game: InGameState, showSectorMap: () -> Unit, val jump: (Be
                 button.draw(g)
             }
         }
+
+        // The leave-crew confirm box (issue #98), on top of everything.
+        if (leaveCrewConfirm) {
+            g.pushTransform()
+            g.translate(position.x + leaveCrewWidgetPos.x.f, position.y + leaveCrewWidgetPos.y.f)
+            leaveCrewWidget.draw(g)
+            g.popTransform()
+            for (button in leaveCrewButtons)
+                button.draw(g)
+        }
     }
 
     // It's a bit horrible, but this function can both draw and create buttons, since
@@ -603,6 +646,10 @@ class JumpWindow(val game: InGameState, showSectorMap: () -> Unit, val jump: (Be
     override fun updateUI(x: Int, y: Int) {
         super.updateUI(x, y)
 
+        // No beacon hover while the leave-crew confirm is up.
+        if (leaveCrewConfirm)
+            return
+
         val p = scaleWindowPoint(x, y)
 
         hovered = null
@@ -675,6 +722,13 @@ class JumpWindow(val game: InGameState, showSectorMap: () -> Unit, val jump: (Be
         if (!tapArmGate(button, x, y))
             return
 
+        // While the leave-crew confirm is up, only its YES/NO buttons are
+        // clickable - in particular a tap on the map must not jump.
+        if (leaveCrewConfirm) {
+            super.mouseClick(button, x, y)
+            return
+        }
+
         super.mouseClick(button, x, y)
 
         if (button != Input.MOUSE_LEFT_BUTTON)
@@ -685,7 +739,18 @@ class JumpWindow(val game: InGameState, showSectorMap: () -> Unit, val jump: (Be
         if (!canJumpTo(hovered))
             return
 
-        jump(hovered)
+        // Jumping away abandons any crew still aboard the enemy ship
+        // (GitHub issue #98) - vanilla asks for confirmation first.
+        if (hovered != game.currentBeacon && game.enemy?.hasCrewOwnedByShip(game.player) == true) {
+            openLeaveCrewConfirm(hovered)
+            return
+        }
+
+        performJump(hovered)
+    }
+
+    private fun performJump(beacon: Beacon) {
+        jump(beacon)
 
         game.player.fuelCount--
 
@@ -695,7 +760,61 @@ class JumpWindow(val game: InGameState, showSectorMap: () -> Unit, val jump: (Be
 
         // Play the jump-out animation (issue #4); the beacon switch - and
         // the arrival animation at the new beacon - happens when it ends.
-        game.beginJumpOut(hovered)
+        game.beginJumpOut(beacon)
+    }
+
+    private fun playerCrewAboardEnemy(): List<LivingCrew> {
+        val enemy = game.enemy ?: return emptyList()
+        return enemy.crew.filterIsInstance<LivingCrew>().filter { it.ownerShip == game.player }
+    }
+
+    /**
+     * NEXT SECTOR (sector exit): jumping away abandons any crew still
+     * aboard the enemy ship too (issue #98), so the confirm gates here as
+     * well. YES opens the sector map - the actual jump (and the crew
+     * loss, recorded in InGameState.beginJumpOut) only happens once a
+     * sector is picked, so cancelling the map loses nothing.
+     */
+    private fun nextSectorClicked() {
+        if (game.enemy?.hasCrewOwnedByShip(game.player) == true) {
+            openLeaveCrewConfirm(null)
+            return
+        }
+        showSectorMapCallback()
+    }
+
+    private fun openLeaveCrewConfirm(beacon: Beacon?) {
+        pendingJumpBeacon = beacon
+        leaveCrewConfirm = true
+        preConfirmButtons = ArrayList(buttons)
+        // Rebuilt here (a click handler - safe point, NOT mid-draw) so the
+        // buttons carry fresh positions; positionUpdated() then pushes the
+        // window's screen offset into them.
+        leaveCrewButtons = leaveCrewWidget.buildButtons(game, this, leaveCrewWidgetPos)
+        buttons.clear()
+        buttons += leaveCrewButtons
+        positionUpdated()
+    }
+
+    private fun closeLeaveCrewConfirm() {
+        leaveCrewConfirm = false
+        pendingJumpBeacon = null
+        buttons.clear()
+        buttons += preConfirmButtons
+        positionUpdated()
+    }
+
+    private fun confirmLeaveCrew() {
+        // The crew themselves are lost when the jump happens - recorded in
+        // InGameState.beginJumpOut (the choke point for beacon jumps AND
+        // sector exit), removed once the beacon changes. The confirm is
+        // purely the UI gate: YES just performs what was asked for.
+        val target = pendingJumpBeacon
+        closeLeaveCrewConfirm()
+        if (target != null)
+            performJump(target)
+        else
+            showSectorMapCallback()
     }
 
     private fun waitOutOfFuel() {
@@ -728,6 +847,12 @@ class JumpWindow(val game: InGameState, showSectorMap: () -> Unit, val jump: (Be
     }
 
     override fun escapePressed() {
+        // Escape dismisses the confirm first (issue #98); vanilla's other
+        // confirms behave the same way.
+        if (leaveCrewConfirm) {
+            closeLeaveCrewConfirm()
+            return
+        }
         cancelClicked()
     }
 

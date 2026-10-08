@@ -782,6 +782,7 @@ public class InGameState extends MainGame.GameState {
                 Beacon target = jumpOutTarget;
                 jumpOutTarget = null;
                 setCurrentBeacon(target);
+                leaveCrewLostInJump();
 
                 // Auto-save on arrival (after the beacon change has fully
                 // resolved), so a force-close can only cost the player the
@@ -1333,6 +1334,27 @@ public class InGameState extends MainGame.GameState {
     // out. When it finishes, the beacon actually changes.
     private float playerJumpOut = 0f;
     private Beacon jumpOutTarget;
+
+    // Player crew abandoned by a jump (GitHub issue #98, the "Are you sure?
+    // Your crew is still aboard the enemy ship." confirm). Filled by
+    // beginJumpOut (the player-jump choke point); removed once the beacon
+    // actually changes, so any game-over check fires at the NEW beacon like
+    // vanilla ("the clone bay will not revive them" - removeFromShip
+    // bypasses the death pipeline entirely). Transient, never serialised.
+    final ArrayList<LivingCrew> crewLostInJump = new ArrayList<>();
+
+    /**
+     * Removes the crew abandoned by the last jump. Called right after
+     * setCurrentBeacon at both jump-completion sites.
+     */
+    private void leaveCrewLostInJump() {
+        if (crewLostInJump.isEmpty())
+            return;
+
+        for (LivingCrew crew : crewLostInJump)
+            crew.removeFromShip();
+        crewLostInJump.clear();
+    }
     private static final float JUMP_OUT_TIME = 1.2f;
     private static final float JUMP_OUT_SCALE_END = 0.35f;
 
@@ -1476,9 +1498,24 @@ public class InGameState extends MainGame.GameState {
      * jumps to a beacon from the star map.
      */
     public void beginJumpOut(Beacon target) {
+        // Crew still aboard the enemy ship are lost when we jump away
+        // (issue #98). Recorded here - the single player-jump choke point,
+        // covering both beacon jumps and sector exit (the sector map can
+        // still be cancelled after the confirm, and cancelling loses
+        // nothing) - then removed by leaveCrewLostInJump once the beacon
+        // actually changes.
+        if (enemy != null) {
+            for (AbstractCrew c : enemy.getCrew()) {
+                if (c instanceof LivingCrew living && living.getOwnerShip() == player
+                        && !crewLostInJump.contains(living))
+                    crewLostInJump.add(living);
+            }
+        }
+
         // If an animation is still in progress, switch immediately.
         if (playerFlyIn > 0 || playerJumpOut > 0 || enemyJumpOut > 0) {
             setCurrentBeacon(target);
+            leaveCrewLostInJump();
             mainGame.writeRunSave();
             return;
         }
