@@ -32,12 +32,31 @@ class DialogueWindow private constructor(val game: InGameState, val playerShip: 
     // Touch ergonomics: bigger option text/targets. 1.3x (783x490) fits
     // the canvas; nudged left+up so it sits a little clearer of the touch
     // HUD (top-bar buttons to the right, scaled systems strip below).
-    // Both values are by-eye tuning points.
+    // The Y and no-enemy X values are by-eye tuning points.
     override val renderScale = if (PlatformSpecific.INSTANCE.isTouchUi) 1.3f else 1f
-    override val windowCentreOffset = ConstPoint(
-        if (PlatformSpecific.INSTANCE.isTouchUi) -40 else 0,
-        if (PlatformSpecific.INSTANCE.isTouchUi) -60 else 0
-    )
+
+    // Vanilla places the dialogue relative to the hostile-ship panel so the
+    // enemy ship stays readable (issue #122). Measured from vanilla 1.6.14
+    // screenshots (602x377 box, frame line = box edge):
+    //  - enemy present:  box top-left (184,147) - right edge 786 clears the
+    //    hostile panel (art starts ~x860) by ~74px
+    //  - no enemy:       box top-left (334,147) - near-centred
+    // (renderSingleMenu centres at ((W-602)/2, (H-377)/2) = (339,171), so
+    // these are the centre offsets.) On touch the same rule applies to the
+    // 1.3x box: its right edge lands on the vanilla 786 line, i.e.
+    // offX = 786 - 602*1.3 - 339 = -336.
+    override val windowCentreOffset: IPoint
+        get() {
+            val touch = PlatformSpecific.INSTANCE.isTouchUi
+            val hasEnemy = game.enemy != null
+            val x = when {
+                touch && hasEnemy -> -336
+                touch -> -40
+                hasEnemy -> -155
+                else -> -5
+            }
+            return ConstPoint(x, if (touch) -60 else -24)
+        }
 
     private val resourceNumFont = game.getFont("JustinFont10")
     private val font = game.getFont("JustinFont11Bold")
