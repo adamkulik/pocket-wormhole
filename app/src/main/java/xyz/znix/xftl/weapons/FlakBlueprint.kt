@@ -2,6 +2,7 @@ package xyz.znix.xftl.weapons
 
 import org.jdom2.Element
 import xyz.znix.xftl.Ship
+import xyz.znix.xftl.f
 import xyz.znix.xftl.game.InGameState
 import xyz.znix.xftl.layout.Room
 import xyz.znix.xftl.math.ConstPoint
@@ -188,6 +189,24 @@ class FlakBlueprint(xml: Element) : AbstractWeaponBlueprint(xml) {
 
         override fun calculateTargetPosition(): IPoint {
             return super.calculateTargetPosition() + destinationOffset
+        }
+
+        override fun getLandingMarker(renderedShip: Ship): LandingMarker? {
+            // Vanilla draws a 5px red circle at each REAL shard's landing spot
+            // while it's in flight. Fake shards (the visuals-only extras of each
+            // volley) get no marker, and incoming enemy flak shows none at all:
+            // the preview only exists for the player's own volleys.
+            if (spec.fake || renderedShip != target.ship || target.ship.isPlayerShip)
+                return null
+            if (dead)
+                return null
+
+            val dest = calculateTargetPosition()
+
+            // Exe-pinned: radius 5, colour (1,0,0), alpha = bell(flight)*0.5
+            // (max 0.5). The bell's input field couldn't be pinned, so use a
+            // constant alpha in the middle of vanilla's range.
+            return LandingMarker(dest.x.f, dest.y.f, 5f, 0.35f)
         }
 
         override fun saveToXML(elem: Element, refs: ObjectRefs) {

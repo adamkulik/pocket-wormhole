@@ -7,6 +7,7 @@ import xyz.znix.xftl.environment.AsteroidProjectile
 import xyz.znix.xftl.game.InGameState
 import xyz.znix.xftl.layout.Room
 import xyz.znix.xftl.math.FPoint
+import xyz.znix.xftl.math.IPoint
 import xyz.znix.xftl.rendering.Graphics
 import xyz.znix.xftl.savegame.ObjectRefs
 import xyz.znix.xftl.savegame.RefLoader
@@ -96,6 +97,15 @@ interface IProjectile {
      * This is used by bombs.
      */
     fun providesPlayerVision(room: Room): Boolean = false
+
+    /**
+     * A small translucent red circle drawn over [renderedShip] while this
+     * projectile is in flight, showing where it's going to land. Flak
+     * shards use this to preview their landing spots, like vanilla does
+     * (which draws it from the flak projectile's own render). Null = no
+     * marker.
+     */
+    fun getLandingMarker(renderedShip: Ship): LandingMarker? = null
 
     /**
      * Called when this projectile hit another projectile, immediately
@@ -203,3 +213,9 @@ interface IProjectile {
 }
 
 typealias ProjectileLoadCallback = (IProjectile) -> Unit
+
+/**
+ * A "where will this land" preview marker, drawn centred on (x, y) in a
+ * ship's coordinate space by [Ship.renderTargeting].
+ */
+data class LandingMarker(val x: Float, val y: Float, val radius: Float, val alpha: Float)

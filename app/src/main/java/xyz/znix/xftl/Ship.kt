@@ -781,7 +781,34 @@ class Ship(
             pos.x -= img.width / 2
             pos.y -= img.height / 2
 
+            // While aiming a flak weapon, vanilla draws a translucent red
+            // circle over the area the volley can land in.
+            val flakType = target.weapon.asWeaponInstance().type as? FlakBlueprint
+            if (flakType != null) {
+                val centre = room.pixelCentre
+                val radius = flakType.radius.f
+
+                g.colour = FLAK_AIM_AREA_COLOUR
+                g.fillOval(centre.x - radius, centre.y - radius, radius * 2, radius * 2)
+            }
+
             img.draw(pos)
+        }
+
+        // Once a flak volley is in flight, draw a small red circle where each
+        // real shard is going to land, so the spread is visible before impact.
+        // This is a vanilla feature that the engine was missing. The shards
+        // can be in either our projectile list (after crossing over) or the
+        // player's one (while incoming), so check both.
+        for (projectile in projectiles) {
+            drawLandingMarker(g, projectile)
+        }
+
+        val player = sys.player
+        if (player != null && player !== this) {
+            for (projectile in player.projectiles) {
+                drawLandingMarker(g, projectile)
+            }
         }
 
         if (targets.beamAiming?.targetShip == this) {
@@ -790,6 +817,13 @@ class Ship(
         } else {
             inboundBeamAim = null
         }
+    }
+
+    private fun drawLandingMarker(g: Graphics, projectile: IProjectile) {
+        val marker = projectile.getLandingMarker(this) ?: return
+
+        g.colour = Colour(1f, 0f, 0f, marker.alpha)
+        g.fillOval(marker.x - marker.radius, marker.y - marker.radius, marker.radius * 2, marker.radius * 2)
     }
 
     fun renderTargetingBeam(g: Graphics, beam: SelectedTarget.BeamAim) {
@@ -2303,6 +2337,9 @@ class Ship(
 
     companion object {
         const val MAX_AUGMENTS: Int = 3
+
+        /** The translucent red circle drawn over a flak weapon's aiming area. Colour pinned from the exe. */
+        private val FLAK_AIM_AREA_COLOUR = Colour(1f, 0f, 0f, 0.25f)
     }
 
     class Hardpoint(val spec: ShipBlueprint.ParsedHardpoint) {
