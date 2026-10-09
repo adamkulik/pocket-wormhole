@@ -51,6 +51,16 @@ class FriendlyCrewAI(private val ship: Ship) {
             if (crew.playerControllable)
                 continue
 
+            // Defending AI crystals seal their own room when boarders are
+            // aboard - vanilla's crystal ships do this, and it's the whole
+            // point of fighting them (they're often sensor-less boarders
+            // in nebulae). Player-controlled crystals decide for themselves.
+            if (crew.lockdownCapable && crew.lockdownReady &&
+                ship.crew.any { it.mode == AbstractCrew.SlotType.INTRUDER && it.currentAction != AbstractCrew.Action.DYING }
+            ) {
+                crew.activateLockdown()
+            }
+
             // Ignore crew in the flagship's artillery rooms
             // We assume that any crew can path to any room, and these crew
             // violate that assumption, which can lead to tasks getting locked up.

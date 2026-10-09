@@ -75,6 +75,7 @@
 
         <hotkey id="weapon_autofire_toggle" ui_name="hotkey_autofire" default_bind="v"/>
         <hotkey id="weapon_autofire_target" ui_name="hotkey_force_autofire" default_bind="lctrl"/>
+        <hotkey id="crew_lockdown" ui_name="hotkey_lockdown" default_bind="p"/>
     </group>
 
     <group id="development" ui_name="xftl_hotkeys_dev_group">

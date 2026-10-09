@@ -257,6 +257,9 @@ object VanillaHotkeys {
     const val WEAPON_AUTOFIRE_TOGGLE: String = "weapon_autofire_toggle"
     const val WEAPON_AUTOFIRE_TARGET: String = "weapon_autofire_target"
 
+    /** The Crystal crew's Lockdown ability (default P). */
+    const val CREW_LOCKDOWN: String = "crew_lockdown"
+
     // We don't have constants for the systems, as their ID is built from the blueprint name
     // The exception is the medbay/clonebay which share a hotkey
     const val SYS_POWER_MEDICAL: String = "sys_power_medical"

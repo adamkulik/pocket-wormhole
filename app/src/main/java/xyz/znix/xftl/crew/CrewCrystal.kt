@@ -17,5 +17,7 @@ class CrewCrystal(blueprint: CrewBlueprint, animations: Animations, room: Room, 
     override val maxHealth: Float get() = 125f
     override val fireFightingSpeed: Float get() = 0.83f
 
-    // TODO implement special ability
+    // The Crystal Lockdown ability (wiki: "Crystals possess a Lockdown
+    // ability", activated from the crew box or the P hotkey).
+    override val lockdownCapable: Boolean get() = true
 }

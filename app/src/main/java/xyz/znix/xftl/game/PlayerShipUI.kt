@@ -334,6 +334,18 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
     private val hoveredCrew: MutableList<AbstractCrew> = ArrayList()
     private var skillsHoveredCrew: AbstractCrew? = null
 
+    // The Crystal Lockdown button: the ready crystal whose expanded panel
+    // currently shows it, and its clickable rect (both render-time state).
+    private var lockdownButtonCrew: LivingCrew? = null
+    private var lockdownButtonRect: Rectangle? = null
+
+    // Touch crew-selection lockdown buttons: touch has no hover, so the
+    // expanded panel (and the LOCKDOWN button inside it) is unreachable -
+    // instead the iPad port's square button shows beside the crew box of
+    // every selected crystal. Rects are only registered for ready,
+    // player-controlled crystals (the _off art is a pure cooldown hint).
+    private var touchLockdownButtons: List<Pair<LivingCrew, Rectangle>> = emptyList()
+
     private val buttons = ArrayList<Button>()
 
     /**
@@ -618,6 +630,32 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
     fun mouseClick(button: Int, x: Int, y: Int, playerShipPosition: IPoint) {
         lastClickConsumedUi = false
         ambiguousCrewPick = null
+
+        // The Crystal Lockdown button (drawn in the expanded skill panel of
+        // a ready crystal - vanilla places it there, above the bars).
+        if (lockdownButtonCrew != null && button == Input.MOUSE_LEFT_BUTTON) {
+            val rect = lockdownButtonRect
+            if (rect != null && rect.contains(x.f, y.f)) {
+                lastClickConsumedUi = true
+                lockdownButtonCrew!!.activateLockdown()
+                return
+            }
+        }
+
+        // Touch variant: the square button beside the box of every selected
+        // crystal (activateLockdown self-guards on readiness). Returning
+        // here also means crewSelectionRectangle is never armed for this
+        // press, so the release can't deselect or box-select, and the
+        // room-selection mouseUp finds neither a room nor a box.
+        if (button == Input.MOUSE_LEFT_BUTTON) {
+            for ((crew, rect) in touchLockdownButtons) {
+                if (rect.contains(x.f, y.f)) {
+                    lastClickConsumedUi = true
+                    crew.activateLockdown()
+                    return
+                }
+            }
+        }
 
         pauseWindow?.let { win ->
             lastClickConsumedUi = true
@@ -1999,6 +2037,7 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
 
         // Draw all the crew boxes
         crewBaseY = oxyY + 59
+        touchLockdownButtons = emptyList()
         for ((index, crew) in ship.sys.playerCrew.withIndex()) {
             val crewY = crewBaseY + index * CREW_BOX_SPACING
 
@@ -2071,7 +2110,7 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
         val clonebay = ship.clonebay
 
         val isMindControlled = crew.mindControlledBy != null
-        val isStunned = false // TODO implement when stunning crew is added
+        val isStunned = crew.isStunned
         val isFlashingHealth = false // TODO
         val isCloning = clonebay?.queue?.contains(crew) ?: false
         val cloneDyingProgress =
@@ -2091,6 +2130,15 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
         }
 
         val drawSkills = crew == skillsHoveredCrew
+
+        // The Crystal Lockdown button lives at the top of the expanded
+        // skill panel (vanilla: "a LOCKDOWN button above his skill bars").
+        // When shown, the panel grows and the bars shift down below it.
+        lockdownButtonCrew = null
+        lockdownButtonRect = null
+        val showLockdownButton = drawSkills && crew.lockdownCapable && crew.lockdownReady && crew.playerControllable
+        val lockdownImg = if (showLockdownButton) game.getImg("img/customizeUI/arrow_lock_down.png") else null
+        val barOffset = lockdownImg?.height?.plus(2) ?: 0
 
         if (!drawSkills) {
             // Draw the semi-transparent background
@@ -2125,27 +2173,51 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
                 arrow.draw(-arrow.width / 2f, -arrow.height / 2f, SYS_ENERGY_ACTIVE)
                 g.popTransform()
             }
+
+            // Touch: the square LOCKDOWN button beside the box of every
+            // selected crystal (the iPad port's own art; its hotkey label
+            // P matches our crew_lockdown hotkey). Lit only when usable.
+            if (PlatformSpecific.INSTANCE.isTouchUi && crew in selectedCrew && crew.lockdownCapable) {
+                val usable = crew.lockdownReady && crew.playerControllable
+                val img = game.getImg(
+                    if (usable) "img/ipad/people/crystal_button_on.png"
+                    else "img/ipad/people/crystal_button_off.png"
+                )
+                val bx = x + CREW_BOX_WIDTH + 4
+                val by = y + (CREW_BOX_HEIGHT - img.height) / 2
+                g.colour = Colour.white
+                img.draw(bx.f, by.f)
+                if (usable)
+                    touchLockdownButtons += crew to Rectangle(bx.f, by.f, img.width.f, img.height.f)
+            }
         } else {
             // Draw the semi-transparent background
             g.colour = Colour(colour.r, colour.g, colour.b, 0.25f)
             g.fillRect(x.f, y.f, 89f, CREW_BOX_HEIGHT.f)
-            g.fillRect(x + 89f, y.f, 80f, 146f)
+            g.fillRect(x + 89f, y.f, 80f, (146 + barOffset).f)
 
             // Draw the outline, which we do with line drawing by rectangles.
             g.colour = colour
             g.fillRect(x.f, y.f, 2f, CREW_BOX_HEIGHT.f)
             g.fillRect(x.f, y.f, 169f, 2f)
             g.fillRect(x.f, y + 25f, 91f, 2f)
-            g.fillRect(x + 89f, y + 27f, 2f, 119f)
-            g.fillRect(x + 167f, y.f, 2f, 146f)
-            g.fillRect(x + 91f, y + 144f, 76f, 2f)
+            g.fillRect(x + 89f, y + 27f, 2f, (119 + barOffset).f)
+            g.fillRect(x + 167f, y.f, 2f, (146 + barOffset).f)
+            g.fillRect(x + 91f, y + 144f + barOffset, 76f, 2f)
 
-            drawSkillBar(g, x + 93, y, crew, Skill.PILOTING)
-            drawSkillBar(g, x + 93, y, crew, Skill.ENGINES)
-            drawSkillBar(g, x + 93, y, crew, Skill.SHIELDS)
-            drawSkillBar(g, x + 93, y, crew, Skill.WEAPONS)
-            drawSkillBar(g, x + 93, y, crew, Skill.REPAIRS)
-            drawSkillBar(g, x + 93, y, crew, Skill.COMBAT)
+            if (lockdownImg != null) {
+                lockdownButtonCrew = crew
+                lockdownButtonRect = Rectangle((x + 93).f, (y + 2).f, lockdownImg.width.f, lockdownImg.height.f)
+                g.colour = Colour.white
+                lockdownImg.draw((x + 93).f, (y + 2).f)
+            }
+
+            drawSkillBar(g, x + 93, y + barOffset, crew, Skill.PILOTING)
+            drawSkillBar(g, x + 93, y + barOffset, crew, Skill.ENGINES)
+            drawSkillBar(g, x + 93, y + barOffset, crew, Skill.SHIELDS)
+            drawSkillBar(g, x + 93, y + barOffset, crew, Skill.WEAPONS)
+            drawSkillBar(g, x + 93, y + barOffset, crew, Skill.REPAIRS)
+            drawSkillBar(g, x + 93, y + barOffset, crew, Skill.COMBAT)
         }
 
         // Draw the health bar
@@ -2515,7 +2587,12 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
             if (!allInternalDoorsOpen && door.isAirlock)
                 continue
 
-            door.open = true
+            // Vanilla's Z overrides a crystal coating - that's what makes
+            // the vent-the-locked-room trap possible.
+            if (door.isSealedByLockdown)
+                door.forceOpenWhileSealed()
+            else
+                door.open = true
         }
     }
 
@@ -2526,7 +2603,23 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
             return
 
         for (door in ship.doors) {
+            // Closing a sealed door re-seals it (clears any open-all
+            // override); the open setter forces sealed doors shut anyway.
+            door.clearLockdownOverride()
             door.open = false
+        }
+    }
+
+    /**
+     * Activate Lockdown for every selected, player-controlled crystal whose
+     * ability is ready (the button and the P hotkey both land here).
+     */
+    private fun activateSelectedLockdown() {
+        for (crew in selectedCrew) {
+            if (!crew.playerControllable)
+                continue
+
+            crew.activateLockdown()
         }
     }
 
@@ -2564,6 +2657,10 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
             system.hotkeyPressed(key)
         }
 
+        // The Crystal Lockdown ability hotkey (wiki: P by default).
+        if (key.id == VanillaHotkeys.CREW_LOCKDOWN)
+            activateSelectedLockdown()
+
         // The select-one-crewmember hotkeys
         for ((index, id) in VanillaHotkeys.SELECT_CREW.withIndex()) {
             if (key.id != id)
@@ -2593,8 +2690,6 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
                 selectedCrew.clear()
                 selectedCrew += game.playerCrew.filter { it.playerControllable }
             }
-
-            // TODO crystal lockdown hotkey, when that's implemented
 
             VanillaHotkeys.SAVE_CREW_POS -> saveCrewPositions()
             VanillaHotkeys.LOAD_CREW_POS -> loadCrewPositions()

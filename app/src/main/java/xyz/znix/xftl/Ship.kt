@@ -1320,6 +1320,29 @@ class Ship(
             target.spawnBreach()
         }
 
+        // Crew stun: stunChance weapons (Heavy Lasers, crystal weapons, the
+        // Vengeance shard) roll a chance and vanilla always stuns for 3
+        // seconds when it procs (see the comment on
+        // AbstractWeaponBlueprint.stunChance); the AE weapons with a <stun>
+        // tag (stun bombs, ion stun) stun everyone in the room for the
+        // stated duration unconditionally.
+        if (damage.stunChance > 0 && Random.rollChance(damage.stunChance)) {
+            for (crewMember in target.crew)
+                crewMember.stun(3f)
+        }
+        if (damage.stunDuration > 0) {
+            for (crewMember in target.crew)
+                crewMember.stun(damage.stunDuration.f)
+        }
+
+        // Lockdown bombs seal the hit room with a crystal coating, identical
+        // to the Crystal crew's Lockdown ability (wiki: "completely identical
+        // in its effects").
+        if (damage.lockdown) {
+            target.lockdown()
+            sys.sounds.getSampleOrWarn(if (Random.nextBoolean()) "lockdown1" else "lockdown2")?.play()
+        }
+
         // Crystal Vengeance (CRYSTAL_SHARDS): when the ship takes damage,
         // a chance to break off a shard that flies at the enemy. The shard
         // is a neutral projectile: 1 damage, 10% breach, 20% stun, ignores
@@ -1443,6 +1466,14 @@ class Ship(
         // reduces the size of the savefile.
         for (door in doors) {
             door.resetHealth()
+        }
+
+        // Crystal Lockdown recharges instantly after a jump - unless the
+        // crystal is currently in a clone bay (wiki, Crystal Lockdown page).
+        for (crewMember in crew) {
+            if (crewMember.room.system is Clonebay)
+                continue
+            crewMember.lockdownCooldown = 0f
         }
     }
 

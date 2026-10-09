@@ -39,6 +39,48 @@ abstract class AbstractCrew(
      */
     open val standingShipHostile: Boolean get() = true
 
+    // Crew stun (Heavy Lasers and crystal weapons roll stunChance; the AE
+    // stun bombs/ion stun apply an explicit duration; the Vengeance shard
+    // rolls 20%): while the timer is above zero the crewmember is fully
+    // disabled - no walking, fighting, repairing, firefighting, sabotaging,
+    // door-punching or manning. Damage still applies normally.
+    var stunTimer: Float = 0f
+        private set
+
+    val isStunned: Boolean
+        get() = stunTimer > 0f
+
+    fun stun(duration: Float) {
+        stunTimer = max(stunTimer, duration)
+    }
+
+    // Crystal Lockdown: the per-crew recharge (50s, wiki). Transient - not
+    // serialised; a jump recharge resets it (see Ship.resetAfterJump).
+    var lockdownCooldown: Float = 0f
+        internal set
+
+    /** Whether this crewmember has the Lockdown ability at all. */
+    open val lockdownCapable: Boolean get() = false
+
+    val lockdownReady: Boolean
+        get() = lockdownCapable && lockdownCooldown <= 0f && !isStunned &&
+                currentAction != Action.DYING
+
+    /**
+     * Seal the room this crewmember is standing in with a crystal coating
+     * (12 seconds, 50 second recharge). Returns false if not ready.
+     */
+    fun activateLockdown(): Boolean {
+        if (!lockdownReady)
+            return false
+
+        room.lockdown(LOCKDOWN_DURATION)
+        lockdownCooldown = LOCKDOWN_RECHARGE
+
+        game.sounds.getSampleOrWarn(if (Random.nextBoolean()) "lockdown1" else "lockdown2")?.play()
+        return true
+    }
+
     val codename: String get() = blueprint.name
 
     var icon: FTLAnimation
@@ -231,6 +273,9 @@ abstract class AbstractCrew(
     /** The healing sparkles animation, created on first use. */
     private var healingAnimation: FTLAnimation? = null
 
+    // Looping stun-stars animation, started on demand while stunned.
+    private var stunAnimation: FTLAnimation? = null
+
     /**
      * Set by [markBeingHealed] this frame, and adopted into
      * [isBeingHealed] at the start of our update.
@@ -352,6 +397,8 @@ abstract class AbstractCrew(
     open fun update(dt: Float) {
         icon.update(dt)
 
+        lockdownCooldown = (lockdownCooldown - dt).coerceAtLeast(0f)
+
         // Adopt whatever the medbay (or another healer) requested earlier
         // this frame - systems update before crew. Also keep the healing
         // animation running (if we have one) so it doesn't visibly jump when
@@ -359,6 +406,8 @@ abstract class AbstractCrew(
         isBeingHealed = healingRequestedThisFrame
         healingRequestedThisFrame = false
         healingAnimation?.update(dt)
+        if (isStunned)
+            stunAnimation?.update(dt)
 
         // If we're moving we shouldn't be vertically offset to match
         // the enemy, if not this will be updated later on.
@@ -484,6 +533,21 @@ abstract class AbstractCrew(
             // to check whether they're on the source or destination ship.
             if (teleportingTo != null)
                 return
+        }
+
+        // A stunned crewmember does nothing at all: no walking, fighting,
+        // repairing, firefighting, sabotaging, door-punching or manning
+        // (manning is action-based, so dropping to IDLE un-mans the
+        // station). The damage checks above already ran, so being stunned
+        // doesn't protect against fires or suffocation.
+        if (stunTimer > 0f) {
+            stunTimer = (stunTimer - dt).coerceAtLeast(0f)
+            currentAction = Action.IDLE
+            isPunching = false
+            attackTimer = null
+            enemyToAttack = null
+            updateAnimation()
+            return
         }
 
         // Bash at the door until it's opened. We still have our target set
@@ -932,6 +996,19 @@ abstract class AbstractCrew(
                 healingAnimation = HEALING_ANIM.startLooping(game)
 
             val anim = healingAnimation!!
+            anim.draw(
+                screenX.f + (icon.currentFrame.width - anim.width) / 2f,
+                screenY.f - anim.height / 2f
+            )
+        }
+
+        // Draw the stun stars centred above the crewmember's head (same
+        // anchor as the healing sparkles - the strip is 5 frames of 14x14).
+        if (isStunned) {
+            if (stunAnimation == null)
+                stunAnimation = STUN_ANIM.startLooping(game)
+
+            val anim = stunAnimation!!
             anim.draw(
                 screenX.f + (icon.currentFrame.width - anim.width) / 2f,
                 screenY.f - anim.height / 2f
@@ -1810,6 +1887,9 @@ abstract class AbstractCrew(
         // 11 * this many seconds.
         private const val HEALING_ANIM_FRAME_TIME = 0.15f
 
+        // Same pace for the stun stars (by-eye; tune if the spin looks off).
+        private const val STUN_ANIM_FRAME_TIME = 0.15f
+
         /**
          * The green sparkles vanilla FTL draws above crewmembers being healed
          * in a medbay. Vanilla hardcodes this effect - it isn't listed in
@@ -1820,6 +1900,19 @@ abstract class AbstractCrew(
             Animations.SpriteSheetSpec("img/people/healing_strip11.png", 32, 32, 352, 32),
             "healing", 0, 0, 11, HEALING_ANIM_FRAME_TIME
         )
+
+        /**
+         * The crew-stun stars: img/people/stun_strip5.png is 5 frames of
+         * 14x14, drawn centred above the stunned crewmember's head.
+         */
+        private val STUN_ANIM = AnimationSpec(
+            Animations.SpriteSheetSpec("img/people/stun_strip5.png", 14, 14, 70, 14),
+            "stun", 0, 0, 5, STUN_ANIM_FRAME_TIME
+        )
+
+        // Crystal Lockdown timings, from the wiki's Crystal Lockdown page.
+        const val LOCKDOWN_DURATION: Float = 12f
+        const val LOCKDOWN_RECHARGE: Float = 50f
 
         const val TELEPORT_ANIMATION_TIME: Float = 0.5f
         const val TELEPORT_IMAGE_STRETCH: Float = 0.1f

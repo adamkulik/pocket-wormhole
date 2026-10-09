@@ -45,6 +45,14 @@ data class Door(val position: ConstPoint, val left: Room?, val right: Room?, val
 
     val maxHealth: Int
         get() {
+            // Crystal-coated doors are far tougher than any normal door: per
+            // the wiki, five or more crew punching from the moment of
+            // lockdown barely manage to break through within the 12 second
+            // coating. With xftl's one damage per punch cadence, 45 lets
+            // exactly 5 crew manage in ~9s while 4 crew can't make it.
+            if (isSealedByLockdown)
+                return LOCKDOWN_DOOR_HEALTH
+
             val healths = BASE_HEALTHS.getValue(ship.sys.difficulty)
 
             if (isHacked) {
@@ -70,10 +78,14 @@ data class Door(val position: ConstPoint, val left: Room?, val right: Room?, val
      */
     var open: Boolean = false
         set(value) {
-            if (isBroken) {
-                field = true
-            } else {
-                field = value
+            when {
+                isBroken -> field = true
+
+                // Crystal-coated (Lockdown) doors are sealed shut - unless
+                // the open-all-doors override was used to vent the room.
+                isSealedByLockdown && !lockdownOpenOverride -> field = false
+
+                else -> field = value
             }
         }
 
@@ -236,7 +248,12 @@ data class Door(val position: ConstPoint, val left: Room?, val right: Room?, val
         // neither can any door at all while the doors system is inoperable
         // (broken/ionised/hacked/powered down/absent) - vanilla then refuses
         // to open or close anything, so don't even highlight the doors.
-        if (isBroken || isHacked || !ship.areDoorsOperable) {
+        // Sealed (Lockdown) doors can't be toggled either - but their
+        // airlocks stay controllable, and the Z open-all override makes the
+        // door behave normally while it's open.
+        if (isBroken || isHacked || !ship.areDoorsOperable ||
+            (isSealedByLockdown && !isAirlock && !lockdownOpenOverride)
+        ) {
             return false
         }
 
@@ -273,6 +290,14 @@ data class Door(val position: ConstPoint, val left: Room?, val right: Room?, val
         // ship may be toggled (see [Ship.areDoorsOperable]).
         if (!ship.areDoorsOperable) {
             return false
+        }
+
+        // Clicking a sealed door that was forced open by the open-all-doors
+        // override closes and re-seals it.
+        if (isSealedByLockdown && lockdownOpenOverride) {
+            lockdownOpenOverride = false
+            open = false
+            return true
         }
 
         if (!hovered) {
@@ -358,6 +383,40 @@ data class Door(val position: ConstPoint, val left: Room?, val right: Room?, val
 
     fun resetHealth() {
         damage = 0
+    }
+
+    /**
+     * True while either adjacent room is coated by a Crystal Lockdown. The
+     * doors are then forced shut ([open] setter), block everyone
+     * ([isLockedFor]), can't be toggled by the player (airlocks excepted)
+     * and are far tougher to break through - but breaking one breaks the
+     * door itself, exactly like punching through a hacked door.
+     */
+    val isSealedByLockdown: Boolean
+        get() = (left?.isLockedDown ?: false) || (right?.isLockedDown ?: false)
+
+    /**
+     * Set by the open-all-doors command (Z): vanilla lets it override the
+     * crystal coating, which is how the well-known vent-the-locked-room
+     * trap works. Cleared when the coating melts, the door is re-locked, or
+     * the lockdown is re-applied.
+     */
+    var lockdownOpenOverride: Boolean = false
+        private set
+
+    /**
+     * The open-all-doors override for sealed doors: force the door open
+     * despite the coating.
+     */
+    fun forceOpenWhileSealed() {
+        if (!isSealedByLockdown)
+            return
+        lockdownOpenOverride = true
+        open = true
+    }
+
+    fun clearLockdownOverride() {
+        lockdownOpenOverride = false
     }
 
     fun saveToXML(): Element? {
@@ -453,6 +512,12 @@ data class Door(val position: ConstPoint, val left: Room?, val right: Room?, val
             return false
         }
 
+        // Crystal-coated doors block everyone, whatever the doors system's
+        // state (the wiki pins that its level doesn't affect the coating).
+        if (isSealedByLockdown) {
+            return true
+        }
+
         if (isHacked) {
             return crew.mode == AbstractCrew.SlotType.CREW
         }
@@ -468,6 +533,12 @@ data class Door(val position: ConstPoint, val left: Room?, val right: Room?, val
 
     companion object {
         private const val ANIMATION_TIME: Float = 0.2f
+
+        // The effective health of a crystal-coated (Lockdown) door. The wiki
+        // pins that five or more crew punching from the moment of lockdown
+        // barely break through within the 12 second coating, and fewer can't
+        // - with one damage per punch this gives exactly that.
+        private const val LOCKDOWN_DOOR_HEALTH: Int = 45
 
         // Door healths depend on the difficulty.
         // These values are the number of attacks required to break

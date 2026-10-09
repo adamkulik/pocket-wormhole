@@ -17,6 +17,8 @@ class Damage() {
         this.fireChance = type.fireChance * 10
         this.breachChance = type.breachChance * 10
         this.stunChance = type.stunChance * 10
+        this.stunDuration = type.stun
+        this.lockdown = type.lockdown
 
         this.noSysDamage = type.noSysDamage
         this.noCrewDamage = type.noPersonnelDamage
@@ -70,12 +72,25 @@ class Damage() {
     var breachChance: Int = 0
     var stunChance: Int = 0
 
+    /**
+     * The crew-stun duration in seconds. Weapons with a `<stun>` tag (the AE
+     * stun bombs/ion stun) apply it to everyone in the room unconditionally;
+     * for [stunChance] weapons there is no dat duration - vanilla always
+     * stuns for 3 seconds (see the comment on [AbstractWeaponBlueprint
+     * .stunChance]).
+     */
+    var stunDuration: Int = 0
+
+    /**
+     * Lockdown bombs (BOMB_LOCK): the hit room is sealed with a crystal
+     * coating, identical to the Crystal crew's Lockdown ability.
+     */
+    var lockdown: Boolean = false
+
     // When these are set, hullDamage isn't automatically added to
     // the system and crew damage.
     var noSysDamage: Boolean = false
     var noCrewDamage: Boolean = false
-
-    // lockdown also belongs here once implemented
 
     /**
      * Apply the effect of a weapon that uses damage-chaining.
@@ -100,7 +115,7 @@ class Damage() {
         val result = Damage()
         result.ionDamage = ionDamage
         result.stunChance = stunChance
-        // TODO stun duration
+        result.stunDuration = stunDuration
         return result
     }
 
@@ -136,6 +151,8 @@ class Damage() {
         result.fireChance = fireChance
         result.breachChance = breachChance
         result.stunChance = stunChance
+        result.stunDuration = stunDuration
+        result.lockdown = lockdown
 
         result.noSysDamage = noSysDamage
         result.noCrewDamage = noCrewDamage

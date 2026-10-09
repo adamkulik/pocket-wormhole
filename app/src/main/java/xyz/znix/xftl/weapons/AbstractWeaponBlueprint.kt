@@ -38,6 +38,10 @@ abstract class AbstractWeaponBlueprint(xml: Element) : Blueprint(xml) {
     // This is the duration, if set always 100% chance
     val stun: Int = xml.getChildTextTrim("stun")?.toInt() ?: 0
 
+    // Lockdown bombs (BOMB_LOCK, vanilla blueprints.xml): detonating seals
+    // the target room with a crystal coating for 12 seconds.
+    val lockdown: Boolean = xml.getChildTextTrim("lockdown") == "1"
+
     // These tags are from Hyperspace, and disable the hull damage being added
     // to personnel and system damage.
     val noPersonnelDamage = xml.getChildTextTrim("noPersDamage")?.toBoolean() ?: false
