@@ -59,7 +59,7 @@ class Cloaking(blueprint: SystemBlueprint) : MainSystem(blueprint) {
 
     override fun makeExtraButtons(powerPos: IPoint): List<Button> {
         // If the system is unpowered, it shows the disabled level-1 image
-        val power = max(powerSelected, 1)
+        val power = max(powerSupplied, 1)
 
         return listOf(CloakButton(power, powerPos))
     }
@@ -180,7 +180,7 @@ class Cloaking(blueprint: SystemBlueprint) : MainSystem(blueprint) {
 
         override val timeRemaining: Float? get() = this@Cloaking.timeRemaining
         override val duration: Float get() = this@Cloaking.duration
-        override val isOff: Boolean get() = powerSelected == 0 || isPowerLocked || isHackActive
+        override val isOff: Boolean get() = powerSupplied == 0 || isPowerLocked || isHackActive
 
         override fun click(button: Int) {
             if (button != Input.MOUSE_LEFT_BUTTON)

@@ -411,6 +411,10 @@ class Weapons(blueprint: SystemBlueprint) : MainSystem(blueprint) {
             return ship.hardpoints[slot].weapon?.type?.power ?: 0
         }
 
+        override fun getItemId(slot: Int): Any {
+            return ship.hardpoints[slot].weapon!!
+        }
+
         override fun isItemPowered(slot: Int): Boolean {
             return ship.hardpoints[slot].weapon?.isPowered ?: false
         }

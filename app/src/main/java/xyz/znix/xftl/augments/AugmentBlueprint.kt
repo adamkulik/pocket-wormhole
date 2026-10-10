@@ -72,7 +72,7 @@ class AugEngiMedbots(elem: Element) : AugmentBlueprint(elem) {
         super.update(ship, dt, totalValue)
 
         val medbay = ship.medbay ?: return
-        if (medbay.powerSelected == 0)
+        if (medbay.powerSupplied == 0)
             return
 
         val healing = dt * 6.4f * totalValue

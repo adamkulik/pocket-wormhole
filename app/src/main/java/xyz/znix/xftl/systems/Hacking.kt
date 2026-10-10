@@ -83,7 +83,7 @@ class Hacking(blueprint: SystemBlueprint) : MainSystem(blueprint) {
         // Otherwise use the selected power, clamped to at least one.
         val height = when (projectile) {
             null -> 1
-            else -> powerSelected.coerceAtLeast(1)
+            else -> powerSupplied.coerceAtLeast(1)
         }
 
         // Only bother to update the UI if this is a) on the player
@@ -267,7 +267,7 @@ class Hacking(blueprint: SystemBlueprint) : MainSystem(blueprint) {
     }
 
     fun startHackingPulse() {
-        if (isPowerLocked || powerSelected == 0)
+        if (isPowerLocked || powerSupplied == 0)
             return
 
         if (!droneLanded)
@@ -325,7 +325,7 @@ class Hacking(blueprint: SystemBlueprint) : MainSystem(blueprint) {
         override val timeRemaining: Float? get() = this@Hacking.timeRemaining
         override val duration: Float get() = this@Hacking.duration
         override val isOff: Boolean
-            get() = powerSelected == 0 || isPowerLocked || droneInFlight ||
+            get() = powerSupplied == 0 || isPowerLocked || droneInFlight ||
                     (!droneLaunched && ship.dronesCount == 0)
 
         override val forceHighlight: Boolean

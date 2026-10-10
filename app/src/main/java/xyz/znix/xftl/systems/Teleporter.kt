@@ -30,7 +30,7 @@ class Teleporter(blueprint: SystemBlueprint) : MainSystem(blueprint) {
 
     val isSendAvailable: Boolean
         get() {
-            if (isPowerLocked || powerSelected == 0)
+            if (isPowerLocked || powerSupplied == 0)
                 return false
 
             // There must be an enemy ship
@@ -43,7 +43,7 @@ class Teleporter(blueprint: SystemBlueprint) : MainSystem(blueprint) {
 
     val isReceiveAvailable: Boolean
         get() {
-            if (isPowerLocked || powerSelected == 0)
+            if (isPowerLocked || powerSupplied == 0)
                 return false
 
             // There must be another ship present, whether or not it's

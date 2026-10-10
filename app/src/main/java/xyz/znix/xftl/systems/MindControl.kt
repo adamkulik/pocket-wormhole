@@ -33,7 +33,7 @@ class MindControl(blueprint: SystemBlueprint) : MainSystem(blueprint) {
     override val isPowerLocked: Boolean get() = super.isPowerLocked || active
     override val hasWhiteLockingBox: Boolean get() = active
 
-    val ready: Boolean get() = powerSelected > 0 && !isPowerLocked && !isHackActive
+    val ready: Boolean get() = powerSupplied > 0 && !isPowerLocked && !isHackActive
 
     private val startSound by onInit { it.sounds.getSample("mindControl") }
     private val endSound by onInit { it.sounds.getSample("mindControlEnd") }

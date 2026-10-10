@@ -218,6 +218,10 @@ class Drones(blueprint: SystemBlueprint) : MainSystem(blueprint) {
             return drones.getOrNull(slot)?.type?.power ?: 0
         }
 
+        override fun getItemId(slot: Int): Any {
+            return drones.getOrNull(slot)!!
+        }
+
         override fun isItemPowered(slot: Int): Boolean {
             return drones.getOrNull(slot)?.instance?.isPowered ?: false
         }

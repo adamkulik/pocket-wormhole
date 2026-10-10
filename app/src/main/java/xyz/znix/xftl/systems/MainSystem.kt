@@ -16,12 +16,17 @@ import kotlin.math.min
 
 abstract class MainSystem(blueprint: SystemBlueprint) : AbstractSystem(blueprint) {
     /**
-     * The amount of power this system is drawing from the reactor, and other sources.
+     * The amount of power this system is drawing from the reactor (and other
+     * global sources like batteries).
      *
      * It's the amount 'selected' because it's the value you change by
      * adjusting the system's power level.
      *
-     * This is simply the sum of all the power in [selectedPowerSources].
+     * This is deliberately NOT the system's total power: per-room power (eg
+     * Zoltan bars) occupies bars of the system's capacity on its own, and the
+     * player's selection fills the room left on top of it (vanilla: the +/-
+     * clicks take and give back reactor bars through the ship's power
+     * manager, and a system's total can never exceed its capacity).
      */
     // Note: this is cached since it's used *everywhere*
     var powerSelected: Int = 0
@@ -71,9 +76,16 @@ abstract class MainSystem(blueprint: SystemBlueprint) : AbstractSystem(blueprint
      */
     private val previousPowerSources = HashMap<EnergySource, Int>()
 
-    val powerAvailable: Int get() = min(undamagedEnergy, ship.powerAvailable + powerSelected)
+    /**
+     * The room this system has for player-selected power: the undamaged
+     * capacity minus any per-room power (eg Zoltan bars), which occupies bars
+     * of the capacity by itself.
+     */
+    protected fun reactorRoom(): Int = (undamagedEnergy - forcedPower).coerceAtLeast(0)
 
-    val powerUnused: Int get() = min(undamagedEnergy - powerSelected, ship.powerAvailable)
+    val powerAvailable: Int get() = min(reactorRoom(), ship.powerAvailable + powerSelected)
+
+    val powerUnused: Int get() = min(reactorRoom() - powerSelected, ship.powerAvailable)
 
     open val isPowerLocked: Boolean get() = isIonised || isHackActive
 
@@ -201,7 +213,10 @@ abstract class MainSystem(blueprint: SystemBlueprint) : AbstractSystem(blueprint
     }
 
     override fun isMannableBy(crew: AbstractCrew): Boolean {
-        if (powerSelected == 0)
+        // A Zoltan-powered system functions without selected power, so it
+        // can be manned (vanilla counts the manning bonus whenever the
+        // system's total power is non-zero).
+        if (powerSupplied == 0)
             return false
 
         return super.isMannableBy(crew)
@@ -217,22 +232,39 @@ abstract class MainSystem(blueprint: SystemBlueprint) : AbstractSystem(blueprint
     }
 
     override fun powerLimitChanged() {
-        if (undamagedEnergy < powerSelected) {
+        if (reactorRoom() < powerSelected + forcedPower) {
             // This ultimately calls consumePower, which will reduce our selected
             // power if there isn't enough, in turn calling powerStateChanged.
+            // The forced power is included in case the capacity shrinkage
+            // (damage) took the room the Zoltan bars were occupying.
             ship.updateAvailablePower()
         }
 
-        if (powerSelected < targetPower && powerSelected < undamagedEnergy) {
-            // We've been repaired (or the ion wore off), try and return to
-            // our original power level.
-            val systemRequested = min(targetPower, undamagedEnergy)
-            val nextValue = min(powerAvailable, systemRequested)
-            if (!setSystemPower(nextValue) || nextValue < systemRequested) {
-                // We didn't have enough reactor power to restore this level.
-                // TODO show a not-enough-power warning here.
-                targetPower = powerSelected
-            }
+        restoreTargetPowerIfPossible()
+    }
+
+    /**
+     * Runs whenever our power sources change, which includes a Zoltan
+     * entering or leaving the room. Besides the repair/ion recovery in
+     * [powerLimitChanged], this is what refills the player's selection after
+     * a Zoltan leaves and frees its bar's worth of capacity again (vanilla's
+     * auto-repower runs for every system except weapons and drones).
+     */
+    override fun powerStateChanged() {
+        restoreTargetPowerIfPossible()
+    }
+
+    private fun restoreTargetPowerIfPossible() {
+        if (powerSelected >= targetPower || powerSelected >= reactorRoom())
+            return
+
+        // We've been repaired, the ion wore off or a Zoltan left the room:
+        // try and return to our original power level.
+        val systemRequested = (targetPower - forcedPower).coerceIn(0, reactorRoom())
+        val nextValue = min(powerAvailable, systemRequested)
+        if (!setSystemPower(nextValue)) {
+            // We didn't have enough reactor power to restore this level.
+            // TODO show a not-enough-power warning here.
         }
     }
 
@@ -247,9 +279,13 @@ abstract class MainSystem(blueprint: SystemBlueprint) : AbstractSystem(blueprint
         if (isPowerLocked)
             return
 
-        setSystemPower(powerSelected + 1)
-
-        targetPower = powerSelected
+        // Update the target before changing the power: the allocation inside
+        // setSystemPower runs the restore logic, which must see the level we
+        // are asking for rather than the previous one.
+        val wanted = powerSelected + 1
+        targetPower = wanted + forcedPower
+        if (!setSystemPower(wanted))
+            targetPower = powerSelected + forcedPower
     }
 
     /**
@@ -263,9 +299,10 @@ abstract class MainSystem(blueprint: SystemBlueprint) : AbstractSystem(blueprint
         if (isPowerLocked)
             return
 
-        setSystemPower(powerSelected - 1)
-
-        targetPower = powerSelected
+        val wanted = powerSelected - 1
+        targetPower = wanted + forcedPower
+        if (!setSystemPower(wanted))
+            targetPower = powerSelected + forcedPower
     }
 
     /**
@@ -285,24 +322,20 @@ abstract class MainSystem(blueprint: SystemBlueprint) : AbstractSystem(blueprint
         if (level == powerSelected)
             return true
 
-        // Increasing power is atomic, eg for shields we need to increase or
-        // decrease it by 2, or do nothing.
+        // Increasing power is atomic - the power will either be taken from
+        // the reactor in full, or not at all.
         val available = powerAvailable
         if (level > available && level > powerSelected)
             return false
 
-        if (level < 0 || level > undamagedEnergy)
+        // The player's selection can never push the system's total power
+        // (selection + per-room power) past its undamaged capacity.
+        if (level < 0 || level > reactorRoom())
             return false
 
         // Decreasing power is not atomic, to avoid getting stuck in a state
         // where we can neither increase nor decrease power.
-        val clamped = level.coerceAtLeast(forcedPower)
-
-        // Already clamped.
-        if (clamped == powerSelected)
-            return false
-
-        powerSelected = clamped
+        powerSelected = level
 
         // This indirectly calls powerStateChanged.
         ship.updateAvailablePower()
@@ -324,41 +357,34 @@ abstract class MainSystem(blueprint: SystemBlueprint) : AbstractSystem(blueprint
         previousPowerSources.putAll(selectedPowerSources)
         selectedPowerSources.clear()
 
-        var totalRemaining = powerSelected.coerceIn(0, undamagedEnergy)
-
-        // How much more power we can accept until the system is fully powered.
+        // First grab per-room power, eg from Zoltans. This power is ADDITIVE:
+        // it occupies bars of the system's capacity on its own, and the
+        // player's selection fills the room left on top of it. This means a
+        // Zoltan walking into a powered system shrinks the room below, so
+        // some of the player's selection can no longer be allocated and its
+        // bars return to the reserve (vanilla's reconcile loop), while a
+        // Zoltan leaving grows the room back and the selection re-fills.
         var remainingUntilFull = undamagedEnergy
-
-        // First grab per-room power, eg from Zoltans, since it can't be
-        // turned on or off.
-        // This means that if a Zoltan walks into the room, it'll displace
-        // some other source of power.
         for (type in EnergySource.PER_SYSTEM_TYPES) {
             val bonusPower = min(type.getSystemPower(this), remainingUntilFull)
             if (bonusPower == 0)
                 continue
 
             remainingUntilFull -= bonusPower
-            totalRemaining -= bonusPower
             selectedPowerSources[type] = bonusPower
 
             require(bonusPower >= 0)
             require(remainingUntilFull >= 0)
         }
 
-        // We can end up with a negative totalRemaining if we're getting more
-        // zoltan power than we want.
-        totalRemaining = totalRemaining.coerceAtLeast(0)
+        // The player's selection is the reactor/battery share, clamped so the
+        // system's total power stays within its (undamaged) capacity.
+        var totalRemaining = powerSelected.coerceIn(0, remainingUntilFull)
 
         // TYPES is in order of priority, so we'll use stuff like the reactor
         // before battery power.
         for (type in EnergySource.GLOBAL_TYPES) {
-            var remaining = previousPowerSources[type] ?: 0
-
-            // If we've got some new power from one source (eg a Zoltan), that
-            // should reduce the amount of power we pull from the
-            // lowest-priority source.
-            remaining = min(remaining, totalRemaining)
+            var remaining = min(previousPowerSources[type] ?: 0, totalRemaining)
 
             if (remaining == 0)
                 continue
@@ -388,13 +414,23 @@ abstract class MainSystem(blueprint: SystemBlueprint) : AbstractSystem(blueprint
      * This should only be called by Ship.updateAvailablePower.
      */
     fun consumePowerSecond(powerAvailable: HashMap<EnergySource, Int>) {
-        // Separately track how much power to add, so we can switch between
-        // sources should one run out.
+        // Only the player-selected (reactor/battery) share is topped up here -
+        // the per-room power was added in consumePowerFirst and occupies bars
+        // of the capacity on its own.
+        var roomForSelection = undamagedEnergy
+        var currentAmount = 0
+        for ((type, amount) in selectedPowerSources) {
+            if (type.isPerSystem) {
+                roomForSelection -= amount
+            } else {
+                currentAmount += amount
+            }
+        }
+        roomForSelection = roomForSelection.coerceAtLeast(0)
+
         // This comes from powerSelected, so that setSystemPower can use that
         // to indicate how much power we actually want.
-        val previousDemand = powerSelected.coerceIn(0, undamagedEnergy)
-        val currentAmount = selectedPowerSources.values.sum()
-        var totalRemaining = previousDemand - currentAmount
+        var totalRemaining = powerSelected.coerceIn(0, roomForSelection) - currentAmount
 
         // Maybe one or more power sources couldn't supply as much as they
         // used to, or setSystemPower is demanding a bit more.
@@ -424,25 +460,31 @@ abstract class MainSystem(blueprint: SystemBlueprint) : AbstractSystem(blueprint
     }
 
     protected open fun updateCachedSelectedPower() {
-        // The cached selection is our demand: what the player (or the AI)
-        // asked for, clamped to what the system can still receive. It is
-        // deliberately NOT the raw sum of selectedPowerSources - that would
-        // let a Zoltan's per-room bonus bar leak into the selection when it
-        // walks in, and leave the demand permanently inflated (a bar drawn
-        // from the reactor while doing nothing) when it walks back out
-        // (GitHub issue #66).
-        val demand = selectedPowerSources.entries
-            .filter { !it.key.isPerSystem }
-            .sumOf { it.value }
+        var zoltanPower = 0
+        var demand = 0
+        for ((type, amount) in selectedPowerSources) {
+            if (type.isPerSystem) {
+                zoltanPower += amount
+            } else {
+                demand += amount
+            }
+        }
 
-        powerSelected = max(demand, powerSelected.coerceIn(0, undamagedEnergy))
+        // The cached selection is our demand: what the player (or the AI)
+        // asked for in reactor power, clamped to the room the per-room power
+        // left. It is deliberately NOT the raw sum of selectedPowerSources -
+        // that would let a Zoltan's per-room bonus bar leak INTO the selection
+        // when it walks in, and leave the demand permanently inflated (a bar
+        // drawn from the reactor while doing nothing) when it walks back out
+        // (GitHub issue #66).
+        powerSelected = max(demand, powerSelected.coerceIn(0, (undamagedEnergy - zoltanPower).coerceAtLeast(0)))
 
         // The functional power level: everything we actually got allocated,
         // including per-system sources like Zoltan bars.
         powerSupplied = selectedPowerSources.values.sum()
 
         // Store our forced power value, which we can't decrease below
-        forcedPower = selectedPowerSources.entries.filter { it.key.isPerSystem }.sumOf { it.value }
+        forcedPower = zoltanPower
     }
 
     override fun saveToXML(elem: Element, refs: ObjectRefs) {

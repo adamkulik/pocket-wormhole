@@ -53,7 +53,7 @@ class Piloting(blueprint: SystemBlueprint) : SubSystem(blueprint) {
         }
 
     override fun isMannableBy(crew: AbstractCrew): Boolean {
-        if (ship.engines!!.powerSelected == 0) {
+        if (ship.engines!!.powerSupplied == 0) {
             return false
         }
 

@@ -7,50 +7,77 @@ import xyz.znix.xftl.systems.MainSystem
  * namely weapons and drones (and it's also usable for mods).
  *
  * These weapons/drones/whatever are referred to as 'items' here.
+ *
+ * The logic mirrors vanilla's weapon-power distributor (decompiled from
+ * FTLGame.exe 1.6.14, see issue-135-zoltan-power-plan.md):
+ *
+ * - Per-room (Zoltan) power is additive: it occupies bars of the system's
+ *   capacity on its own, and is handed out to items in slot order, first
+ *   slot first (vanilla's own tooltip says "Always powers the first weapon.
+ *   Click and drag to reorder").
+ * - An item fully covered by Zoltan power turns on for free; one partially
+ *   covered keeps the bar reserved but stays off.
+ * - An armed item whose Zoltan share shrinks (a Zoltan leaving, or a
+ *   reorder moving the bar elsewhere) turns OFF, even if the reactor could
+ *   cover the difference - items are never auto-repowered.
+ * - The player's + click arms the first unpowered item, paying only its
+ *   non-Zoltan remainder; the - click disarms the last armed item that has
+ *   any non-Zoltan power.
+ *
+ * Unlike vanilla we run the distributor from [MainSystem.powerStateChanged]
+ * (on every power-source change) plus on item changes, rather than every
+ * frame - the outcome is the same, as the algorithm is idempotent.
  */
 class WeaponPowerManager(private val system: MainSystem, private val items: ItemAccess) {
     /**
-     * The amount of Zoltan power each item receives.
+     * The amount of Zoltan power each slot receives.
      *
      * This is effectively just for caching, as it can be found purely
-     * from the current [forcedPower] value, and iterating through
+     * from the current [MainSystem.forcedPower] value, and iterating through
      * all the weapons.
      */
-    private val forcedPower: IntArray = IntArray(items.count)
+    private val forcedPower = IntArray(items.count)
 
     /**
-     * Shows how much power the currently-powered items are using.
+     * The Zoltan share each ITEM currently receives, tracked by item
+     * identity. Slot indices change when the player reorders weapons, but
+     * the share belongs to the item - tracking per-item is what makes a
+     * reorder re-target the Zoltan bar (vanilla re-runs its distributor
+     * with the new slot order to the same effect).
+     */
+    private val itemForced = HashMap<Any, Int>()
+
+    /**
+     * How much reactor power the currently-armed items need.
      *
-     * This should match [MainSystem.powerSelected], except when weapons are being
-     * turned on and off, hence why this is only used for power management.
+     * This is the system's selected power, minus any per-room power: the
+     * Zoltan share of an armed item is additive and free, so it isn't part
+     * of the reactor demand.
      */
     val currentPower: Int
         get() {
-            // Only add up the non-forced power, so we don't have to account
-            // for power that's put into powered-off weapons.
             var reactorPower = 0
             for (slot in forcedPower.indices) {
-                if (items.isItemPowered(slot))
-                    reactorPower += items.getItemPowerDraw(slot) - forcedPower[slot]
-            }
+                if (!items.isItemPowered(slot))
+                    continue
 
-            // And add the forced power back on at the end.
-            return reactorPower + system.forcedPower
+                reactorPower += items.getItemPowerDraw(slot) - forcedPower[slot]
+            }
+            return reactorPower
         }
 
-
     /**
-     * Update the powered weapons, to accommodate the system's new power state.
+     * Update the armed items, to accommodate the system's new power state.
      */
     fun powerStateChanged() {
-        // First, turn on any items that are fully powered by Zoltans.
-        // These ones can't be powered off by the player.
-        // This also updates forcedPower.
+        // Hand out the Zoltan power to the slots in order - the first slot's
+        // item takes what it needs, then the next one, and so on.
         forcedPower.fill(0)
         var remainingForcedPower = system.forcedPower
         for (slot in forcedPower.indices) {
             if (!items.hasItem(slot))
                 continue
+
             val powerDraw = items.getItemPowerDraw(slot)
 
             forcedPower[slot] = remainingForcedPower.coerceAtMost(powerDraw)
@@ -63,19 +90,52 @@ class WeaponPowerManager(private val system: MainSystem, private val items: Item
             // Zoltans in the room) wouldn't do anything, as this check would
             // always be skipped.
             remainingForcedPower -= forcedPower[slot]
-            if (forcedPower[slot] != powerDraw)
+        }
+
+        // Vanilla's distributor shrink branch: an armed item whose Zoltan
+        // share shrank loses its power entirely. Track the share per ITEM,
+        // so reordering items moves the bar with the slots instead of
+        // misreading the new occupant as a shrink.
+        for (slot in forcedPower.indices) {
+            if (!items.hasItem(slot))
                 continue
 
-            // TODO does this match vanilla behaviour with ions?
-            items.setItemPowered(slot, true)
+            val item = items.getItemId(slot)
+            val previous = itemForced[item] ?: 0
+            itemForced[item] = forcedPower[slot]
+
+            if (items.isItemPowered(slot) && forcedPower[slot] < previous)
+                items.setItemPowered(slot, false)
+        }
+
+        // Forget the shares of items that are gone, to keep the map bounded.
+        if (itemForced.size > forcedPower.size * 2) {
+            val present = HashSet<Any>()
+            for (slot in forcedPower.indices) {
+                if (items.hasItem(slot))
+                    present.add(items.getItemId(slot))
+            }
+            itemForced.keys.retainAll(present)
+        }
+
+        // First, turn on any items that are fully powered by Zoltans.
+        // These ones can't be powered off by the player.
+        for (slot in forcedPower.indices) {
+            if (!items.hasItem(slot) || items.isItemPowered(slot))
+                continue
+
+            val powerDraw = items.getItemPowerDraw(slot)
+            if (powerDraw != 0 && forcedPower[slot] == powerDraw)
+                items.setItemPowered(slot, true)
         }
 
         // The items are arranged in order of priority, so turn the last ones off if possible.
-        for (slot in items.count - 1 downTo 0) {
+        // This covers eg an ion storm cutting the reactor's output.
+        for (slot in forcedPower.indices.reversed()) {
             if (!items.isItemPowered(slot))
                 continue
 
-            if (system.powerSupplied >= currentPower)
+            if (system.powerSupplied >= currentPower + system.forcedPower)
                 break
 
             // Force-turn-off the item, even if we have ion damage.
@@ -85,11 +145,14 @@ class WeaponPowerManager(private val system: MainSystem, private val items: Item
             items.setItemPowered(slot, false)
         }
 
-        // If the system has too much power - more than the items are
-        // using - then get rid of that excess.
-        if (system.powerSupplied != currentPower) {
+        // Keep the system's selected power in sync with the armed items.
+        // This only ever lowers the selection here: raising it happens in
+        // [setItemPower], which first checks the power is actually
+        // available. Lowering is what releases an un-armed item's bar back
+        // to the reactor (vanilla: items are sticky-off, the system bar
+        // goes back to the reactor).
+        if (system.powerSelected != currentPower)
             items.setSystemPower(currentPower)
-        }
     }
 
     fun increasePower() {
@@ -191,19 +254,27 @@ class WeaponPowerManager(private val system: MainSystem, private val items: Item
         fun getItemPowerDraw(slot: Int): Int
 
         /**
+         * An identity for the item in the given slot. Used to track each
+         * item's Zoltan share across reorders, where an item's slot changes.
+         *
+         * Only called when [hasItem] is true for the slot.
+         */
+        fun getItemId(slot: Int): Any
+
+        /**
          * Check if an item is turned on, or false if that item doesn't exist.
          */
         fun isItemPowered(slot: Int): Boolean
 
         /**
          * Turns an item on/off, does nothing if that item isn't there.
-         *
-         * This is a no-op if the item is already powered as specified.
          */
         fun setItemPowered(slot: Int, powered: Boolean)
 
         /**
-         * Calls [MainSystem.setSystemPower]
+         * Set the system's selected (reactor) power level.
+         *
+         * Returns true if successful.
          */
         fun setSystemPower(level: Int): Boolean
     }

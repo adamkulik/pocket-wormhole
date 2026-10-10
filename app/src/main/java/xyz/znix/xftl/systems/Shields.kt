@@ -14,7 +14,13 @@ import kotlin.math.max
 class Shields(blueprint: SystemBlueprint) : MainSystem(blueprint) {
     override val sortingType: SortingType get() = SortingType.SHIELD
 
-    val selectedShieldBars: Int get() = powerSelected / 2
+    /**
+     * The number of shield bubbles the player has selected: the paired bars
+     * the total power level makes up, counting the reactor selection AND any
+     * per-room power (eg a Zoltan bar), since both occupy bars of the pair
+     * (vanilla: a Zoltan bar + one reactor bar completes a bubble).
+     */
+    val selectedShieldBars: Int get() = (powerSelected + forcedPower) / 2
 
     /**
      * The bubbles this system is actually running at: half the supplied
@@ -151,35 +157,13 @@ class Shields(blueprint: SystemBlueprint) : MainSystem(blueprint) {
         addSkillPoint(Skill.SHIELDS)
     }
 
-    override fun increasePower() {
-        if (isPowerLocked)
-            return
-
-        setSystemPower(selectedShieldBars * 2 + 2)
-        targetPower = powerSelected
-    }
-
-    override fun decreasePower() {
-        if (isPowerLocked)
-            return
-
-        // Clamp the power at 0, in case we have an odd number of power bars.
-        setSystemPower((selectedShieldBars * 2 - 2).coerceAtLeast(0))
-        targetPower = powerSelected
-    }
-
-    override fun updateCachedSelectedPower() {
-        super.updateCachedSelectedPower()
-
-        // Shield bars are only ever selected in whole bubbles. The cached
-        // demand can still end up odd - damage clamping the allocation, or
-        // the accounting around a Zoltan bar arriving or leaving (GitHub
-        // issue #66) - and an unpaired bar would keep drawing power while
-        // doing nothing, since half a bubble primes nothing. Round down to
-        // the whole-bubble count.
-        if (powerSelected.mod(2) == 1)
-            powerSelected -= 1
-    }
+    // increasePower/decreasePower are inherited from MainSystem: vanilla's
+    // +/- clicks add and remove ONE bar at a time for every system, shields
+    // included. There is no pair rule on the clicks - odd bar counts are
+    // legal states (a lone bar produces no bubble), and the +/- on a Zoltan
+    // bar completes or opens a bubble with a single click (GitHub issue
+    // #135). The pairing only exists in the display and in the recharge
+    // logic below.
 
     override fun getPowerBarSpacing(powerLevel: Int): Int {
         // Group the power bars into pairs
