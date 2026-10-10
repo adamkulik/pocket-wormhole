@@ -2561,9 +2561,12 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
             // animation plays, then arrival at the new sector's start beacon
             // runs setCurrentBeacon - which handles the sector music switch,
             // the arrival chime, spawning whatever's at the beacon, etc.
-            // The run-save is written by the existing jump-out completion /
-            // immediate-switch fallback sites, same as normal beacon jumps.
-            game.beginJumpOut(sector.startBeacon)
+            // The run-save is written by the jump-out completion site, same
+            // as normal beacon jumps.
+            // Guarded against in-flight animations (GitHub issue #145): an
+            // enemy can start fleeing while this map is open.
+            if (!game.isJumpAnimationPlaying())
+                game.beginJumpOut(sector.startBeacon)
 
             // In case we were at a store
             // TODO move this into an on-jump handler function

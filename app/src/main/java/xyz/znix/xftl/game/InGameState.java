@@ -769,7 +769,7 @@ public class InGameState extends MainGame.GameState {
 
         // The game stays frozen while an arrival or jump-out animation
         // plays (issue #4).
-        if (!isPaused() && playerFlyIn <= 0 && playerJumpOut <= 0 && enemyJumpOut <= 0)
+        if (!isPaused() && !isJumpAnimationPlaying())
             updateGameState(delta);
 
         // Tick the jump-out animations (issue #4). When the player's
@@ -1307,9 +1307,12 @@ public class InGameState extends MainGame.GameState {
             player.setOpponentCloakActive(false);
         }
 
-        if (!isInDanger()) {
-            // If the player isn't fighting a ship, there are no borders (not yet implemented), and they're not
+        if (!isInDanger() && !arrivalEventsPending) {
+            // If the player isn't fighting a ship, there are no boarders, and they're not
             // in a dangerous environment (eg, an asteroid field) then let them jump instantly.
+            // The pending-event check closes the arrival window (GitHub issue #145): the
+            // beacon's event is about to spawn its ship or hazard, and vanilla - whose loop
+            // is frozen while the event dialogue is up - never charges through that moment.
             player.setFtlChargeProgress(1);
         }
     }
@@ -1498,6 +1501,16 @@ public class InGameState extends MainGame.GameState {
      * jumps to a beacon from the star map.
      */
     public void beginJumpOut(Beacon target) {
+        // One jump at a time (GitHub issue #145): vanilla's jumps are
+        // instant, so there is no window in which a second jump could be
+        // requested - here the jump-out/arrival animations create one, and
+        // honouring the request would skip a beacon (or a sector) entirely.
+        // The jump map can't be opened while an animation plays
+        // (PlayerShipUI.openJumpMap gates on this), so a request here means
+        // a stale window or a debug path - ignore it.
+        if (isJumpAnimationPlaying())
+            return;
+
         // Crew still aboard the enemy ship are lost when we jump away
         // (issue #98). Recorded here - the single player-jump choke point,
         // covering both beacon jumps and sector exit (the sector map can
@@ -1512,14 +1525,6 @@ public class InGameState extends MainGame.GameState {
             }
         }
 
-        // If an animation is still in progress, switch immediately.
-        if (playerFlyIn > 0 || playerJumpOut > 0 || enemyJumpOut > 0) {
-            setCurrentBeacon(target);
-            leaveCrewLostInJump();
-            mainGame.writeRunSave();
-            return;
-        }
-
         jumpOutTarget = target;
         playerJumpOut = 1f;
 
@@ -1528,6 +1533,16 @@ public class InGameState extends MainGame.GameState {
         if (leave != null) {
             leave.play();
         }
+    }
+
+    /**
+     * True while the player's jump-out or arrival animation (or an enemy's
+     * jump-out) is playing (issue #4's animations). Vanilla's jumps are
+     * instant, so no UI may start another jump inside these windows
+     * (GitHub issue #145).
+     */
+    public boolean isJumpAnimationPlaying() {
+        return playerFlyIn > 0 || playerJumpOut > 0 || enemyJumpOut > 0;
     }
 
     private void trySpawnBoss() {

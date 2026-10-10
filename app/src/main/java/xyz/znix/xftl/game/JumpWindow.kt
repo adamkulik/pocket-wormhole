@@ -750,6 +750,14 @@ class JumpWindow(val game: InGameState, showSectorMap: () -> Unit, val jump: (Be
     }
 
     private fun performJump(beacon: Beacon) {
+        // One jump at a time (GitHub issue #145): if a jump-out/arrival
+        // animation is playing (eg this window was already open when an
+        // enemy started fleeing), ignore the request - otherwise the fuel
+        // and fleet pursuit below would be spent on a jump that
+        // beginJumpOut refuses to start.
+        if (game.isJumpAnimationPlaying())
+            return
+
         jump(beacon)
 
         game.player.fuelCount--
