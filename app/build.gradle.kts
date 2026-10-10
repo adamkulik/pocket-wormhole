@@ -11,8 +11,8 @@ android {
         applicationId = "com.pocketwormhole.android"
         minSdk = 26
         targetSdk = 34
-        versionCode = 11
-        versionName = "0.2.6"
+        versionCode = 12
+        versionName = "0.2.7"
     }
 
     // Release signing is opt-in via Gradle properties (kept out of the repo):
