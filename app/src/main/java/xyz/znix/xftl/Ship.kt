@@ -864,6 +864,16 @@ class Ship(
      */
     val crewVisibleThroughHull: Boolean
         get() {
+            // A cloak on this ship beats every remote sense - Slug telepathy
+            // and the Lifeform Scanner reveal nothing through it (wiki
+            // Cloaking: sensors, telepathy, the scanner and a powered hacking
+            // drone "don't provide vision" of a cloaked ship, "and without
+            // vision you cannot use mind control"). Vision from things
+            // physically aboard - your crew or boarding drone, or a
+            // mind-controlled crew member - comes via Room.playerHasVision
+            // instead, which the cloak preserves.
+            if (!isPlayerShip && isCloakActive)
+                return false
             // A living player-owned Slug reveals the crew of whichever ship
             // it is aboard - including one of your Slugs boarding the enemy
             // ship (GitHub issue #106; wiki Slugs: "Reveals live enemy crew").

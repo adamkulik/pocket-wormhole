@@ -249,28 +249,34 @@ data class Room(val ship: Ship, val id: Int, val x: Int, val y: Int, val width: 
             }
         }
 
-        // A cloaked ship hides its rooms from the player (vanilla: the
-        // "mind-control at fight start while paused" trick exists precisely
-        // because the cloak takes the view away - wiki Mind Control; mind
-        // control "requires view of enemy crew"). The player's own ship
-        // never hides: crew-sensed crews keep counting for mind control via
-        // Ship.crewVisibleThroughHull, which is deliberately separate.
+        // A powered hacking probe provides vision
+        val hacking = system?.hackedBy
+        if (hacking != null && hacking.room!!.ship.isPlayerShip && hacking.isPoweredUp) {
+            playerHasVision = true
+        }
+
+        // A cloaked ship hides its interior from every REMOTE source - the
+        // sensors, Slug telepathy, the Lifeform Scanner and even a powered
+        // hacking drone attached to it (wiki Cloaking: "you lose vision of
+        // its interior unless your crew or boarding drone or mind-controlled
+        // enemy crew is aboard the enemy ship ... and without vision you
+        // cannot use mind control"). Things physically IN a room keep its
+        // vision: your crew or a powered boarding drone standing there, or
+        // a crew member being mind-controlled (LivingCrew
+        // .providesPlayerVision). The player's own ship is never hidden by
+        // its own cloak.
         if (!ship.isPlayerShip && ship.isCloakActive) {
-            playerHasVision = false
+            playerHasVision = crew.any { it.providesPlayerVision }
         }
 
         if (ship.sys.debugFlags.showEverything.set) {
             playerHasVision = true
         }
 
-        // This is used by bombs
+        // This is used by bombs - kept outside the cloak block, as an
+        // in-flight bomb keeps granting vision of its target room (wiki
+        // Mind Control: "teleporting a bomb that doesn't miss").
         if (ship.projectiles.any { it.providesPlayerVision(this) }) {
-            playerHasVision = true
-        }
-
-        // A powered hacking probe provides vision
-        val hacking = system?.hackedBy
-        if (hacking != null && hacking.room!!.ship.isPlayerShip && hacking.isPoweredUp) {
             playerHasVision = true
         }
 
