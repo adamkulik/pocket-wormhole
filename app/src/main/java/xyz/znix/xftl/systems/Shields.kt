@@ -157,13 +157,49 @@ class Shields(blueprint: SystemBlueprint) : MainSystem(blueprint) {
         addSkillPoint(Skill.SHIELDS)
     }
 
-    // increasePower/decreasePower are inherited from MainSystem: vanilla's
-    // +/- clicks add and remove ONE bar at a time for every system, shields
-    // included. There is no pair rule on the clicks - odd bar counts are
-    // legal states (a lone bar produces no bubble), and the +/- on a Zoltan
-    // bar completes or opens a bubble with a single click (GitHub issue
-    // #135). The pairing only exists in the display and in the recharge
-    // logic below.
+    /**
+     * Vanilla's ShieldBox + click completes the current bubble - pinned
+     * against FTLGame.exe 1.6.14 (the box's click handler sets the click
+     * step to 2, or 1 when the system has a Zoltan bar) and by user test
+     * (from empty, one click adds two bars). A lone Zoltan bar only needs
+     * one more bar, and an odd (half-bubble) system level only has room
+     * for one more bar. The click is atomic: if that many bars aren't
+     * available, nothing happens and the fail sound plays.
+     */
+    override fun increasePower() {
+        if (isPowerLocked)
+            return
+
+        val step = when {
+            forcedPower.mod(2) == 1 -> 1
+            reactorRoom() - powerSelected >= 2 -> 2
+            else -> 1
+        }
+
+        val wanted = powerSelected + step
+        targetPower = wanted + forcedPower
+        if (!setSystemPower(wanted))
+            targetPower = powerSelected + forcedPower
+    }
+
+    /**
+     * Vanilla's ShieldBox - click mirrors the + click (user-pinned in
+     * vanilla 1.6.14: minus removes two bars): it removes bars down to the
+     * previous bubble boundary - a full pair from an even total, just the
+     * lone bar from an odd one. The result clamps at zero, so a pair held
+     * up by Zoltan bars merely loses its reactor bars.
+     */
+    override fun decreasePower() {
+        if (isPowerLocked)
+            return
+
+        val step = if ((powerSelected + forcedPower).mod(2) == 1) 1 else 2
+        val wanted = (powerSelected - step).coerceAtLeast(0)
+
+        targetPower = wanted + forcedPower
+        if (!setSystemPower(wanted))
+            targetPower = powerSelected + forcedPower
+    }
 
     override fun getPowerBarSpacing(powerLevel: Int): Int {
         // Group the power bars into pairs
