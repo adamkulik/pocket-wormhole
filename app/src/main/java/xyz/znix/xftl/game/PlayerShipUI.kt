@@ -334,14 +334,9 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
     private val hoveredCrew: MutableList<AbstractCrew> = ArrayList()
     private var skillsHoveredCrew: AbstractCrew? = null
 
-    // The Crystal Lockdown button: the ready crystal whose expanded panel
-    // currently shows it, and its clickable rect (both render-time state).
-    private var lockdownButtonCrew: LivingCrew? = null
-    private var lockdownButtonRect: Rectangle? = null
-
     // Touch crew-selection lockdown buttons: touch has no hover, so the
-    // expanded panel (and the LOCKDOWN button inside it) is unreachable -
-    // instead the iPad port's square button shows beside the crew box of
+    // expanded skill panel is awkward to use - instead the iPad port's
+    // square button shows beside the crew box of
     // every selected crystal. Rects are only registered for ready,
     // player-controlled crystals (the _off art is a pure cooldown hint).
     private var touchLockdownButtons: List<Pair<LivingCrew, Rectangle>> = emptyList()
@@ -630,17 +625,6 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
     fun mouseClick(button: Int, x: Int, y: Int, playerShipPosition: IPoint) {
         lastClickConsumedUi = false
         ambiguousCrewPick = null
-
-        // The Crystal Lockdown button (drawn in the expanded skill panel of
-        // a ready crystal - vanilla places it there, above the bars).
-        if (lockdownButtonCrew != null && button == Input.MOUSE_LEFT_BUTTON) {
-            val rect = lockdownButtonRect
-            if (rect != null && rect.contains(x.f, y.f)) {
-                lastClickConsumedUi = true
-                lockdownButtonCrew!!.activateLockdown()
-                return
-            }
-        }
 
         // Touch variant: the square button beside the box of every selected
         // crystal (activateLockdown self-guards on readiness). Returning
@@ -2131,15 +2115,6 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
 
         val drawSkills = crew == skillsHoveredCrew
 
-        // The Crystal Lockdown button lives at the top of the expanded
-        // skill panel (vanilla: "a LOCKDOWN button above his skill bars").
-        // When shown, the panel grows and the bars shift down below it.
-        lockdownButtonCrew = null
-        lockdownButtonRect = null
-        val showLockdownButton = drawSkills && crew.lockdownCapable && crew.lockdownReady && crew.playerControllable
-        val lockdownImg = if (showLockdownButton) game.getImg("img/customizeUI/arrow_lock_down.png") else null
-        val barOffset = lockdownImg?.height?.plus(2) ?: 0
-
         if (!drawSkills) {
             // Draw the semi-transparent background
             g.colour = Colour(colour.r, colour.g, colour.b, CREW_BOX_BG_ALPHA)
@@ -2194,30 +2169,23 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
             // Draw the semi-transparent background
             g.colour = Colour(colour.r, colour.g, colour.b, 0.25f)
             g.fillRect(x.f, y.f, 89f, CREW_BOX_HEIGHT.f)
-            g.fillRect(x + 89f, y.f, 80f, (146 + barOffset).f)
+            g.fillRect(x + 89f, y.f, 80f, 146f)
 
             // Draw the outline, which we do with line drawing by rectangles.
             g.colour = colour
             g.fillRect(x.f, y.f, 2f, CREW_BOX_HEIGHT.f)
             g.fillRect(x.f, y.f, 169f, 2f)
             g.fillRect(x.f, y + 25f, 91f, 2f)
-            g.fillRect(x + 89f, y + 27f, 2f, (119 + barOffset).f)
-            g.fillRect(x + 167f, y.f, 2f, (146 + barOffset).f)
-            g.fillRect(x + 91f, y + 144f + barOffset, 76f, 2f)
+            g.fillRect(x + 89f, y + 27f, 2f, 119f)
+            g.fillRect(x + 167f, y.f, 2f, 146f)
+            g.fillRect(x + 91f, y + 144f, 76f, 2f)
 
-            if (lockdownImg != null) {
-                lockdownButtonCrew = crew
-                lockdownButtonRect = Rectangle((x + 93).f, (y + 2).f, lockdownImg.width.f, lockdownImg.height.f)
-                g.colour = Colour.white
-                lockdownImg.draw((x + 93).f, (y + 2).f)
-            }
-
-            drawSkillBar(g, x + 93, y + barOffset, crew, Skill.PILOTING)
-            drawSkillBar(g, x + 93, y + barOffset, crew, Skill.ENGINES)
-            drawSkillBar(g, x + 93, y + barOffset, crew, Skill.SHIELDS)
-            drawSkillBar(g, x + 93, y + barOffset, crew, Skill.WEAPONS)
-            drawSkillBar(g, x + 93, y + barOffset, crew, Skill.REPAIRS)
-            drawSkillBar(g, x + 93, y + barOffset, crew, Skill.COMBAT)
+            drawSkillBar(g, x + 93, y, crew, Skill.PILOTING)
+            drawSkillBar(g, x + 93, y, crew, Skill.ENGINES)
+            drawSkillBar(g, x + 93, y, crew, Skill.SHIELDS)
+            drawSkillBar(g, x + 93, y, crew, Skill.WEAPONS)
+            drawSkillBar(g, x + 93, y, crew, Skill.REPAIRS)
+            drawSkillBar(g, x + 93, y, crew, Skill.COMBAT)
         }
 
         // Draw the health bar
