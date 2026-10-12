@@ -117,6 +117,7 @@ class DroneBlueprint(xml: Element) : Blueprint(xml) {
             DroneType.COMBAT -> CombatDrone(this)
             DroneType.DEFENSE -> DefenceDrone(this)
             DroneType.SHIP_REPAIR -> HullRepairDrone(this)
+            DroneType.SHIELD -> ShieldDrone(this)
             else -> DummyDrone(this)
         }
     }
