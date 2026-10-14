@@ -2081,13 +2081,33 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
             }
         }
 
-        // The save/load stations messages, which fade out after a second
-        if (saveCrewPosMessageTimer > 0f) {
-            saveCrewPosMessageTimer -= game.renderingDeltaTime
+        // The save/load stations message is drawn by
+        // drawCrewStationMessage, which InGameState.render calls after the
+        // tooltip pass: the button tooltips would otherwise cover it
+        // whenever the cursor rests on the button - which on touch is
+        // always, since the cursor stays where the last tap landed.
+    }
 
-            val message = game.translator[saveCrewPosMessageText]
-            oxygenEvadeFont.drawString(11f, crewSaveLoadY + 55f, message, Colour.white)
-        }
+    /**
+     * Draw the "Stations Saved!" / "Return to Stations!" message that
+     * shows for a second after using the crew station save/load buttons.
+     *
+     * This is called after the tooltip pass (not from drawTopBar) so it
+     * draws on top of them: the message appears just below the buttons,
+     * exactly where the tooltip box sits while the cursor rests on the
+     * button after clicking it.
+     */
+    fun drawCrewStationMessage(g: Graphics) {
+        if (saveCrewPosMessageTimer <= 0f)
+            return
+
+        saveCrewPosMessageTimer -= game.renderingDeltaTime
+
+        val lastCrewBoxY = crewBaseY + (ship.sys.playerCrew.size - 1).coerceAtLeast(0) * CREW_BOX_SPACING
+        val crewSaveLoadY = lastCrewBoxY + 32
+
+        val message = game.translator[saveCrewPosMessageText]
+        oxygenEvadeFont.drawString(11f, crewSaveLoadY + 55f, message, Colour.white)
     }
 
     private fun drawCrewBox(g: Graphics, crew: LivingCrew, x: Int, y: Int) {

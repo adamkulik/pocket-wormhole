@@ -1204,6 +1204,12 @@ public class InGameState extends MainGame.GameState {
         }
         lastFameTooltip = tooltip;
 
+        // The crew station save/load feedback message draws above the
+        // tooltips: it appears just below the station buttons, exactly
+        // where a button's tooltip sits while the cursor rests there -
+        // which on touch is always the case after tapping the button.
+        shipUI.drawCrewStationMessage(g);
+
         g.popTransform();
     }
 
@@ -2136,65 +2142,37 @@ public class InGameState extends MainGame.GameState {
     }
 
     /**
-     * Snapshot of where a crewmember was when the letterbox SAVE button
-     * was pressed. The room may belong to the enemy ship (a boarding
-     * crewmember's "station" is where they were posted there).
-     */
-    private static final class StationSave {
-        final AbstractCrew crew;
-        final Room room;
-
-        StationSave(AbstractCrew crew, Room room) {
-            this.crew = crew;
-            this.room = room;
-        }
-    }
-
-    // Transient - never serialised; Save+Quit / a jump clears it.
-    private final ArrayList<StationSave> savedStations = new ArrayList<>();
-
-    /**
-     * Remember where every living, player-controllable crewmember
-     * currently is, so the RETURN button can send them back here.
+     * The letterbox SAVE/RETURN buttons run EXACTLY the small UI buttons'
+     * code path (PlayerShipUI.saveCrewPositions / loadCrewPositions): the
+     * same saved state (LivingCrew.savedPosition, serialised with the
+     * run) and the same "Stations Saved!" / "Return to Stations!"
+     * feedback toast. The previous letterbox-private StationSave list
+     * duplicated the logic without the feedback.
      */
     public void letterboxSaveStations() {
         if (shipUI != null && shipUI.isWindowOpen())
             return;
 
-        savedStations.clear();
-        for (LivingCrew crew : getPlayerCrew()) {
-            if (!crew.getPlayerControllable())
-                continue;
-            if (crew.getCurrentAction() == AbstractCrew.Action.DYING)
-                continue;
-            savedStations.add(new StationSave(crew, crew.getRoom()));
-        }
+        if (shipUI != null)
+            shipUI.saveCrewPositions();
     }
 
-    /**
-     * Send everyone back to where they were when SAVE was pressed.
-     * Crewmembers whose saved room is on a ship they're no longer aboard
-     * (the enemy died and jumped away, etc.) are skipped.
-     */
+    /** See letterboxSaveStations. */
     public void letterboxReturnStations() {
         if (shipUI != null && shipUI.isWindowOpen())
             return;
 
-        for (StationSave save : savedStations) {
-            AbstractCrew crew = save.crew;
-            if (crew.getCurrentAction() == AbstractCrew.Action.DYING)
-                continue;
-            if (!crew.getPlayerControllable())
-                continue;
-            if (crew.getRoom().getShip() != save.room.getShip())
-                continue;
-            crew.setTargetRoom(save.room);
-        }
+        if (shipUI != null)
+            shipUI.loadCrewPositions();
     }
 
     /** Whether the SAVE button's lit art should show (stations stored). */
     public boolean hasSavedStations() {
-        return !savedStations.isEmpty();
+        for (LivingCrew crew : getPlayerCrew()) {
+            if (crew.getSavedPosition() != null)
+                return true;
+        }
+        return false;
     }
 
     /**
