@@ -1675,7 +1675,12 @@ public class InGameState extends MainGame.GameState {
      * public so that automated tests can call it directly.
      */
     public void checkCrewKillDefeat() {
-        if (enemy == null || !enemyIsHostile)
+        // A dead hull takes precedence: destroying a ship kills its crew
+        // as a side effect, and without this guard the crew-kill defeat
+        // (deadCrew event + derelict) would fire mid-gib-animation and
+        // the destroyed-rewards path (which checks enemyIsHostile) would
+        // never run. The derelict is only for when the hull survives.
+        if (enemy == null || !enemyIsHostile || enemy.isDead())
             return;
 
         boolean anyCrewLeft = enemy.hasCrewOwnedByShip(enemy);
