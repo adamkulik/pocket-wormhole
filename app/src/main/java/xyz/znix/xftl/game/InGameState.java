@@ -767,6 +767,17 @@ public class InGameState extends MainGame.GameState {
                 shakeStrength = 0f;
         }
 
+        // Show the text queued by a stranded-boarding-party rescue
+        // (rescueStuckBoarders) once the dialogue that was open when the
+        // rescue fired has closed. Done here rather than at dialogue-close
+        // time so events which close inside their constructor (the
+        // TRADER_LIST pattern) can't swallow the queued window.
+        if (pendingCrewStuck != null && shipUI != null && !shipUI.isWindowOpen()) {
+            Event crewStuck = pendingCrewStuck;
+            pendingCrewStuck = null;
+            showEventDialogue(crewStuck, Random.Default.nextInt());
+        }
+
         // The game stays frozen while an arrival or jump-out animation
         // plays (issue #4).
         if (!isPaused() && !isJumpAnimationPlaying())
@@ -1335,6 +1346,13 @@ public class InGameState extends MainGame.GameState {
     private float shakeStrength = 0f;
     private boolean arrivalShowBeaconEvent = false;
     private Event arrivalEliteEvent;
+
+    // The CREW_STUCK event, resolved when a stranded boarding party is
+    // rescued (rescueStuckBoarders) while another dialogue is open - shown
+    // once that dialogue closes (see the check in update()). Transient and
+    // never saved: the crew themselves are already home, so losing this to
+    // a save only skips the explanatory text.
+    private Event pendingCrewStuck;
     public Image jumpFlare;   // issue #4: shared by the arrival and jump-away animations
     private static final float ARRIVAL_TIME = 1.4f;
 
@@ -1702,11 +1720,18 @@ public class InGameState extends MainGame.GameState {
                 Event event = eventManager.get("BOSS_AUTOMATED").resolve();
                 showEventDialogue(event, Random.Default.nextInt());
             } else {
+                boolean deadCrewDialogueShown = false;
                 if (enemy.getSpec() != null) {
                     IEvent event = enemy.getSpec().getDeadCrew();
-                    if (event != null)
+                    if (event != null) {
                         showEventDialogue(event.resolve(), Random.Default.nextInt());
+                        deadCrewDialogueShown = true;
+                    }
                 }
+
+                // Vanilla: a boarding party stranded on the derelict by a
+                // broken teleporter takes the enemy ship's shuttle home.
+                rescueStuckBoarders(deadCrewDialogueShown);
 
                 setEnemyIsHostile(false);
 
@@ -1715,6 +1740,63 @@ public class InGameState extends MainGame.GameState {
                 // on the map.
                 currentBeacon.setShip(null);
             }
+        }
+    }
+
+    /**
+     * Vanilla behaviour (pinned from the exe's crew-kill defeat code plus
+     * the wiki's Boarding/Crew Teleporter pages): when the enemy ship is
+     * defeated while the player's teleporter is broken and there are no
+     * crew left on the player ship to repair it, the boarding party takes
+     * one of the enemy ship's shuttles home - they teleport into the
+     * piloting room, and the CREW_STUCK event explains what happened.
+     *
+     * @param dialogueOpen true when the deadCrew rewards dialogue was just
+     *                     opened, in which case the CREW_STUCK text queues
+     *                     behind it instead of replacing it.
+     */
+    private void rescueStuckBoarders(boolean dialogueOpen) {
+        // Vanilla reads the teleporter system's health and requires it to be
+        // 0; a ship without the system at all reads as 0 there too.
+        Teleporter teleporter = player.getTeleporter();
+        if (teleporter != null && !teleporter.getBroken())
+            return;
+
+        // If anyone is home they could repair the teleporter and recall the
+        // boarding party normally, so vanilla leaves them be.
+        if (player.hasCrewOwnedByShip(player))
+            return;
+
+        // Land in the piloting room (vanilla GetSystemRoom(6)). Every
+        // vanilla ship has piloting; the fallback is for modded layouts.
+        Room dest = null;
+        if (player.getPiloting() != null)
+            dest = player.getPiloting().getRoom();
+        if (dest == null)
+            dest = player.getRooms().get(0);
+
+        boolean anyStranded = false;
+        for (AbstractCrew crew : enemy.getCrew()) {
+            // Dying crew finish dying where they are - the clone bay still
+            // catches them (the derelict's hull keeps updating).
+            if (!(crew instanceof LivingCrew) || crew.getCurrentAction() == AbstractCrew.Action.DYING)
+                continue;
+
+            LivingCrew living = (LivingCrew) crew;
+            if (living.getOwnerShip() != player)
+                continue;
+
+            anyStranded = true;
+            living.teleportAnimatedTo(dest);
+        }
+        if (!anyStranded)
+            return;
+
+        Event crewStuck = eventManager.get("CREW_STUCK").resolve();
+        if (dialogueOpen) {
+            pendingCrewStuck = crewStuck;
+        } else {
+            showEventDialogue(crewStuck, Random.Default.nextInt());
         }
     }
 
