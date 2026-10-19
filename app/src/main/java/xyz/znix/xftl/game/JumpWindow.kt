@@ -70,16 +70,43 @@ class JumpWindow(val game: InGameState, showSectorMap: () -> Unit, val jump: (Be
     private val beaconShadow = game.getImg("img/map/map_icon_diamond_shadow.png")
     private val beaconEnvironmentHazard = game.getImg("img/map/map_icon_hazard.png")
 
-    // Nebula puffs (GitHub issue #74): vanilla envelopes each nebula beacon
-    // on the map in one of these soft clouds, making the sector's nebula
-    // areas visible at a glance. The variant is picked per-beacon, so it's
-    // stable between map openings.
-    private val nebulaPuffs = listOf(
+    // Vanilla has two sets of nebula cloud art, and picks between them
+    // based on how many nebula beacons there are in the sector: the small
+    // clouds for sparse nebulae, and the large ones for denser areas
+    // (GitHub issue #141: drawing only the small art per beacon left the
+    // nebula beacons looking like disconnected purple dots).
+    private val nebulaSmallPuffs = listOf(
         game.getImg("img/map/nebula_0.png"),
         game.getImg("img/map/nebula_1.png"),
         game.getImg("img/map/nebula_2.png"),
         game.getImg("img/map/nebula_3.png"),
     )
+    private val nebulaLargePuffs = listOf(
+        game.getImg("img/map/nebula_large_0.png"),
+        game.getImg("img/map/nebula_large_1.png"),
+        game.getImg("img/map/nebula_large_2.png"),
+    )
+
+    private class NebulaCloud(val image: Image, val x: Float, val y: Float)
+
+    private val nebulaClouds: List<NebulaCloud> by lazy { buildNebulaClouds() }
+
+    private fun buildNebulaClouds(): List<NebulaCloud> {
+        val nebulaBeacons = sector.beacons.filter { it.environmentType.isNebula }
+        if (nebulaBeacons.isEmpty())
+            return emptyList()
+
+        val layout = planNebulaClouds(
+            nebulaBeacons.map { it.pos },
+            nebulaSmallPuffs.map { it.imageSize },
+            nebulaLargePuffs.map { it.imageSize },
+        )
+        val images = if (layout.useLargeImages) nebulaLargePuffs else nebulaSmallPuffs
+        return layout.clouds.map {
+            NebulaCloud(images[it.imageIndex], it.x, it.y)
+        }
+    }
+
     private val beaconYellow = game.getImg("img/map/map_icon_diamond_yellow.png")
     private val beaconBlue = game.getImg("img/map/map_icon_diamond_blue.png")
     private val beaconDanger = game.getImg("img/map/map_icon_triangle_red.png")
@@ -207,18 +234,17 @@ class JumpWindow(val game: InGameState, showSectorMap: () -> Unit, val jump: (Be
         mapBase.x = position.x + Sector.OFFSET.x
         mapBase.y = position.y + Sector.OFFSET.y
 
-        // Draw the nebula cloud puffs first, as one layer below everything
-        // else (GitHub issues #74 and #146). Vanilla draws the whole nebula
-        // layer immediately after the map background, before the beacon
-        // connections, icons and labels, so a cloud can never paint over
-        // another beacon's label - most visibly the green EXIT pill when
-        // the exit beacon sits in column 4/5 and a nebula beacon happens to
-        // be to its right (issue #146).
+        // Draw the nebula layer first, as one layer below everything
+        // else (GitHub issues #74, #146 and #141). Vanilla draws the whole
+        // nebula layer immediately after the map background, before the
+        // beacon connections, icons and labels, so a cloud can never paint
+        // over another beacon's label - most visibly the green EXIT pill
+        // when the exit beacon sits in column 4/5 and a nebula beacon
+        // happens to be to its right (issue #146).
         //
-        // Each nebula beacon gets one of these soft clouds so the sector's
-        // nebula areas stand out on the map - AND the little blue glow oval
-        // is kept underneath (the user spotted the missing indicator against
-        // vanilla; the clouds alone read wrong). Blue first, cloud on top.
+        // The little blue glow oval is kept under every nebula beacon (the
+        // user spotted the missing indicator against vanilla; the clouds
+        // alone read wrong). Blue first, then the clouds on top.
         for (beacon in sector.beacons) {
             if (!beacon.environmentType.isNebula)
                 continue
@@ -227,10 +253,14 @@ class JumpWindow(val game: InGameState, showSectorMap: () -> Unit, val jump: (Be
 
             g.colour = Constants.BEACON_NEBULA_CIRCLE
             g.fillOval(centrePos.x - 9f, centrePos.y - 9f, 20f, 20f)
-            val puff = nebulaPuffs[(beacon.pos.x * 31 + beacon.pos.y * 17).mod(nebulaPuffs.size)]
-            puff.draw(
-                centrePos.x - puff.width / 2f, centrePos.y - puff.height / 2f
-            )
+        }
+
+        // The pre-generated nebula clouds overlap each other and span
+        // neighbouring nebula beacons, forming the same connected cloud
+        // masses as vanilla (see planNebulaClouds). Small art for sparse
+        // nebulae, large for dense ones - vanilla's own rule.
+        for (cloud in nebulaClouds) {
+            cloud.image.draw(mapBase.x + cloud.x, mapBase.y + cloud.y)
         }
 
         // In the last stand, the danger stripes sit behind everything else.
