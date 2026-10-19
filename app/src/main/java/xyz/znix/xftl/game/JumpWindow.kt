@@ -340,7 +340,8 @@ class JumpWindow(val game: InGameState, showSectorMap: () -> Unit, val jump: (Be
             }
 
             // Draw the player ship rotating around the beacon.
-            val rotationSpeed = TWO_PI / 20f // Go around every 20 seconds
+            // Graphics.rotate takes degrees, so this is degrees/second.
+            val rotationSpeed = MAP_ICON_ROTATION_SPEED // Go around every 20 seconds
             if (beacon == game.currentBeacon) {
                 val icon = when (fuelDistressFlashOn) {
                     true -> playerShipNoFuel

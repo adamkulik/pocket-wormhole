@@ -13,6 +13,17 @@ const val PIf = PI.toFloat()
 const val TWO_PI = 2 * PIf
 
 /**
+ * How fast the player and flagship icons orbit the beacon they're sitting on
+ * on the jump map, in degrees per second - one full orbit every 20 seconds.
+ *
+ * This is in DEGREES because [xyz.znix.xftl.rendering.Graphics.rotate] takes
+ * degrees. It used to be written as TWO_PI / 20f, which the rendering code
+ * interpreted as degrees and made the icons circle once every ~19 minutes,
+ * so they looked completely static (GitHub issue #148).
+ */
+const val MAP_ICON_ROTATION_SPEED = 360f / 20f
+
+/**
  * A [Random] instance for use in purely visual stuff.
  *
  * This makes it easier to find un-seeded random usages, in the effort

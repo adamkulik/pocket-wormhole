@@ -169,7 +169,8 @@ class FlagshipBoss private constructor(val sector: Sector, val game: InGameState
     }
 
     override fun drawMapIcon(g: Graphics, centre: IPoint) {
-        val rotationSpeed = TWO_PI / 20f // Go around every 20 seconds
+        // Graphics.rotate takes degrees, so this is degrees/second.
+        val rotationSpeed = MAP_ICON_ROTATION_SPEED // Go around every 20 seconds
         mapIconRotation += game.renderingDeltaTime * rotationSpeed
 
         // These offsets are approximate.
