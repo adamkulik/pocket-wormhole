@@ -223,7 +223,15 @@ class FriendlyCrewAI(private val ship: Ship) {
         // If our boarders on the enemy ship are low on health, teleport them back.
         // Do this first, so receiving low-health crew takes priority over
         // sending more when the teleporter comes off cooldown.
-        doTeleportRecv(teleportForceRecv)
+        //
+        // This is the AI ship's behaviour only: in vanilla the player always
+        // controls their own teleporter, and their boarding party never
+        // auto-recalls however low their health gets (GitHub issue #162).
+        // The check is here rather than inside doTeleportRecv because a
+        // hacked player teleporter can force a recall (handled separately).
+        if (!ship.isPlayerShip) {
+            doTeleportRecv(teleportForceRecv)
+        }
 
         // If the crew are ready, activate the teleporter.
         if (teleportSend) {
