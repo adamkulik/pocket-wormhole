@@ -40,6 +40,12 @@ class FlagshipBoss private constructor(val sector: Sector, val game: InGameState
     private var stage: Int = 1
 
     /**
+     * The stage-2 Power Surge (GitHub issue #176). Null on the other
+     * stages - stage 3's surge is the separate laser barrage.
+     */
+    private var powerSurge: PowerSurge? = null
+
+    /**
      * The flagship from the player's last visit, if they jumped away from the
      * fight mid-stage. Vanilla keeps the flagship's damage and remaining crew
      * between retreats - only a destroyed stage rebuilds it (GitHub issue
@@ -88,6 +94,11 @@ class FlagshipBoss private constructor(val sector: Sector, val game: InGameState
         stashedShip?.let {
             stashedShip = null
             applyStageSuperShield(it)
+
+            // The surge split is re-rolled when the player returns (FTL
+            // wiki: the split stays fixed "unless you jump away and come
+            // back").
+            powerSurge = if (stage == 2) PowerSurge(game, it) else null
             return it
         }
 
@@ -121,7 +132,26 @@ class FlagshipBoss private constructor(val sector: Sector, val game: InGameState
         val event: Event = game.eventManager["BOSS_TEXT_$stage"].resolve()
         game.shipUI.showEventDialogue(event, nextInt())
 
+        powerSurge = if (stage == 2) PowerSurge(game, flagship) else null
         return flagship
+    }
+
+    override fun update(dt: Float) {
+        // Only tick while this flagship is the ship the player is fighting.
+        val enemy = game.enemy ?: return
+        if (enemy.boss !== this)
+            return
+
+        // A savegame loaded mid-fight has no PowerSurge instance yet
+        // (createShip isn't called on load).
+        if (powerSurge == null && stage == 2)
+            powerSurge = PowerSurge(game, enemy)
+
+        powerSurge?.update(dt)
+    }
+
+    override fun drawWarnings(g: Graphics) {
+        powerSurge?.renderWarning(g)
     }
 
     override fun drawMapIcon(g: Graphics, centre: IPoint) {
@@ -183,6 +213,8 @@ class FlagshipBoss private constructor(val sector: Sector, val game: InGameState
     override fun bossShipKilled(enemy: Ship) {
         // The stage was destroyed - the next one is a fresh ship.
         stashedShip = null
+        powerSurge = null
+        enemy.clearSuperDrones()
 
         updateNextBeacon()
 

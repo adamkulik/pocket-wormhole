@@ -8,6 +8,7 @@ import xyz.znix.xftl.augments.AugmentBlueprint
 import xyz.znix.xftl.crew.*
 import xyz.znix.xftl.drones.AbstractExternalDrone
 import xyz.znix.xftl.drones.AbstractIndoorsDrone
+import xyz.znix.xftl.drones.SuperDrone
 import xyz.znix.xftl.game.*
 import xyz.znix.xftl.hangar.EditableShip
 import xyz.znix.xftl.hangar.FinalisedEditableSystem
@@ -181,6 +182,17 @@ class Ship(
      * around this ship.
      */
     val externalDrones = ArrayList<AbstractExternalDrone>()
+
+    /**
+     * The drones deployed by the flagship's stage-2 Power Surge, if this is
+     * the flagship. Vanilla keeps these in a separate `superDrones` list on
+     * the ship rather than the drone system's slots - they need no power or
+     * drone parts and are unaffected by hacking (GitHub issue #176).
+     *
+     * They're owned by this ship but fly around (and are rendered by) the
+     * enemy ship, exactly like regular combat drones.
+     */
+    val superDrones = ArrayList<SuperDrone>()
 
     /**
      * The AI that controls friendly (non-intruder) crew on this ship.
@@ -988,7 +1000,15 @@ class Ship(
 
         updateExterior(dt)
 
+        // Power-surge drones are updated by their owner rather than the
+        // Drones system, since they don't occupy one of its slots.
+        for (drone in superDrones.toTypedArray())
+            drone.update(dt)
+
         if (isDead) {
+            // Vanilla clears `superDrones` when their owner is destroyed.
+            clearSuperDrones()
+
             if (!destructionSoundPlayed) {
                 destructionSoundPlayed = true
 
@@ -1502,6 +1522,10 @@ class Ship(
         // Remove all incoming and outgoing projectiles
         projectiles.clear()
 
+        // Clear the power-surge drones (they belong to the fight we're
+        // leaving, not the one we're arriving at).
+        clearSuperDrones()
+
         // Get rid of any drones orbiting us
         externalDrones.clear()
 
@@ -1960,6 +1984,17 @@ class Ship(
         return floating
     }
 
+    /**
+     * Remove every power-surge drone this ship has deployed, without a
+     * cooldown or death handling - vanilla clears `superDrones` when the
+     * fight ends (GitHub issue #176).
+     */
+    fun clearSuperDrones() {
+        for (drone in superDrones)
+            drone.removeInstance()
+        superDrones.clear()
+    }
+
     fun enemyShipUpdated() {
         drones?.enemyShipUpdated()
 
@@ -2113,6 +2148,14 @@ class Ship(
         for (drone in externalDrones) {
             // Skip drones that are left over from a now-destroyed fight
             if (!sys.isShipPresent(drone.ownerShip))
+                continue
+
+            // Power-surge drones are transient hazard spawns, like
+            // vanilla's superDrones - they don't need serialising (they
+            // disappear after two shots and the next surge spawns new
+            // ones), and reloading them as ordinary CombatDrones would
+            // leave them flying around forever.
+            if (drone is SuperDrone)
                 continue
 
             val droneElem = Element("drone")

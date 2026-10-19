@@ -1191,6 +1191,10 @@ public class InGameState extends MainGame.GameState {
         // Draw the ASB HUD danger icon + warning banner (issue #77).
         asb.renderWarnings(g);
 
+        // Boss HUD warnings (the flagship's "POWER SURGE DETECTED").
+        if (enemy != null && enemy.getBoss() != null)
+            enemy.getBoss().drawWarnings(g);
+
         // Draw the paused text before the UI, so the UI goes on top.
         if (paused) {
             Image pauseImg = getImg("img/Text_pause2.png");
@@ -1296,6 +1300,11 @@ public class InGameState extends MainGame.GameState {
 
         if (enemy != null) {
             enemy.update(dt);
+
+            // Boss hazards, such as the flagship's stage-2 Power Surge
+            // (GitHub issue #176), tick on game time.
+            if (enemy.getBoss() != null)
+                enemy.getBoss().update(dt);
 
             // Since we try and limit direct communications between
             // the ships, pass information about the cloak status back

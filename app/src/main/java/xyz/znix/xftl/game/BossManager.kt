@@ -79,6 +79,19 @@ interface BossManager : ISerialReferencable {
     fun bossShipKilled(enemy: Ship)
 
     /**
+     * Tick any per-fight boss hazards (the flagship's Power Surge). Called
+     * only while this boss's ship is the current enemy and the game isn't
+     * paused.
+     */
+    fun update(dt: Float) {}
+
+    /**
+     * Draw any boss-specific HUD warnings (the flagship's power-surge
+     * banner).
+     */
+    fun drawWarnings(g: Graphics) {}
+
+    /**
      * Park a ship the player just jumped away from mid-fight, so it can be
      * restored (with its damage and surviving crew) if they return. Vanilla
      * preserves the flagship's state between retreats (GitHub issue #86).

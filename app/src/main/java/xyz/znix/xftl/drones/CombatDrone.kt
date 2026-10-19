@@ -13,7 +13,7 @@ import xyz.znix.xftl.weapons.BeamBlueprint
 import xyz.znix.xftl.weapons.DroneBlueprint
 import xyz.znix.xftl.weapons.IRoomTargetingWeapon
 
-class CombatDrone(type: DroneBlueprint) : AbstractExternalDrone(type, true) {
+open class CombatDrone(type: DroneBlueprint) : AbstractExternalDrone(type, true) {
     override val flightController = CombatFlightController(this)
 
     private lateinit var offImage: Image
@@ -100,6 +100,7 @@ class CombatDrone(type: DroneBlueprint) : AbstractExternalDrone(type, true) {
 
                 if (targetHostile) {
                     fire()
+                    onFiredAtTarget()
                     pickNewTarget()
                 }
             }
@@ -127,6 +128,17 @@ class CombatDrone(type: DroneBlueprint) : AbstractExternalDrone(type, true) {
     private fun onReachedDestination() {
         fireTimer = 0.5f
         flightController.paused = true
+    }
+
+    /**
+     * Called once per attack cycle, after the drone has fired - or tried to
+     * fire while its target is cloaked, which vanilla counts as one of its
+     * shots (see [SuperDrone]).
+     *
+     * Used by the flagship's power-surge drones, which disappear after two
+     * shots (GitHub issue #176).
+     */
+    protected open fun onFiredAtTarget() {
     }
 
     private fun fire() {
