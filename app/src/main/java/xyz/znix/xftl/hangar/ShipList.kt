@@ -19,12 +19,28 @@ class ShipList(private val state: SelectShipState, private val close: (LazyShipB
 
     private val title = state.translator["shiplist_title"]
 
+    private val lockIcon = state.getImg("img/customizeUI/box_lock_on.png")
+    private val hintFont = state.font
+
     private val ships: List<LazyShipBlueprint>
+
+    /**
+     * The names of the ship blueprints that the player hasn't unlocked
+     * yet. These are still listed (vanilla shows every ship), but are
+     * drawn darkened with a padlock and can't be selected.
+     */
+    private val lockedShips: Set<String>
 
     private var offsetY: Int = 0
     private var maxY: Int = 0
 
     private var hovered: LazyShipBlueprint? = null
+
+    /**
+     * The locked ship the mouse is currently over, if any. This is used
+     * to show its unlock hint at the bottom of the window.
+     */
+    private var hoveredLocked: LazyShipBlueprint? = null
 
     init {
         // Ships in families only get the A variant, other (modded in) ships
@@ -32,6 +48,8 @@ class ShipList(private val state: SelectShipState, private val close: (LazyShipB
         val nonFamilyShips = state.ships.filter { !state.shipFamilies.byShipId.containsKey(it.name) }
         val aVariants = state.shipFamilies.families.map { family -> state.ships.first { it.name == family.ships[0] } }
         ships = aVariants + nonFamilyShips
+
+        lockedShips = ships.filter { !state.isShipUnlocked(it.name) }.map { it.name }.toSet()
     }
 
     fun draw(container: GameContainer, g: Graphics) {
@@ -49,7 +67,8 @@ class ShipList(private val state: SelectShipState, private val close: (LazyShipB
         val textWidth = titleFont.getWidth(title)
         val titleTabWidth = startWidth + textWidth + endWidth
 
-        val shipName = hovered?.shipClass?.let { state.translator[it] } ?: hovered?.name
+        val shipName = (hovered ?: hoveredLocked)?.shipClass?.let { state.translator[it] }
+            ?: (hovered ?: hoveredLocked)?.name
         val shipNameWidth = shipName?.let { titleFont.getWidth(it) } ?: 0
         val shipNameTabWidth = startWidth + shipNameWidth + endWidth
         val shipNameX = pos.x + size.x + 7 - shipNameTabWidth
@@ -87,6 +106,44 @@ class ShipList(private val state: SelectShipState, private val close: (LazyShipB
             // Space by endWidth, since it's the left-most one
             titleFont.drawString(shipNameX + endWidth.f, pos.y + 24f, shipName, Constants.JUMP_DISABLED_TEXT)
         }
+
+        drawUnlockHint(g)
+    }
+
+    /**
+     * Draw the unlock hint for a locked ship the mouse is hovering over.
+     *
+     * In vanilla the ship list shows every ship, and hovering a locked one
+     * shows how to unlock it rather than the ship's description - the hint
+     * text comes from the blueprint's `<unlock>` element.
+     */
+    private fun drawUnlockHint(g: Graphics) {
+        val ship = hoveredLocked ?: return
+        val hint = ship.unlockText?.let { state.translator[it] } ?: return
+
+        // Wrap the text to fit inside the window.
+        val maxWidth = size.x - 80
+        val lines = ArrayList<String>()
+        var line = ""
+        for (word in hint.split(' ')) {
+            val candidate = if (line.isEmpty()) word else "$line $word"
+            if (line.isNotEmpty() && hintFont.getWidth(candidate) > maxWidth) {
+                lines.add(line)
+                line = word
+            } else {
+                line = candidate
+            }
+        }
+        if (line.isNotEmpty()) lines.add(line)
+
+        // Anchor the text to the bottom of the window.
+        val lineHeight = 14
+        var y = pos.y + size.y - 20 - (lines.size - 1) * lineHeight
+        for (text in lines) {
+            val x = pos.x + (size.x - hintFont.getWidth(text)) / 2
+            hintFont.drawString(x.f, y.f, text, Colour.white)
+            y += lineHeight
+        }
     }
 
     private fun drawBody(g: Graphics) {
@@ -97,6 +154,7 @@ class ShipList(private val state: SelectShipState, private val close: (LazyShipB
         val cellHeight = 120
 
         hovered = null
+        hoveredLocked = null
 
         for (ship in ships) {
             val x = pos.x + 30 + col * cellWidth
@@ -106,7 +164,18 @@ class ShipList(private val state: SelectShipState, private val close: (LazyShipB
             // hopefully shouldn't be any.
             val miniPath = "img/customizeUI/miniship_${ship.img}.png"
             val img = state.getImgOrNull(miniPath) ?: continue
-            img.draw(x, y)
+
+            // Locked ships are still listed (vanilla shows all of them),
+            // but they're darkened, have a padlock over them, and can't be
+            // selected.
+            val locked = ship.name in lockedShips
+            img.draw(x.f, y.f, if (locked) LOCKED_TINT else Colour.white)
+            if (locked) {
+                lockIcon.draw(
+                    x + (img.width - lockIcon.width) / 2,
+                    y + (img.height - lockIcon.height) / 2
+                )
+            }
 
             col++
             if (x + 200 + img.width > pos.x + size.x) {
@@ -123,7 +192,11 @@ class ShipList(private val state: SelectShipState, private val close: (LazyShipB
                 state.mousePos.x - pos.x in 0..size.x && state.mousePos.y - pos.y in 0..size.y &&
                 state.mousePos.x - x in 0..cellWidth && state.mousePos.y - y in 0..cellHeight
             ) {
-                hovered = ship
+                if (locked) {
+                    hoveredLocked = ship
+                } else {
+                    hovered = ship
+                }
             }
         }
     }
@@ -149,5 +222,10 @@ class ShipList(private val state: SelectShipState, private val close: (LazyShipB
             return
         }
         offsetY = (offsetY - change / 5).coerceIn(0..maxScroll)
+    }
+
+    companion object {
+        /** How much to darken a locked ship's miniship image. */
+        private val LOCKED_TINT = Colour(0.3f, 0.3f, 0.3f, 1f)
     }
 }

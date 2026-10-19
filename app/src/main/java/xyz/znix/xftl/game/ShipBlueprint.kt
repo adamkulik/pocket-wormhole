@@ -30,6 +30,13 @@ class ShipBlueprint(private val elem: Element, df: Datafile) : Blueprint(elem) {
      */
     val shipTitle: GameText? = elem.getGameTextChild("name")
 
+    /**
+     * The localisation key of the hint shown in the hangar while this layout
+     * is still locked, eg "Learn from the Zoltan that sometimes diplomacy
+     * works." Vanilla's `<unlock>` element.
+     */
+    val unlockText: GameText? = elem.getGameTextChild("unlock")
+
     val weaponSlots: Int? = elem.getChildTextTrim("weaponSlots")?.toInt()
     val droneSlots: Int? = elem.getChildTextTrim("droneSlots")?.toInt()
 

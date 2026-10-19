@@ -307,4 +307,5 @@ class LazyShipBlueprint(
     val img: String = elem.getAttributeValue("img")
     val shipClass: GameText? = elem.getGameTextChild("class")
     val shipTitle: GameText? = elem.getGameTextChild("name")
+    val unlockText: GameText? = elem.getGameTextChild("unlock")
 }

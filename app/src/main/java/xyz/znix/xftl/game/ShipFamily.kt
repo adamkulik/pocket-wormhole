@@ -17,6 +17,21 @@ class ShipFamily(elem: Element) {
         achievements = elem.getChildren("ach").map { it.getAttributeValue("id") }
     }
 
+    /**
+     * Whether the player can select this family in the hangar.
+     *
+     * Families without an [unlockId] (such as the Kestrel) are available
+     * from the start. The rest are unlocked by their quest event - the
+     * event has an `<unlockShip id="..."/>` element, which the
+     * [DialogueWindow] records in the profile.
+     */
+    fun isUnlocked(profile: SaveProfile): Boolean {
+        if (unlockId == null)
+            return true
+
+        return profile.getShipUnlock(this) != null
+    }
+
     class FamilyTable(doc: Document) {
         val families: List<ShipFamily>
         val byShipId: Map<String, ShipFamily>

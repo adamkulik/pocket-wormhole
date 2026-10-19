@@ -111,7 +111,7 @@ class SelectShipState(private val datafile: Datafile, private val main: MainGame
 
         shipSelector = SpecDeserialiser(uiProvider).load("ship_list_abc").mainWidget
 
-        shipSelector.addButtonListener("random") { selectShip(ships.random().real) }
+        shipSelector.addButtonListener("random") { selectShip(randomUnlockedShip()) }
 
         shipSelector.addButtonListener("type_a") { selectShipVariant(0) }
         shipSelector.addButtonListener("type_b") { selectShipVariant(1) }
@@ -129,7 +129,7 @@ class SelectShipState(private val datafile: Datafile, private val main: MainGame
             }
         }
 
-        selectShip(ships.first { it.name == shipFamilies.families.first().ships[0] }.real)
+        selectShip(ships.firstOrNull { isShipUnlocked(it.name) }?.real ?: ships.first().real)
     }
 
     override fun shutdown() {
@@ -325,7 +325,7 @@ class SelectShipState(private val datafile: Datafile, private val main: MainGame
                 // Disable to prevent clicking, but still show as selected.
                 button.forceSelected = true
                 button.disabled = true
-            } else if (family == null || !variantExists) {
+            } else if (family == null || !variantExists || !isFamilyUnlocked(family)) {
                 button.forceSelected = false
                 button.disabled = true
             } else {
@@ -344,12 +344,36 @@ class SelectShipState(private val datafile: Datafile, private val main: MainGame
      */
     private fun selectShipVariant(index: Int) {
         val family = shipFamilies.byShipId[current.baseBlueprint] ?: return
+        if (!isFamilyUnlocked(family)) return
+
         val shipId = family.ships.getOrNull(index) ?: return
 
         val blueprint = ships.firstOrNull { it.name == shipId } ?: return
         selectShip(blueprint.real)
     }
 
+    /**
+     * Whether the player has unlocked the ship family of the given
+     * blueprint. Ships not belonging to a family (modded-in layouts) are
+     * always available.
+     */
+    fun isShipUnlocked(shipName: String): Boolean {
+        val family = shipFamilies.byShipId[shipName] ?: return true
+        return isFamilyUnlocked(family)
+    }
+
+    fun isFamilyUnlocked(family: ShipFamily): Boolean {
+        return family.isUnlocked(main.profile)
+    }
+
+    /**
+     * Pick a random ship for the "random" button, among the ones the
+     * player has actually unlocked.
+     */
+    private fun randomUnlockedShip(): ShipBlueprint {
+        val unlocked = ships.filter { isShipUnlocked(it.name) }
+        return (unlocked.ifEmpty { ships }).random().real
+    }
     private inner class ShipSelectUIProvider : UIProvider {
         override fun getFont(name: String): SILFontLoader {
             return this@SelectShipState.getFont(name)
