@@ -207,6 +207,32 @@ class JumpWindow(val game: InGameState, showSectorMap: () -> Unit, val jump: (Be
         mapBase.x = position.x + Sector.OFFSET.x
         mapBase.y = position.y + Sector.OFFSET.y
 
+        // Draw the nebula cloud puffs first, as one layer below everything
+        // else (GitHub issues #74 and #146). Vanilla draws the whole nebula
+        // layer immediately after the map background, before the beacon
+        // connections, icons and labels, so a cloud can never paint over
+        // another beacon's label - most visibly the green EXIT pill when
+        // the exit beacon sits in column 4/5 and a nebula beacon happens to
+        // be to its right (issue #146).
+        //
+        // Each nebula beacon gets one of these soft clouds so the sector's
+        // nebula areas stand out on the map - AND the little blue glow oval
+        // is kept underneath (the user spotted the missing indicator against
+        // vanilla; the clouds alone read wrong). Blue first, cloud on top.
+        for (beacon in sector.beacons) {
+            if (!beacon.environmentType.isNebula)
+                continue
+
+            val centrePos = mapBase + beacon.pos
+
+            g.colour = Constants.BEACON_NEBULA_CIRCLE
+            g.fillOval(centrePos.x - 9f, centrePos.y - 9f, 20f, 20f)
+            val puff = nebulaPuffs[(beacon.pos.x * 31 + beacon.pos.y * 17).mod(nebulaPuffs.size)]
+            puff.draw(
+                centrePos.x - puff.width / 2f, centrePos.y - puff.height / 2f
+            )
+        }
+
         // In the last stand, the danger stripes sit behind everything else.
         // TODO draw the player and boss ships below this.
         if (sector.isLastStand) {
@@ -260,21 +286,6 @@ class JumpWindow(val game: InGameState, showSectorMap: () -> Unit, val jump: (Be
             val isNeighbour = neighbourVisSet.contains(beacon)
             val showBasicInfo = beacon.visited || sector.mapRevealed || isNeighbour
             val showAdvInfo = beacon.visited || sector.mapRevealed || (isNeighbour && hasLRS)
-
-            // Draw the nebula cloud puffs under nebulas (GitHub issue #74):
-            // vanilla envelopes each nebula beacon in one of these soft
-            // clouds so the sector's nebula areas stand out on the map —
-            // AND it keeps the little blue glow oval underneath (the user
-            // spotted the missing indicator against vanilla; the clouds
-            // alone read wrong). Blue first, cloud on top.
-            if (beacon.environmentType.isNebula) {
-                g.colour = Constants.BEACON_NEBULA_CIRCLE
-                g.fillOval(centrePos.x - 9f, centrePos.y - 9f, 20f, 20f)
-                val puff = nebulaPuffs[(beacon.pos.x * 31 + beacon.pos.y * 17).mod(nebulaPuffs.size)]
-                puff.draw(
-                    centrePos.x - puff.width / 2f, centrePos.y - puff.height / 2f
-                )
-            }
 
             if (showAdvInfo && beacon.environmentType.isDangerous) {
                 beaconEnvironmentHazard.draw(pos.x - 5, pos.y - 5)
