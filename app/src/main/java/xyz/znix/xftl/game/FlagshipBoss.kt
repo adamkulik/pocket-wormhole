@@ -197,8 +197,14 @@ class FlagshipBoss private constructor(val sector: Sector, val game: InGameState
             jumping = true
         }
 
-        if (stage == 3) {
-            game.shipUI.showGameOverScreen(GameOverWindow.Outcome.WIN)
+
+        if (isFinalStage(stage)) {
+            // The retail game shows no BOSS_DESTROYED dialogue here: the
+            // credits (vanilla's thank-you blurb and the backer roll) run
+            // straight after the explosion, followed by the victory screen.
+            // The run is over at this point, so the port deletes its save.
+            game.markRunEnded()
+            game.shipUI.showVictoryCredits()
         } else {
             stage++
 
@@ -287,6 +293,17 @@ class FlagshipBoss private constructor(val sector: Sector, val game: InGameState
         jumping = false
     }
 
+    /**
+     * Debug/testing hook: jump straight to the given stage, so the later
+     * stages can be tested without playing through the earlier ones. Any
+     * ship stashed from a previous retreat is discarded so the selected
+     * stage spawns fresh.
+     */
+    fun debugSetStage(stage: Int) {
+        this.stage = stage.coerceIn(1, FINAL_STAGE)
+        stashedShip = null
+    }
+
     override fun saveToXML(elem: Element, refs: ObjectRefs) {
         SaveUtil.addAttrRef(elem, "beacon", refs, beacon)
         SaveUtil.addAttrRef(elem, "next", refs, nextBeacon)
@@ -364,6 +381,16 @@ class FlagshipBoss private constructor(val sector: Sector, val game: InGameState
         fun createForDeserialisation(sector: Sector, game: InGameState): FlagshipBoss {
             return FlagshipBoss(sector, game)
         }
+
+        /**
+         * The number of stages the vanilla flagship is fought over. Only
+         * destroying the last one wins the game (GitHub issue #178).
+         */
+        internal const val FINAL_STAGE = 3
+
+
+        /** True if destroying the given stage ends the game in victory. */
+        internal fun isFinalStage(stage: Int): Boolean = stage >= FINAL_STAGE
 
         private const val LASER_WEAPON_NAME = "ARTILLERY_BOSS_1"
         private const val MISSILE_WEAPON_NAME = "ARTILLERY_BOSS_2"

@@ -433,8 +433,14 @@ class DebugCommands(console: DebugConsole) : ConsoleCommandProvider(console) {
     }
 
     @ConsoleCommand(name = "boss")
-    @CmdHelp("Spawn the sector boss (flagship) at the current beacon")
-    private fun cmdBoss() {
+    @CmdHelp("Spawn the sector boss (flagship) at the current beacon, optionally choosing its stage (1-3)")
+    private fun cmdBoss(@CmdVarArg args: List<String>) {
+        val stage = if (args.isEmpty()) null else args.joinToString(" ").trim().toIntOrNull()
+        if (args.isNotEmpty() && (stage == null || stage !in 1..FlagshipBoss.FINAL_STAGE)) {
+            addLine("Usage: boss [stage ${1..FlagshipBoss.FINAL_STAGE}]")
+            return
+        }
+
         val sector = game.currentBeacon.sector
         val boss = sector.bosses.firstOrNull() as? FlagshipBoss ?: run {
             val created = FlagshipBoss(sector, game, game.currentBeacon)
@@ -442,8 +448,15 @@ class DebugCommands(console: DebugConsole) : ConsoleCommandProvider(console) {
             created
         }
 
+        // Choosing the stage makes the flagship's later stages testable
+        // without playing through them (GitHub issue #178).
+        if (stage != null) {
+            boss.debugSetStage(stage)
+        }
+
         boss.debugTeleportTo(game.currentBeacon)
-        addLine("Flagship placed at the current beacon - jump away and back to fight it.")
+        val stageText = if (stage == null) "" else " (stage $stage)"
+        addLine("Flagship$stageText placed at the current beacon - jump away and back to fight it.")
     }
 
     @ConsoleCommand(name = "kill-ecrew")

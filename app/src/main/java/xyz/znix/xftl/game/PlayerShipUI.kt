@@ -2816,6 +2816,15 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
 
         currentWindow = GameOverWindow(game, outcome)
     }
+    /**
+     * Show vanilla's ending credits (thank-you blurb + backer roll), then
+     * the victory screen once they finish (GitHub issue #178).
+     */
+    fun showVictoryCredits() {
+        currentWindow = VictoryCreditsWindow(game) {
+            showGameOverScreen(GameOverWindow.Outcome.WIN)
+        }
+    }
 
     fun getCurrentCursor(): Cursor {
         // Use the hacking/teleport/mind control cursor
