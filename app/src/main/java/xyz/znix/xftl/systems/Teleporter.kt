@@ -207,6 +207,77 @@ class Teleporter(blueprint: SystemBlueprint) : MainSystem(blueprint) {
         commandedTeleport = TeleportAction(room, send)
     }
 
+    /**
+     * The effect of an enemy hacking pulse disrupting this Teleporter
+     * (GitHub issue #164; wiki Hacking, Crew Teleporter): the teleporter is
+     * forced to recall its own crew from the other ship. In other words, if
+     * the enemy hacks your teleporter, your boarding party is sent back
+     * home - and if you hack theirs, their boarders are ejected from your
+     * ship.
+     *
+     * Vanilla rules (wiki Hacking / Crew Teleporter):
+     * - "Forcibly recalls hostile boarders, putting the system on cooldown
+     *   if anyone was successfully recalled."
+     * - "Does not retrieve crew from a cloaked ship."
+     * - "Depowering a hacked Teleporter system will prevent sending your
+     *   crew back by the enemy hacking pulse" - hence the power check here,
+     *   at the start of the pulse.
+     * - "Can retrieve up to 4 crew from the enemy ship."
+     *
+     * Mind control: crew belong to whichever ship is controlling them, so
+     * enemy crew the hacker has mind-controlled are recalled to the hacker's
+     * ship ("when your teleporter is hacked, it will abduct enemy crew that
+     * you have mind-controlled on the enemy ship"). Crew on the teleporter's
+     * own ship are never considered - they're already home.
+     */
+    fun hackedDisrupt(hacker: Ship) {
+        // A depowered teleporter can't recall anyone, and doesn't go on
+        // cooldown either (wiki).
+        if (powerSupplied == 0)
+            return
+
+        // Zoltan shields and cloaking both block teleportation.
+        if (hacker.isCloakActive || hacker.superShield > 0)
+            return
+
+        var ourCrew = hacker.crew
+            .filterIsInstance<LivingCrew>()
+            .filter { belongsToShip(it) }
+
+        // A teleporter can only retrieve four crew at a time - the same
+        // limit the normal receive path applies.
+        if (ourCrew.size > 4) {
+            ourCrew = ourCrew.shuffled().subList(0, 4)
+        }
+
+        // No cooldown if we didn't actually bring anyone back.
+        if (ourCrew.isEmpty())
+            return
+
+        for (crew in ourCrew) {
+            crew.teleportAnimatedTo(room!!)
+        }
+
+        teleportSound.play()
+
+        // Ion-stun for 20s at 1 power, 15s at 2, and 10s at 3 - the same
+        // cooldown a normal teleport applies.
+        ionTimer += cooldownTime(powerSupplied).f
+        onCooldown = true
+    }
+
+    /**
+     * True if the given crewmember belongs to this teleporter's ship.
+     *
+     * Mind-controlled crew follow their controller (vanilla: the teleporter
+     * abduction rule), so the owner ship is only consulted when the
+     * crewmember isn't under mind control.
+     */
+    private fun belongsToShip(crew: LivingCrew): Boolean {
+        val controller = crew.mindControlledBy
+        return if (controller != null) controller == ship.mindControl else crew.ownerShip == ship
+    }
+
     // Surprisingly, we have very little to serialise - the crew
     // handle their teleportation state themselves, and our cooldown
     // is handled via ion damage.

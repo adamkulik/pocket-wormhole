@@ -281,10 +281,12 @@ class Hacking(blueprint: SystemBlueprint) : MainSystem(blueprint) {
 
         // The pulse also applies per-system disruption effects (wiki
         // Hacking): mind control turns a random enemy crew into an ally,
-        // and a hacking-vs-hacking pulse can destroy the attached drone.
+        // a hacking-vs-hacking pulse can destroy the attached drone, and
+        // a teleporter forcibly recalls its owner's boarders.
         when (val target = projectile?.target?.system) {
             is MindControl -> target.hackedDisrupt(ship)
             is Hacking -> target.hackedPulseDestroyDrone(powerSupplied)
+            is Teleporter -> target.hackedDisrupt(ship)
         }
 
         startSound.play()
