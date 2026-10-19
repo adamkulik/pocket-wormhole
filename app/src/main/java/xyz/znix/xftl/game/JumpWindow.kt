@@ -63,6 +63,10 @@ class JumpWindow(val game: InGameState, showSectorMap: () -> Unit, val jump: (Be
     private val fleetControlImg = game.getImg("img/map/map_warningcircle.png")
     private val fleetControlTile = game.getImg("img/map/map_warningcircle_tile.png")
 
+    // The last stand's "turns until the base is destroyed" panel.
+    private val bossJumpsBox = game.getImg("img/map/boss_jumps_box.png")
+    private val bossJumpsNumberFont = game.getFont("num_font")
+
     private val beaconShadow = game.getImg("img/map/map_icon_diamond_shadow.png")
     private val beaconEnvironmentHazard = game.getImg("img/map/map_icon_hazard.png")
 
@@ -393,6 +397,80 @@ class JumpWindow(val game: InGameState, showSectorMap: () -> Unit, val jump: (Be
         }
     }
 
+    /**
+     * Draw vanilla's "Turns until the base is destroyed" panel (text id
+     * boss_jumps) when the flagship has reached the federation base. The
+     * box art and the 4 - baseTurns countdown are pinned from the 1.6.14
+     * executable (JumpWindow render FUN_005fdbf0, boss_jumps_box.png).
+     *
+     * On desktop the panel floats above the map window, as vanilla does;
+     * on touch layouts the map window is already nudged up and scaled, so
+     * it's drawn just inside the top of the window instead (it still scales
+     * with the window).
+     */
+    private fun drawBaseCountdown(g: Graphics) {
+        val boss = sector.bosses.firstOrNull { it.baseTurns > 0 } ?: return
+        val turnsLeft = FlagshipBoss.BASE_TURNS_TO_DESTROY - boss.baseTurns
+        if (turnsLeft <= 0)
+            return
+
+        val label = game.translator["boss_jumps"]
+
+        // Vanilla widens the box from 200px until the label fits in at most
+        // two lines (its measurement loop caps the text height at 50px).
+        var textWidth = 200
+        while (textWidth < 600 && sectorInfoFont.wrapString(label, textWidth).size > 2)
+            textWidth += 10
+
+        // Vanilla's coordinates here are window-local; the port draws
+        // windows in absolute canvas space (other JumpWindow elements add
+        // position too), so offset them or the panel lands off-screen
+        // above the map on desktop.
+        val boxY = position.y + (if (PlatformSpecific.INSTANCE.isTouchUi) 4 else -82)
+        val boxLeft = position.x + 629 - textWidth
+
+        // Nine-slice the box art the same way vanilla does: the left 26px
+        // cap, a 1px stretchable middle and the remaining 91px right cap.
+        bossJumpsBox.drawSection(boxLeft, boxY, 26, 78, 0, 0)
+        bossJumpsBox.drawSection(position.x + 655 - textWidth, boxY, 1, 78, 26, 0, stretchX = textWidth)
+        bossJumpsBox.drawSection(position.x + 655, boxY, 91, 78, 27, 0)
+
+
+        // The text sits in the stretched middle of the pink area, which
+        // starts after the left icon cap and ends where the black number
+        // slot begins (local x 655). Centring there keeps it clear of the
+        // wrench icon instead of overlapping it.
+        val labelCentre = position.x + 655 - textWidth / 2
+        val labelWidth = textWidth
+        val labelLeft = labelCentre - labelWidth / 2
+        // Centre the label block vertically inside the 78px box. Vanilla's
+        // baseline offsets assume its own font metrics; using the loaded
+        // font's baselineToTop keeps it centred for our font instead
+        // (issue #149 follow-up - the first line was clipped by the top
+        // border).
+        // Tighter than the font default so the two lines read as one block
+        // inside the short box (tune COUNTDOWN_LINE_SPACING_SCALE).
+        val lineSpacing = sectorInfoFont.lineSpacing * sectorInfoFont.scale * COUNTDOWN_LINE_SPACING_SCALE
+        val lineAscent = sectorInfoFont.baselineToTop * sectorInfoFont.scale
+        val wrapped = sectorInfoFont.wrapString(label, labelWidth)
+        val blockHeight = lineAscent + (wrapped.size - 1) * lineSpacing
+        var lineY = boxY + (78f - blockHeight) / 2f + lineAscent
+        for (line in wrapped) {
+            sectorInfoFont.drawStringCentred(labelLeft.f, lineY, labelWidth.f, line, Constants.SECTOR_CUTOUT_TEXT)
+            lineY += lineSpacing
+        }
+
+        // Vanilla shifts the single digit '1' four pixels right so it looks
+        // centred in its slot.
+        val numberX = position.x + 696 + if (turnsLeft == 1) 4 else 0
+        // Centre the digit vertically in the box too (its slot spans the
+        // full inner height): baseline = centre + ascent/2.
+        val numberAscent = bossJumpsNumberFont.baselineToTop * bossJumpsNumberFont.scale
+        bossJumpsNumberFont.drawString(
+            numberX.f, boxY + 39f + numberAscent / 2f, turnsLeft.toString(), Constants.SECTOR_CUTOUT_TEXT
+        )
+    }
+
     private fun drawDangerZone(g: Graphics) {
         val dangerZoneRHS = sector.dangerZoneCentre.x + Sector.DANGER_ZONE_RADIUS
         val nextDangerZoneRHS = dangerZoneRHS + sector.getFleetAdvanceFor(game.currentBeacon)
@@ -452,6 +530,8 @@ class JumpWindow(val game: InGameState, showSectorMap: () -> Unit, val jump: (Be
             // Draw the contents of the map
             drawMapContent(g)
         })
+
+        drawBaseCountdown(g)
 
         // Draw the top-left map label tab
         val tab = game.translator["map_title"]
@@ -987,6 +1067,9 @@ class JumpWindow(val game: InGameState, showSectorMap: () -> Unit, val jump: (Be
     companion object {
         // The width of the glow around the edge of the window
         private const val GLOW = 7
+
+        /** Line-spacing multiplier for the base-countdown label (issue #149). */
+        private const val COUNTDOWN_LINE_SPACING_SCALE = 0.75f
 
         /**
          * This draws the little rounded corners that move in and out, which is used

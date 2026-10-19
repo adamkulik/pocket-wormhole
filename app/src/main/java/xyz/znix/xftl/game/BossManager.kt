@@ -47,6 +47,18 @@ interface BossManager : ISerialReferencable {
     val useBossShipUI: Boolean
 
     /**
+     * The number of turns this boss has spent holding the federation base
+     * (the last stand's countdown). Zero when not applicable.
+     */
+    val baseTurns: Int get() = 0
+
+    /**
+     * True once this boss has held the federation base long enough to
+     * destroy it. The player is spared while fighting the boss there.
+     */
+    val isBaseDestroyed: Boolean get() = false
+
+    /**
      * Create the boss ship.
      *
      * This is called whenever the player jumps to the beacon that contains this ship.

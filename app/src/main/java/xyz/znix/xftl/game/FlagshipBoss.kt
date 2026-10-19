@@ -46,6 +46,18 @@ class FlagshipBoss private constructor(val sector: Sector, val game: InGameState
     private var powerSurge: PowerSurge? = null
 
     /**
+     * Vanilla's rebel_flagship_base_turns: how many turns the flagship has
+     * held the federation base. The jump map shows "4 - baseTurns" turns
+     * remaining, and at [BASE_TURNS_TO_DESTROY] the base is destroyed
+     * (unless the player is fighting the flagship there).
+     */
+    override var baseTurns: Int = 0
+        private set
+
+    override val isBaseDestroyed: Boolean
+        get() = baseTurns >= BASE_TURNS_TO_DESTROY
+
+    /**
      * The flagship from the player's last visit, if they jumped away from the
      * fight mid-stage. Vanilla keeps the flagship's damage and remaining crew
      * between retreats - only a destroyed stage rebuilds it (GitHub issue
@@ -174,6 +186,12 @@ class FlagshipBoss private constructor(val sector: Sector, val game: InGameState
             //  it's at the base - this is when the next beacon is null.)
             updateNextBeacon()
             jumping = nextBeacon != null
+
+            // Sitting on the federation base: each further turn counts
+            // towards its destruction (vanilla rebel_flagship_base_turns).
+            if (realBeacon == sector.finishBeacon) {
+                baseTurns = min(baseTurns + 1, BASE_TURNS_TO_DESTROY)
+            }
         } else {
             realBeacon = nextBeacon!!
             updateNextBeacon()
@@ -183,6 +201,11 @@ class FlagshipBoss private constructor(val sector: Sector, val game: InGameState
 
             // If we were running away, we're allowed to go back to the base again.
             runningAway = false
+
+            // Arriving at the base starts the countdown at one (vanilla
+            // immediately shows "3 turns until the base is destroyed").
+            // Anywhere else clears it.
+            baseTurns = if (realBeacon == sector.finishBeacon) 1 else 0
         }
     }
 
@@ -361,12 +384,26 @@ class FlagshipBoss private constructor(val sector: Sector, val game: InGameState
         stashedShip = null
     }
 
+    /**
+     * Debug/testing hook: park the flagship on the federation base with the
+     * given number of turns already counted (1 = "3 turns left", 4 = the
+     * base is destroyed unless the player is there).
+     */
+    fun debugPlaceAtBase(turns: Int) {
+        realBeacon = sector.finishBeacon
+        nextBeacon = null
+        jumping = false
+        runningAway = false
+        baseTurns = turns.coerceIn(0, BASE_TURNS_TO_DESTROY)
+    }
+
     override fun saveToXML(elem: Element, refs: ObjectRefs) {
         SaveUtil.addAttrRef(elem, "beacon", refs, beacon)
         SaveUtil.addAttrRef(elem, "next", refs, nextBeacon)
         SaveUtil.addAttrBool(elem, "jumping", jumping)
         SaveUtil.addAttrBool(elem, "runningAway", runningAway)
         SaveUtil.addAttrInt(elem, "stage", stage)
+        SaveUtil.addAttrInt(elem, "baseTurns", baseTurns)
 
         // The ship the player retreated from mid-stage (GitHub issue #86).
         // Registered first, exactly like saveGameState registers the live
@@ -407,6 +444,8 @@ class FlagshipBoss private constructor(val sector: Sector, val game: InGameState
         jumping = SaveUtil.getAttrBool(elem, "jumping")
         runningAway = SaveUtil.getAttrBool(elem, "runningAway")
         stage = SaveUtil.getAttrInt(elem, "stage")
+        baseTurns = (elem.getAttributeValue("baseTurns")?.toInt() ?: 0)
+            .coerceIn(0, BASE_TURNS_TO_DESTROY)
 
         val human = game.blueprintManager["human"] as CrewBlueprint
 
@@ -432,6 +471,12 @@ class FlagshipBoss private constructor(val sector: Sector, val game: InGameState
 
     companion object {
         const val SERIALISATION_TYPE = "wormhole.flagship"
+
+        /**
+         * Once the flagship has spent this many turns on the federation
+         * base it destroys it (vanilla's rebel_flagship_base_turns == 4).
+         */
+        const val BASE_TURNS_TO_DESTROY = 4
 
         // Force the deserialiser to use this function rather than making the constructor public,
         // as it makes it very clear that this function isn't supposed to be used for anything ele.

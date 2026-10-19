@@ -3010,6 +3010,15 @@ public class InGameState extends MainGame.GameState {
             return;
         }
 
+        // In the last stand the flagship destroys the federation base if it
+        // holds it for three turns after arriving (vanilla
+        // rebel_flagship_base_turns reaches four). The player is spared while
+        // fighting the flagship on the base itself.
+        if (isFederationBaseDestroyed()) {
+            shipUI.showGameOverScreen(GameOverWindow.Outcome.LOOSE_BASE_DESTROYED);
+            return;
+        }
+
         // Do we still have living crew, either aboard us or on a ship we've
         // boarded? Ownership is checked so mid-teleport and mind-controlled
         // crew are handled.
@@ -3024,6 +3033,20 @@ public class InGameState extends MainGame.GameState {
             return;
 
         shipUI.showGameOverScreen(GameOverWindow.Outcome.LOOSE_CREW);
+    }
+
+    /**
+     * True if a sector boss has held the federation base long enough to
+     * destroy it, and the player isn't there fighting it. Public for
+     * automated tests.
+     */
+    public boolean isFederationBaseDestroyed() {
+        Sector sector = currentBeacon.getSector();
+        for (BossManager boss : sector.getBosses()) {
+            if (boss.isBaseDestroyed() && boss.getBeacon() != currentBeacon)
+                return true;
+        }
+        return false;
     }
 
     public void updatePlayerCrew() {

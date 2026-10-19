@@ -458,6 +458,20 @@ class DebugCommands(console: DebugConsole) : ConsoleCommandProvider(console) {
         val stageText = if (stage == null) "" else " (stage $stage)"
         addLine("Flagship$stageText placed at the current beacon - jump away and back to fight it.")
     }
+    @ConsoleCommand(name = "boss-base")
+    @CmdHelp("Park the flagship on the federation base; turns is its base-turn counter (1-4)")
+    private fun cmdBossBase(@ParName("turns") turns: Int) {
+        val sector = game.currentBeacon.sector
+        val boss = sector.bosses.firstOrNull() as? FlagshipBoss ?: run {
+            val created = FlagshipBoss(sector, game, sector.finishBeacon)
+            sector.bosses.add(created)
+            created
+        }
+
+        boss.debugPlaceAtBase(turns)
+        addLine("Flagship parked on the federation base ($turns turns counted). Open the jump map to see the countdown.")
+    }
+
 
     @ConsoleCommand(name = "kill-ecrew")
     @CmdHelp("Kill all crew aboard the enemy ship (including any boarding you)")

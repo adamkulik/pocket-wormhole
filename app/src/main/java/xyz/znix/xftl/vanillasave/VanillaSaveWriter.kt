@@ -129,7 +129,7 @@ object VanillaSaveWriter {
         w.int(boss?.nextBeacon?.let { beacons.indexOf(it) } ?: 0)
         w.bool(boss?.jumping ?: false)
         w.bool(false) // retreating
-        w.int(0) // base_turns
+        w.int(boss?.baseTurns ?: 0) // base_turns
 
         // Visited-sector route: one bool per SectorInfo entry across the
         // map's branching columns (matches real saves: ~20 entries). The
