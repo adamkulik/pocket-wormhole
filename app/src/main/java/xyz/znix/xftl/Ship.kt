@@ -1964,8 +1964,14 @@ class Ship(
 
         val missed = Random.rollChance(evasion + deltaEvasion)
         if (missed) {
-            piloting?.addSkillPoint(Skill.PILOTING)
-            engines?.addSkillPoint(Skill.ENGINES)
+            // Vanilla doesn't credit piloting/engines experience for shots
+            // dodged while cloaked (GitHub issue #172; FTL wiki, Crew skills:
+            // "Skill is also not gained when your ship is cloaked"). This
+            // covers every miss roll - projectiles, bombs and asteroids.
+            if (!isCloakActive) {
+                piloting?.addSkillPoint(Skill.PILOTING)
+                engines?.addSkillPoint(Skill.ENGINES)
+            }
         }
         return missed
     }
