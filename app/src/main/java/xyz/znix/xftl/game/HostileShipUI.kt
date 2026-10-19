@@ -20,8 +20,14 @@ class HostileShipUI(private val game: InGameState, private val enemy: Ship) {
          * touch layouts - see [boxScale].
          */
         private const val TOUCH_BOX_SCALE = 0.9f
-    }
 
+        /**
+         * The equivalent scale for the (larger) boss frame, chosen so its
+         * content bottom lands on the same line as the normal box's
+         * scaled bottom (~530), clearing the scaled systems strip.
+         */
+        private const val TOUCH_BOSS_BOX_SCALE = 0.88f
+    }
 
     private val mutableShipPos = Point(0, 0)
     val shipPos: IPoint get() = mutableShipPos
@@ -29,7 +35,8 @@ class HostileShipUI(private val game: InGameState, private val enemy: Ship) {
     /**
      * The scale the enemy's box - frame, labels, bars and the ship drawn
      * inside it - is rendered at. Vanilla is 1; on touch layouts the box
-     * is drawn slightly smaller ([TOUCH_BOX_SCALE]) and anchored to the
+     * is drawn slightly smaller ([TOUCH_BOX_SCALE], or
+     * [TOUCH_BOSS_BOX_SCALE] for the taller boss frame) and anchored to the
      * vanilla content top/right edges, so it clears the scaled systems
      * strip while leaving the FTL escape warning (drawn above the box)
      * its vanilla headroom. While any touch targeting mode is active
@@ -41,10 +48,10 @@ class HostileShipUI(private val game: InGameState, private val enemy: Ship) {
      */
     private val boxScale: Float
         get() = when {
-            enemy.isUsingBossUI -> 1f
             game.isTouchTargeting() -> 1f
-            PlatformSpecific.INSTANCE.isTouchUi -> TOUCH_BOX_SCALE
-            else -> 1f
+            !PlatformSpecific.INSTANCE.isTouchUi -> 1f
+            enemy.isUsingBossUI -> TOUCH_BOSS_BOX_SCALE
+            else -> TOUCH_BOX_SCALE
         }
 
     // Issue #4: the jump-away animation state (goes from 1 to 0). Started
@@ -59,9 +66,10 @@ class HostileShipUI(private val game: InGameState, private val enemy: Ship) {
 
     /**
      * Convert a screen-space position to the enemy ship's render space
-     * (what (mouse - shipPos) used to be), accounting for the touch
-     * layout's scaled box. Complements [getShipPos]. Only valid while
-     * the enemy ship is displayed.
+     * (what the enemy's render code and screenPosToShipPos work in), for
+     * hit-testing rooms/crew on it. This replaces subtracting [shipPos],
+     * which the touch layout's scaled box needs un-scaling after. Only
+     * valid while the enemy ship is displayed.
      */
     fun convertScreenToShipRender(point: Point) {
         point.x = ((point.x - mutableShipPos.x) / boxScale).roundToInt()
@@ -70,8 +78,9 @@ class HostileShipUI(private val game: InGameState, private val enemy: Ship) {
 
     /**
      * Convert a position in the enemy ship's render space (e.g. a
-     * crewmember's screenX/screenY) to screen space, for hit-testing
-     * things on the enemy ship - your boarding party, mainly.
+     * crewmember's screenX/screenY) to screen space - the inverse of
+     * [convertScreenToShipRender]. Only valid while the enemy ship is
+     * displayed.
      */
     fun shipRenderToScreen(x: Int, y: Int): IPoint = Point(
         (mutableShipPos.x + boxScale * x).roundToInt(),
@@ -156,9 +165,8 @@ class HostileShipUI(private val game: InGameState, private val enemy: Ship) {
         // boxY - 10 - off the top of the screen. Drawing everything
         // slightly smaller keeps the warning's vanilla headroom while
         // the content bottom rises to ~530, clearing the strip. The boss
-        // frame stays full-size: even scaled it can't clear the strip,
-        // and it rarely overlaps one that long
-        // (touch-strip-scaling-plan.md).
+        // frame is taller, so it uses a slightly smaller scale of its own
+        // to reach the same bottom line (issue #151).
         val scale = boxScale
 
         // The screen-space position of the box image's top-left corner,
