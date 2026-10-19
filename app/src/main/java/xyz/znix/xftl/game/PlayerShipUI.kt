@@ -2534,7 +2534,7 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
     }
 
     fun openJumpMap() {
-        if (!ship.isFtlReady || !ship.canChargeFTL)
+        if (!canOpenJumpMap(ship, game))
             return
 
         currentWindow = JumpWindow(game, ::openSectorMap) {
@@ -3295,4 +3295,22 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
         private const val CREW_BOX_HEIGHT = 27
         private const val CREW_BOX_SPACING = 30
     }
+}
+
+/**
+ * Whether the JUMP button/hotkey may open the beacon map right now.
+ *
+ * The drive must be charged and able to charge, and no jump-out/arrival
+ * animation may be playing (GitHub issue #145). The animation check matters:
+ * the FTL charge only resets when the beacon actually changes, so without it
+ * the map can be reopened mid-jump-out while paused, and a second jump skips
+ * the first beacon (or sector) entirely. That was still reproducible on the
+ * Android v0.2.7 build because its port of the fix missed this entry point
+ * (GitHub issue #160), so keep the gate here where it has a unit test.
+ */
+internal fun canOpenJumpMap(ship: Ship, game: InGameState): Boolean {
+    if (!ship.isFtlReady || !ship.canChargeFTL)
+        return false
+
+    return !game.isJumpAnimationPlaying()
 }
