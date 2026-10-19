@@ -86,8 +86,11 @@ class BombBlueprint(xml: Element) : AbstractWeaponBlueprint(xml) {
             val firedAtSelf: Boolean = target.ship == ship
 
             // Bombs we fire at ourselves can't miss or hit the super-shield.
+            // Zoltan Shield Bypass lets a bomb teleport through the shield
+            // and explode inside the ship.
             val missed = !firedAtSelf && target.ship.pickMissed(-type.accuracyModifier)
-            val hitSuperShield = !firedAtSelf && target.ship.superShield > 0 && !missed
+            val hitSuperShield = !firedAtSelf && !missed &&
+                    target.ship.superShieldBlocksRemoteAction(ship)
 
             target.ship.projectiles += makeBomb(target, missed, hitSuperShield)
         }

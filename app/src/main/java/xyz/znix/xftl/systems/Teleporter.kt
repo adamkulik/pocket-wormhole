@@ -87,7 +87,7 @@ class Teleporter(blueprint: SystemBlueprint) : MainSystem(blueprint) {
             if (!isSendAvailable)
                 return
 
-            if (command.room.ship.superShield > 0)
+            if (command.room.ship.superShieldBlocksRemoteAction(ship))
                 return
 
             // Crew are only teleported if they're assigned a slot on the teleporter.
@@ -108,7 +108,7 @@ class Teleporter(blueprint: SystemBlueprint) : MainSystem(blueprint) {
             if (!isReceiveAvailable)
                 return
 
-            if (command.room.ship.superShield > 0)
+            if (command.room.ship.superShieldBlocksRemoteAction(ship))
                 return
 
             var ourCrew = command.room.crew
@@ -282,7 +282,7 @@ class Teleporter(blueprint: SystemBlueprint) : MainSystem(blueprint) {
             if (enemyShip == null)
                 return
 
-            if (enemyShip.superShield > 0) {
+            if (enemyShip.superShieldBlocksRemoteAction(ship)) {
                 superShieldWarning.startFor(3.5f)
                 return
             }

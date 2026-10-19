@@ -184,6 +184,11 @@ class BlueprintManager {
             AugmentBlueprint.EXPLOSIVE_REPLICATOR -> AugmentBlueprint(elem)
             AugmentBlueprint.FTL_JAMMER -> AugmentBlueprint(elem)
 
+            // The Zoltan Shield Bypass mechanic (teleporting crew and bombs,
+            // and mind control through super shields) lives in the systems
+            // and Ship.superShieldBlocksRemoteAction.
+            AugmentBlueprint.ZOLTAN_BYPASS -> AugmentBlueprint(elem)
+
             // Adv. FTL Navigation's mechanic (jumping to visited beacons)
             // is implemented by the jump map; the stasis pod is an event
             // quest prop. Neither has a passive effect to implement.

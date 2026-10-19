@@ -55,6 +55,15 @@ open class AugmentBlueprint(elem: Element) : Blueprint(elem) {
         const val FTL_JAMMER: String = "FTL_JAMMER"
 
         /**
+         * Zoltan Shield Bypass: lets this ship teleport crew and bomb
+         * weapons through a super shield, and mind-control crew aboard
+         * a shielded ship. The mechanic lives in
+         * Ship.superShieldBlocksRemoteAction; hacking drones are not
+         * helped by it (vanilla).
+         */
+        const val ZOLTAN_BYPASS: String = "ZOLTAN_BYPASS"
+
+        /**
          * Lifeform Scanner: senses the crew aboard enemy ships through the
          * hull, working exactly like Slug telepathy (wiki). The visibility
          * lives in Ship.crewVisibleThroughHull; the augment itself has no

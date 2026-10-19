@@ -1919,6 +1919,27 @@ class Ship(
     }
 
     /**
+     * Check whether this ship's super shield (Zoltan Shield) blocks a
+     * remote action performed by [actor] - teleporting crew or bombs
+     * aboard, or mind controlling one of the crew.
+     *
+     * Vanilla pin (wiki, Zoltan Shield): "Zoltan Shields prevent boarding,
+     * hacking, and mind control." The Zoltan Shield Bypass augment lifts
+     * that for the ship carrying it - its dat description reads "Allows
+     * crew/bomb teleportation and mind control to work through Super
+     * Shields."
+     *
+     * Hacking is deliberately NOT included: the wiki's Zoltan Shield
+     * Bypass section notes hacking drones still cannot be launched and
+     * are destroyed on contact with a Zoltan Shield.
+     */
+    fun superShieldBlocksRemoteAction(actor: Ship): Boolean {
+        if (superShield == 0)
+            return false
+        return !actor.hasAugment(AugmentBlueprint.ZOLTAN_BYPASS)
+    }
+
+    /**
      * Update [Room.reservedPlayerSlots] and [Room.reservedEnemySlots]
      * for every room on the ship.
      *

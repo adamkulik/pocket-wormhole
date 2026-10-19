@@ -183,9 +183,9 @@ class MindControl(blueprint: SystemBlueprint) : MainSystem(blueprint) {
         if (!ready)
             return
 
-        // Block mind-control on enemy ships with a super shield
-        // TODO super shield bypass
-        if (room.ship != ship && room.ship.superShield > 0)
+        // Block mind-control on enemy ships with a super shield - unless
+        // this ship carries the Zoltan Shield Bypass augment.
+        if (room.ship != ship && room.ship.superShieldBlocksRemoteAction(ship))
             return
 
         // The player can only target rooms they have visibility onto. Crew
@@ -296,10 +296,10 @@ class MindControl(blueprint: SystemBlueprint) : MainSystem(blueprint) {
             // If the enemy ship has a zoltan shield but there are intruders
             // on the player's ship, they can activate mind control and place
             // it on the enemy ship - it just doesn't do anything once un-paused.
-            // TODO super shield bypass
+            // The Zoltan Shield Bypass augment lifts the shield block.
             val hasIntruders = ship.intruders.any { (it as? LivingCrew)?.isMindControlResistant == false }
             val enemyShip = game.getEnemyOf(ship)
-            if (!hasIntruders && enemyShip != null && enemyShip.superShield > 0) {
+            if (!hasIntruders && enemyShip != null && enemyShip.superShieldBlocksRemoteAction(ship)) {
                 superShieldWarning.startFor(3.5f)
                 return
             }
