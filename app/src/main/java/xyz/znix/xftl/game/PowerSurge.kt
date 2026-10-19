@@ -1,14 +1,24 @@
 package xyz.znix.xftl.game
 
 import xyz.znix.xftl.Ship
+import xyz.znix.xftl.TWO_PI
 import xyz.znix.xftl.drones.SuperDrone
+import xyz.znix.xftl.math.ConstPoint
 import xyz.znix.xftl.rendering.Colour
 import xyz.znix.xftl.rendering.Graphics
 import xyz.znix.xftl.weapons.DroneBlueprint
+import xyz.znix.xftl.weapons.LaserBlueprint
+import xyz.znix.xftl.weapons.PowerSurgeLaserProjectile
+import kotlin.math.cos
+import kotlin.math.sin
 import kotlin.random.Random
 
 /**
- * The Rebel Flagship's stage-2 Power Surge (GitHub issue #176).
+ * The Rebel Flagship's Power Surge (GitHub issue #15).
+ *
+ * Stage 2 deploys a swarm of combat/beam drones (GitHub issue #176), while
+ * stage 3 fires a seven-laser barrage and restores its Zoltan shield on
+ * every fourth surge.
  *
  * Vanilla behaviour pinned from FTLGame.exe 1.6.14:
  * - `BossShip` owns a repeating timer (`TimerHelper` at +0x138) with a
@@ -36,7 +46,11 @@ import kotlin.random.Random
  * time the player arrives at the stage (the wiki: the split stays fixed
  * "unless you jump away and come back").
  */
-open class PowerSurge(private val game: InGameState, private val ship: Ship) {
+open class PowerSurge(
+    private val game: InGameState,
+    private val ship: Ship,
+    private val stage: Int = DRONE_SURGE_STAGE,
+) {
     /**
      * The seven drone types that make up this fight's surge, in vanilla's
      * creation order. Only the first [droneCount] are deployed each surge.
@@ -49,6 +63,13 @@ open class PowerSurge(private val game: InGameState, private val ship: Ship) {
     val droneCount: Int = droneCountFor(game.difficulty)
 
     private var timer: Float = rollDelay()
+
+    /**
+     * How many surges have fired during this stage - vanilla's
+     * `BossShip::powerCount`, which `StartStage` resets to zero. Only stage
+     * 3 reads it: every fourth surge restores the Zoltan shield.
+     */
+    private var surgeCount: Int = 0
 
     /** True while the five-second warning banner/alarm is showing. */
     var isWarningActive: Boolean = false
@@ -86,6 +107,21 @@ open class PowerSurge(private val game: InGameState, private val ship: Ship) {
     }
 
     private fun deploySurge() {
+        if (stage == BARRAGE_SURGE_STAGE) {
+            // `BossShip::OnLoop` (0x00407d40): `powerCount % 4 == 3` calls
+            // `PrepareSuperShield` (0x0049cb50), otherwise
+            // `PrepareSuperBarrage` (0x004a6a90), then powerCount++.
+            // So surges 1-3 are barrages and the 4th restores the shield,
+            // repeating every four surges.
+            if (surgeCount % SURGES_PER_SHIELD_RESTORE == SURGES_PER_SHIELD_RESTORE - 1) {
+                restoreSuperShield()
+            } else {
+                fireSuperBarrage()
+            }
+            surgeCount++
+            return
+        }
+
         for (name in droneTypeNames.take(droneCount))
             deploySurgeDrone(name)
     }
@@ -101,6 +137,57 @@ open class PowerSurge(private val game: InGameState, private val ship: Ship) {
         drone.init(ship)
         drone.isPowered = true
         ship.superDrones.add(drone)
+    }
+
+    /**
+     * Fire the stage-3 laser barrage - vanilla's
+     * `ShipManager::PrepareSuperBarrage` (0x004a6a90).
+     *
+     * Seven `LASER_HEAVY_1` lasers are created at the flagship's centre,
+     * each aimed at a random room of the player's ship, with a random
+     * launch heading (the spray direction in the flagship's space) and a
+     * random entry angle into the player's space. Their damage is
+     * hard-coded to 1 by [PowerSurgeLaserProjectile], while the status
+     * chances stay the Heavy Laser Mk I's (30% fire / 21% effective
+     * breach / 20% stun).
+     */
+    protected open fun fireSuperBarrage() {
+        val targetShip = game.getEnemyOf(ship) ?: return
+        if (targetShip.rooms.isEmpty())
+            return
+
+        val blueprint = game.blueprintManager[WEAPON_BLUEPRINT] as LaserBlueprint
+        val spawnPos = ConstPoint(ship.hullCentreX.toInt(), ship.hullCentreY.toInt())
+
+        repeat(BARRAGE_LASERS) {
+            val target = targetShip.rooms.random()
+            val projectile = PowerSurgeLaserProjectile(blueprint, target)
+
+            // Vanilla randomises both: `heading` (the exe sets
+            // `projectile->heading = random() % 360`) is the direction the
+            // shot sprays out of the flagship's centre, and the entry
+            // angle into the destination space is chosen when it arrives.
+            projectile.entryAngle = Random.nextFloat() * TWO_PI
+            val heading = Random.nextFloat() * TWO_PI
+            val endPos = ConstPoint(
+                spawnPos.x + (cos(heading) * BARRAGE_SPRAY_DISTANCE).toInt(),
+                spawnPos.y + (sin(heading) * BARRAGE_SPRAY_DISTANCE).toInt(),
+            )
+            projectile.setInitialPath(spawnPos, endPos)
+
+            ship.projectiles.add(projectile)
+        }
+    }
+
+    /**
+     * Restore the flagship's Zoltan shield - stage 3's every-fourth surge.
+     *
+     * Vanilla's `PrepareSuperShield` (0x0049cb50) sets both the current and
+     * maximum super-shield to 12; the maximum is already 12 on a stage-3
+     * ship (see `FlagshipBoss.applyStageSuperShield`).
+     */
+    protected open fun restoreSuperShield() {
+        ship.superShield = ship.maxSuperShield
     }
 
     /**
@@ -132,6 +219,26 @@ open class PowerSurge(private val game: InGameState, private val ship: Ship) {
     }
 
     companion object {
+        /** Stage 2's Power Surge deploys drones. */
+        const val DRONE_SURGE_STAGE: Int = 2
+
+        /** Stage 3's Power Surge fires the laser barrage/shield restore. */
+        const val BARRAGE_SURGE_STAGE: Int = 3
+
+        /** Stage 3's every-fourth surge restores the Zoltan shield. */
+        const val SURGES_PER_SHIELD_RESTORE: Int = 4
+
+        /** Stage 3's barrage fires seven heavy lasers (exe 0x004a6a90). */
+        const val BARRAGE_LASERS: Int = 7
+
+        /** The blueprint the stage-3 barrage lasers use (hard-coded in the exe). */
+        const val WEAPON_BLUEPRINT: String = "LASER_HEAVY_1"
+
+        // The intermediate path distance used to make the barrage shots
+        // spray out of the flagship before switching to the player's space
+        // (the same technique AbstractProjectileWeaponInstance uses).
+        private const val BARRAGE_SPRAY_DISTANCE = 5000
+
         // Vanilla's superDrones pool is always seven drones; the
         // difficulty only decides how many of them are armed.
         const val SURGE_DRONE_POOL: Int = 7

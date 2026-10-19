@@ -40,8 +40,8 @@ class FlagshipBoss private constructor(val sector: Sector, val game: InGameState
     private var stage: Int = 1
 
     /**
-     * The stage-2 Power Surge (GitHub issue #176). Null on the other
-     * stages - stage 3's surge is the separate laser barrage.
+     * The Power Surge (GitHub issue #15): stage 2's drone swarm and stage
+     * 3's laser barrage/Zoltan-shield restore. Null on stage 1.
      */
     private var powerSurge: PowerSurge? = null
 
@@ -93,12 +93,14 @@ class FlagshipBoss private constructor(val sector: Sector, val game: InGameState
         // in this case.
         stashedShip?.let {
             stashedShip = null
+
+            // resetAfterJump cleared the stage-3 Zoltan shield - put it back.
             applyStageSuperShield(it)
 
             // The surge split is re-rolled when the player returns (FTL
             // wiki: the split stays fixed "unless you jump away and come
             // back").
-            powerSurge = if (stage == 2) PowerSurge(game, it) else null
+            powerSurge = makePowerSurge(it)
             return it
         }
 
@@ -132,7 +134,7 @@ class FlagshipBoss private constructor(val sector: Sector, val game: InGameState
         val event: Event = game.eventManager["BOSS_TEXT_$stage"].resolve()
         game.shipUI.showEventDialogue(event, nextInt())
 
-        powerSurge = if (stage == 2) PowerSurge(game, flagship) else null
+        powerSurge = makePowerSurge(flagship)
         return flagship
     }
 
@@ -144,8 +146,8 @@ class FlagshipBoss private constructor(val sector: Sector, val game: InGameState
 
         // A savegame loaded mid-fight has no PowerSurge instance yet
         // (createShip isn't called on load).
-        if (powerSurge == null && stage == 2)
-            powerSurge = PowerSurge(game, enemy)
+        if (powerSurge == null)
+            powerSurge = makePowerSurge(enemy)
 
         powerSurge?.update(dt)
     }
@@ -277,6 +279,18 @@ class FlagshipBoss private constructor(val sector: Sector, val game: InGameState
      */
     private fun applyStageSuperShield(ship: Ship) {
         applyStageSuperShield(ship, stage)
+    }
+
+    /**
+     * Create the surge controller for the current stage, or null for
+     * stages without one (stage 1). Recreating it when the player jumps
+     * away and returns re-rolls the stage-2 drone split and restarts the
+     * stage-3 surge cadence, matching #176's behaviour.
+     */
+    private fun makePowerSurge(ship: Ship): PowerSurge? {
+        if (stage != PowerSurge.DRONE_SURGE_STAGE && stage != PowerSurge.BARRAGE_SURGE_STAGE)
+            return null
+        return PowerSurge(game, ship, stage)
     }
 
     private fun updateNextBeacon() {

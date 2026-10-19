@@ -142,6 +142,9 @@ interface IProjectile {
 
                 AsteroidProjectile.SERIALISATION_TYPE -> AsteroidProjectile.loadFromXML(elem, refs, callback)
 
+                PowerSurgeLaserProjectile.SERIALISATION_TYPE ->
+                    PowerSurgeLaserProjectile.loadFromXML(game, elem, refs, callback)
+
                 VengeanceShardProjectile.SERIALISATION_TYPE ->
                     VengeanceShardProjectile.loadFromXML(elem, refs, callback)
 
