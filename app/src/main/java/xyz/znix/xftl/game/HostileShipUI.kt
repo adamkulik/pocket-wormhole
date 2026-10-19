@@ -306,9 +306,13 @@ class HostileShipUI(private val game: InGameState, private val enemy: Ship) {
                 bubbleX += 10
                 val superShieldY = shieldsY + 15 + 5
 
-                superShieldBar.draw(bubbleX, superShieldY)
+                // The flagship's 12-point shield uses its own, wider bar art
+                // (the regular one has five notches).
+                val bar = if (enemy.maxSuperShield > 5) superShieldBarBoss else superShieldBar
+                bar.draw(bubbleX, superShieldY)
 
-                val width = 50f * enemy.superShield / enemy.maxSuperShield
+                val maxWidth = bar.width - 6f
+                val width = maxWidth * enemy.superShield / enemy.maxSuperShield
                 g.colour = Constants.SYS_ENERGY_ACTIVE
                 g.fillRect(bubbleX + 3f, superShieldY + 3f, width, 7f)
             } else if (shields.rechargeTimer != 0f) {

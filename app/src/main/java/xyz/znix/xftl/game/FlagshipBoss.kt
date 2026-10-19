@@ -87,6 +87,7 @@ class FlagshipBoss private constructor(val sector: Sector, val game: InGameState
         // in this case.
         stashedShip?.let {
             stashedShip = null
+            applyStageSuperShield(it)
             return it
         }
 
@@ -99,6 +100,7 @@ class FlagshipBoss private constructor(val sector: Sector, val game: InGameState
         val blueprint: ShipBlueprint = game.blueprintManager.getShip(shipName)
         val flagship = Ship(blueprint, game, null, null, this)
         flagship.loadDefaultContents()
+        applyStageSuperShield(flagship)
 
         // Spawn in the crew to the weapon rooms, assuming they're still alive
         // and the rooms still exist.
@@ -234,6 +236,15 @@ class FlagshipBoss private constructor(val sector: Sector, val game: InGameState
         lasersCrew?.let { mainShipCrew.remove(it) }
         ionCrew?.let { mainShipCrew.remove(it) }
         beamCrew?.let { mainShipCrew.remove(it) }
+    }
+
+    /**
+     * The third-stage flagship starts with a full 12-point Zoltan shield.
+     * Vanilla hard-codes this in BossShip::StartStage (no ship augment is
+     * involved), so it is not in the BOSS_3 blueprint.
+     */
+    private fun applyStageSuperShield(ship: Ship) {
+        applyStageSuperShield(ship, stage)
     }
 
     private fun updateNextBeacon() {
@@ -391,6 +402,25 @@ class FlagshipBoss private constructor(val sector: Sector, val game: InGameState
 
         /** True if destroying the given stage ends the game in victory. */
         internal fun isFinalStage(stage: Int): Boolean = stage >= FINAL_STAGE
+
+        /** The stage that gets the boss-sized Zoltan shield (vanilla). */
+        internal const val SUPER_SHIELD_STAGE = 3
+
+        /** The third-stage flagship's Zoltan shield strength (vanilla). */
+        internal const val SUPER_SHIELD_STRENGTH = 12
+
+        /**
+         * Apply the stage's starting super-shield to a freshly-created (or
+         * restored) flagship. Split out so the test kit can exercise it.
+         */
+        internal fun applyStageSuperShield(ship: Ship, stage: Int) {
+            if (stage != SUPER_SHIELD_STAGE)
+                return
+
+            // Set the maximum first: the current value is clamped to it.
+            ship.maxSuperShield = SUPER_SHIELD_STRENGTH
+            ship.superShield = SUPER_SHIELD_STRENGTH
+        }
 
         private const val LASER_WEAPON_NAME = "ARTILLERY_BOSS_1"
         private const val MISSILE_WEAPON_NAME = "ARTILLERY_BOSS_2"
