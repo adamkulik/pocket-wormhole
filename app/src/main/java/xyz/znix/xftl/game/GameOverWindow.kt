@@ -5,6 +5,7 @@ import xyz.znix.xftl.math.ConstPoint
 import xyz.znix.xftl.math.IPoint
 import xyz.znix.xftl.rendering.Colour
 import xyz.znix.xftl.rendering.Graphics
+import xyz.znix.xftl.replaceArg
 import xyz.znix.xftl.ui.Label
 import xyz.znix.xftl.ui.WidgetContainer
 
@@ -78,7 +79,10 @@ class GameOverWindow(private val game: InGameState, val outcome: Outcome) : Wind
             textY += 34
         }
 
-        val scoreText = "SCORE: 123"
+        // The vanilla label is localised (text_misc.xml's "gameover_score",
+        // "SCORE: \1") and the score itself is the run's session score
+        // (GitHub issue #168) - it was a hardcoded placeholder before.
+        val scoreText = game.translator["gameover_score"].replaceArg(game.finalScore)
         scoreFont.drawStringCentred(centreX.f, position.y + 208f, 0f, scoreText, Colour.white)
     }
 

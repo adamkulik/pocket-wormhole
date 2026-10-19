@@ -19,6 +19,14 @@ class VanillaSaveData {
     // Cargo: blueprint ids
     val cargo = ArrayList<String>()
 
+    // The session counters behind the final score (vanilla game-state
+    // offsets 0x08, 0x30 and 0x58). The save stores them right after the
+    // difficulty, in this order; the fourth value there is an unscored
+    // statistic we don't model.
+    var scoreShipsDefeated: Int = 0
+    var scoreBeaconsVisited: Int = 0
+    var scoreScrapCollected: Int = 0
+
     // Seeds / fleet
     var sectorTreeSeed: Int = 0
     var sectorLayoutSeed: Int = 0
@@ -171,7 +179,12 @@ object VanillaSaveParser {
             1 -> Difficulty.NORMAL
             else -> Difficulty.HARD
         }
-        repeat(4) { r.int() } // lifetime profile stats
+        // Score counters, written here by vanilla's FUN_00442460:
+        // ships defeated, beacons visited, scrap collected, unused.
+        out.scoreShipsDefeated = r.int()
+        out.scoreBeaconsVisited = r.int()
+        out.scoreScrapCollected = r.int()
+        r.int()
         out.shipName = r.string()
         out.blueprintName = r.string()
         out.sectorNumber = r.int() - 1

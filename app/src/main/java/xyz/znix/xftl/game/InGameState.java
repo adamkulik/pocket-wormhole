@@ -126,6 +126,23 @@ public class InGameState extends MainGame.GameState {
     private boolean isCurrentlyLoadingSave;
 
     /**
+     * The session counters behind the final score (GitHub issue #168).
+     *
+     * Vanilla keeps these as fields of its game state and writes them into
+     * save games: ships defeated (offset 0x08), beacons visited (0x30) and
+     * scrap collected (0x58). Pinned from FTLGame.exe 1.6.14: FUN_004461d0
+     * computes the score, FUN_00445ca0/00445d60/00445d90 increment these
+     * counters, and FUN_00442460 writes them into the save file.
+     *
+     * Note the scrap counter is the BASE scrap reward - the extra from a
+     * Scrap Recovery Arm and the Repair Arm's penalty do not affect it (the
+     * exe increments it before applying the augment modifiers).
+     */
+    private int scoreScrapCollected;
+    private int scoreBeaconsVisited;
+    private int scoreShipsDefeated;
+
+    /**
      * The encounter tail bytes from a vanilla save this run was imported
      * from, preserved verbatim by the vanilla-format writer (vanilla hangs
      * on tails we invent). Null for runs that started in this engine.
@@ -285,6 +302,13 @@ public class InGameState extends MainGame.GameState {
     public InGameState(MainGame mainGame, GameContent content, VanillaSaveData data) {
         this(mainGame, content);
         difficulty = data.getDifficulty();
+
+        // The vanilla save's header stores the score counters (ships
+        // defeated, beacons visited, scrap collected - in that order).
+        scoreShipsDefeated = data.getScoreShipsDefeated();
+        scoreBeaconsVisited = data.getScoreBeaconsVisited();
+        scoreScrapCollected = data.getScoreScrapCollected();
+
         vanillaTail = data.getTail();
         isCurrentlyLoadingSave = true;
 
@@ -1326,6 +1350,15 @@ public class InGameState extends MainGame.GameState {
                         showEventDialogue(event.resolve(), Random.Default.nextInt());
                 }
 
+                // Vanilla counts ships defeated by reducing their hull (or
+                // crew) to zero, but NOT the flagship's phases (wiki,
+                // Score). enemyIsHostile also guards against counting a ship
+                // that was already crew-killed (its derelict can later blow
+                // up).
+                if (enemyIsHostile && enemy.getBoss() == null) {
+                    scoreShipsDefeated++;
+                }
+
                 if (enemy.getBoss() != null) {
                     enemy.getBoss().bossShipKilled(enemy);
                 }
@@ -1473,6 +1506,14 @@ public class InGameState extends MainGame.GameState {
         }
 
         this.currentBeacon = currentBeacon;
+
+        // The score counts every beacon arrival, including re-visits, but
+        // not rebel-fleet-controlled beacons - and never while restoring a
+        // save, which is just re-entering the beacon the run was saved at
+        // (vanilla's loader raises game+0x1245 to suppress the same count).
+        if (!isCurrentlyLoadingSave && !currentBeacon.isOvertaken()) {
+            scoreBeaconsVisited++;
+        }
 
         // Keep track of which sectors we visit, to show on the sector map UI.
         GameMap.SectorInfo sectorInfo = currentBeacon.getSector().getInfo();
@@ -1768,6 +1809,10 @@ public class InGameState extends MainGame.GameState {
                 // broken teleporter takes the enemy ship's shuttle home.
                 rescueStuckBoarders(deadCrewDialogueShown);
 
+                // A crew kill is a defeated ship (the flagship branch above
+                // is not - its AI takes over instead).
+                scoreShipsDefeated++;
+
                 setEnemyIsHostile(false);
 
                 // If we jump back, they shouldn't re-appear.
@@ -1887,6 +1932,11 @@ public class InGameState extends MainGame.GameState {
         root.setAttribute("enableAE", Boolean.toString(enableAdvancedEdition));
         root.setAttribute("difficulty", difficulty.name());
 
+        // The session counters behind the final score (GitHub issue #168).
+        root.setAttribute("scoreScrap", Integer.toString(scoreScrapCollected));
+        root.setAttribute("scoreBeacons", Integer.toString(scoreBeaconsVisited));
+        root.setAttribute("scoreShips", Integer.toString(scoreShipsDefeated));
+
         ObjectRefs refs = new ObjectRefs();
         Sector sector = currentBeacon.getSector();
 
@@ -1972,6 +2022,18 @@ public class InGameState extends MainGame.GameState {
 
     private void loadGameState(Element root) {
         RefLoader refs = new RefLoader();
+
+        // Restore the score counters (GitHub issue #168). Saves written by
+        // older builds do not have them, so default to zero.
+        String scoreScrap = root.getAttributeValue("scoreScrap");
+        if (scoreScrap != null)
+            scoreScrapCollected = Integer.parseInt(scoreScrap);
+        String scoreBeacons = root.getAttributeValue("scoreBeacons");
+        if (scoreBeacons != null)
+            scoreBeaconsVisited = Integer.parseInt(scoreBeacons);
+        String scoreShips = root.getAttributeValue("scoreShips");
+        if (scoreShips != null)
+            scoreShipsDefeated = Integer.parseInt(scoreShips);
 
         // If the player ship has a custom layout, load that.
         Element customLayout = root.getChild("customLayout");
@@ -2602,6 +2664,49 @@ public class InGameState extends MainGame.GameState {
     }
 
     /**
+     * Vanilla's final score for the current run: the scrap collected, plus
+     * ten points per beacon visited and twenty per ship defeated, multiplied
+     * by the difficulty modifier (1x easy, 1.25x normal, 1.5x hard) and
+     * truncated to an integer (FTLGame.exe 1.6.14 FUN_004461d0).
+     */
+    public int getFinalScore() {
+        return computeFinalScore(scoreScrapCollected, scoreBeaconsVisited, scoreShipsDefeated, difficulty);
+    }
+
+    /**
+     * The vanilla score formula, exposed separately so it can be tested
+     * without playing a whole run.
+     */
+    public static int computeFinalScore(int scrapCollected, int beaconsVisited, int shipsDefeated,
+                                        @Nullable Difficulty difficulty) {
+        int base = scrapCollected + 10 * beaconsVisited + 20 * shipsDefeated;
+
+        float multiplier;
+        if (difficulty == Difficulty.EASY) {
+            multiplier = 1f;
+        } else if (difficulty == Difficulty.HARD) {
+            multiplier = 1.5f;
+        } else {
+            // Normal - and a safe default if called before difficulty is set.
+            multiplier = 1.25f;
+        }
+
+        return (int) (base * multiplier);
+    }
+
+    public int getScoreScrapCollected() {
+        return scoreScrapCollected;
+    }
+
+    public int getScoreBeaconsVisited() {
+        return scoreBeaconsVisited;
+    }
+
+    public int getScoreShipsDefeated() {
+        return scoreShipsDefeated;
+    }
+
+    /**
      * Scrap Recovery Arm (SCRAP_COLLECTOR) + Repair Arm (REPAIR_ARM) scrap
      * modifiers, from any source that isn't a store.
      *
@@ -2641,6 +2746,14 @@ public class InGameState extends MainGame.GameState {
         player.setMissilesCount(player.getMissilesCount() + resources.getMissiles());
 
         int scrapGain = resources.getScrap();
+
+        // The score counts the base reward, before the Scrap Recovery Arm /
+        // Repair Arm modifiers (vanilla's FUN_00615930 passes the unmodified
+        // amount to the stat counter). Losses do not subtract from it.
+        if (scrapGain > 0) {
+            scoreScrapCollected += scrapGain;
+        }
+
         player.setScrap(player.getScrap() + applyScrapModifiers(scrapGain));
 
         // Repair Arm: repairs 2 hull every time scrap is collected (wiki).
