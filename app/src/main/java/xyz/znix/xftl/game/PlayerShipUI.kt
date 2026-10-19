@@ -1623,6 +1623,15 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
     }
 
     fun renderMenus(container: GameContainer, g: Graphics) {
+        // A manual pause (the PAUSE hotkey or the Android letterbox pause
+        // button) supersedes the derived auto-pauses: the vanilla PAUSED
+        // indicator is drawn at the same spot as the AUTO-PAUSED banner, so
+        // the two overlap into an unreadable mess and the player gets no
+        // confirmation their pause registered (GitHub issue #173 - pausing
+        // during auto-pause to hold a beam's target). Hide only the
+        // AUTO-PAUSED banner; the action banners below still show.
+        val showAutoPause = !game.isManuallyPaused()
+
         // The power popup sits above the ship UI but under any windows.
         // Manipulating power auto-pauses the game, so show the AUTO-PAUSED
         // banner (the iPad port's own art) while it's open.
@@ -1630,10 +1639,11 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
             popup.draw(g)
 
             val autoPause = game.getImg("img/autopause.png")
-            autoPause.draw(
-                (container.width - autoPause.width) / 2,
-                container.height - 16 - autoPause.height
-            )
+            if (showAutoPause)
+                autoPause.draw(
+                    (container.width - autoPause.width) / 2,
+                    container.height - 16 - autoPause.height
+                )
         }
 
         currentWindow?.let { renderSingleMenu(container, g, it) }
@@ -1653,7 +1663,8 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
             val roomSelY = container.height - 16 - roomSelection.height
             val autoPauseY = roomSelY - 20 - autoPause.height
 
-            autoPause.draw(centreX - autoPause.width / 2, autoPauseY)
+            if (showAutoPause)
+                autoPause.draw(centreX - autoPause.width / 2, autoPauseY)
             roomSelection.draw(centreX - roomSelection.width / 2, roomSelY)
         }
 
@@ -1676,9 +1687,10 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
                 val targetY = container.height - 16 - target.height
                 val autoPauseY = targetY - 20 - autoPause.height
 
-                autoPause.draw(centreX - autoPause.width / 2, autoPauseY)
+                if (showAutoPause)
+                    autoPause.draw(centreX - autoPause.width / 2, autoPauseY)
                 target.draw(centreX - target.width / 2, targetY)
-            } else {
+            } else if (showAutoPause) {
                 autoPause.draw(centreX - autoPause.width / 2, container.height - 16 - autoPause.height)
             }
         }
@@ -1705,7 +1717,8 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
             val bannerY = container.height - 16 - banner.height
             val autoPauseY = bannerY - 20 - autoPause.height
 
-            autoPause.draw(centreX - autoPause.width / 2, autoPauseY)
+            if (showAutoPause)
+                autoPause.draw(centreX - autoPause.width / 2, autoPauseY)
             banner.draw(centreX - banner.width / 2, bannerY)
         }
     }

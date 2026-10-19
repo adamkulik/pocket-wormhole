@@ -2246,6 +2246,21 @@ public class InGameState extends MainGame.GameState {
             mainGame.onRunEnded();
         }
     }
+    /**
+     * True if the player has explicitly paused the game - the PAUSE hotkey,
+     * or the Android letterbox pause button - as opposed to one of the
+     * derived auto-pause sources (a window, a touch targeting mode, the
+     * autofire assignment mode).
+     * <p>
+     * The touch UI hides its AUTO-PAUSED banner while this is set: a manual
+     * pause supersedes the auto-pause, and the banner would overlap the
+     * vanilla PAUSED indicator drawn underneath it, leaving the player no
+     * way to tell that their pause was registered (GitHub issue #173 -
+     * pausing during auto-pause to hold a beam's target).
+     */
+    public boolean isManuallyPaused() {
+        return paused;
+    }
 
     /**
      * Called when the app loses focus (GitHub issue #96): open the pause
