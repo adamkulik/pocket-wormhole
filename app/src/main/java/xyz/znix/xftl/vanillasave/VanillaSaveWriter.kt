@@ -326,12 +326,16 @@ object VanillaSaveWriter {
         // so write an empty list (a lockdown in progress is lost on export).
         w.int(0)
 
-        // Weapons on hardpoints
+        // Weapons on hardpoints. Vanilla's bool is the per-weapon 'armed'
+        // flag (the weapon is powered - verified against real saves: a
+        // three-weapon ship with 3 bars of weapons power has two armed and
+        // one unarmed), so write the engine's per-weapon power state rather
+        // than claiming everything is armed.
         val weapons = ship.hardpoints.mapNotNull { it.weapon }
         w.int(weapons.size)
         for (weapon in weapons) {
             w.string(weapon.type.name)
-            w.bool(true) // armed
+            w.bool(weapon.isPowered)
         }
 
         // Drones: slot entries (in-flight external drones are transient and
@@ -573,17 +577,29 @@ object VanillaSaveWriter {
     }
 
     private fun writeSystem(w: VanillaSaveByteWriter, system: AbstractSystem?) {
-        if (system == null || system.energyLevels <= 0) {
-            // Vanilla writes only the capacity for uninstalled systems; a
-            // system present in-engine but at level 0 counts as uninstalled.
+        if (system == null) {
+            // Vanilla writes only the capacity for uninstalled systems.
+            w.int(0)
+            return
+        }
+
+        // Piloting, sensors and doors store their UPGRADE LEVEL as the
+        // capacity (1-3), and their 'power' field is just the on/off switch
+        // (verified against a real save with sensors powered off: capacity 1,
+        // power 0). xftl can't switch subsystems off - they're always
+        // running - so they're always written as powered, including while
+        // broken: vanilla keeps the power assignment through damage. The
+        // backup battery is the exception (it isn't a 0/1-powered subsystem).
+        val plainSubsystem = system is SubSystem && system !is BackupBattery
+        if (system.energyLevels <= 0) {
             w.int(0)
             return
         }
 
         w.int(system.energyLevels)
-        val selectedPower = when (system) {
-            is MainSystem -> system.powerSelected
-            is SubSystem -> system.undamagedEnergy
+        val selectedPower = when {
+            plainSubsystem -> 1
+            system is MainSystem -> system.powerSelected
             else -> system.undamagedEnergy
         }
         w.int(selectedPower)
@@ -595,9 +611,14 @@ object VanillaSaveWriter {
         w.int(0) // battery_power
         w.int(system.hackedBy?.powerSelected ?: 0)
         w.bool(system.isHackActive)
-        w.int(0) // tempcapacity_cap
+        // Every system in a real FTL 1.6.14 save carries this triple: an
+        // effectively-unlimited temporary capacity cap, no temporary loss,
+        // and a divisor of one. Writing zeros instead makes vanilla treat the
+        // system as having no available capacity - it drops the saved power
+        // allocation and draws the system disabled (GitHub issue #181).
+        w.int(1000) // tempcapacity_cap
         w.int(0) // tempcapacity_loss
-        w.int(0) // tempcapacity_divisor
+        w.int(1) // tempcapacity_divisor
     }
 
     // Sprite paths verified to exist in the vanilla dat (img/stars/*).

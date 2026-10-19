@@ -96,6 +96,11 @@ class VanillaSaveData {
         var damageProgress: Int = 0
         var hackLevel: Int = 0
         var hacked: Boolean = false
+        // Vanilla's temporary capacity modifiers: cap, loss, divisor.
+        // Real saves carry (1000, 0, 1) on every system.
+        var tempCapacityCap: Int = 0
+        var tempCapacityLoss: Int = 0
+        var tempCapacityDivisor: Int = 0
     }
 
     class VanillaDoor {
@@ -310,7 +315,9 @@ object VanillaSaveParser {
                 r.int() // battery power
                 sys.hackLevel = r.int()
                 sys.hacked = r.bool()
-                r.int(); r.int(); r.int() // temp capacity
+                sys.tempCapacityCap = r.int()
+                sys.tempCapacityLoss = r.int()
+                sys.tempCapacityDivisor = r.int()
                 ship.systems[slotName] = sys
             }
         }

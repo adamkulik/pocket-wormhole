@@ -407,7 +407,27 @@ public class InGameState extends MainGame.GameState {
             VanillaSaveData.VanillaSystem vsSys = vs.getSystems().get(slot);
             if (vsSys == null) continue;
 
+            AbstractSystem system = null;
+            for (AbstractSystem candidate : player.getSystems()) {
+                if (candidate.getBlueprint().getName().equals(xftlName)) {
+                    system = candidate;
+                    break;
+                }
+            }
+
             sysElem.setAttribute("level", Integer.toString(vsSys.getCapacity()));
+
+            // The selected power allocation. The fresh ship is built while
+            // isCurrentlyLoadingSave is set, which makes createNewPlayerShip's
+            // default power-up pass a no-op - so without this every imported
+            // system would start unpowered (GitHub issue #181). Subsystems
+            // have no power attribute: vanilla stores their on/off state in
+            // the save's 'power' field, which xftl doesn't model (subsystems
+            // there are always running).
+            if (!(system instanceof SubSystem)) {
+                sysElem.setAttribute("power", Integer.toString(vsSys.getPower()));
+            }
+
             sysElem.setAttribute("damage", Integer.toString(vsSys.getDamaged()));
             sysElem.setAttribute("ionTimer", Float.toString(vsSys.getDeionisationTicks() / VanillaSaveFormat.TICKS_PER_SECOND));
             if (vsSys.getIon() > 0) {
@@ -507,20 +527,22 @@ public class InGameState extends MainGame.GameState {
         oxygenElem.setText(oxygen.toString().trim());
         xml.addContent(oxygenElem);
 
-        // Weapons: replace the types on the hardpoints.
+        // Weapons: rebuild the hardpoint list from the save. The freshly
+        // built ship only serialises the weapons it starts with (often none
+        // at all), so patching the existing elements in place dropped every
+        // weapon picked up during the run (GitHub issue #181). Vanilla
+        // stores the weapons packed in slot order, and the save's bool is
+        // the per-weapon 'armed' (powered) flag.
         Element weaponsElem = xml.getChild("weapons");
-        List<Element> weaponElems = new ArrayList<>(weaponsElem.getChildren("weapon"));
-        for (int i = 0; i < weaponElems.size(); i++) {
-            Element weaponElem = weaponElems.get(i);
-            if (i < vs.getWeapons().size()) {
-                weaponElem.setAttribute("type", vs.getWeapons().get(i).getFirst());
-                weaponElem.setAttribute("powered", "false");
-                weaponElem.setAttribute("chargeTime", "0");
-                weaponElem.removeChildren("extraCharges");
-                weaponElem.removeChildren("chainCount");
-            } else {
-                weaponsElem.removeContent(weaponElem);
-            }
+        weaponsElem.removeChildren("weapon");
+        int weaponSlots = player.getHardpoints().size();
+        for (int i = 0; i < vs.getWeapons().size() && i < weaponSlots; i++) {
+            Element weaponElem = new Element("weapon");
+            weaponElem.setAttribute("hardpoint", Integer.toString(i));
+            weaponElem.setAttribute("type", vs.getWeapons().get(i).getFirst());
+            weaponElem.setAttribute("powered", Boolean.toString(vs.getWeapons().get(i).getSecond()));
+            weaponElem.setAttribute("chargeTime", "0");
+            weaponsElem.addContent(weaponElem);
         }
 
         // Drones: write them into the drone control system's element.
