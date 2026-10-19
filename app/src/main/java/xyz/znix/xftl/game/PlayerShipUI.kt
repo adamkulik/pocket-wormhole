@@ -2808,6 +2808,12 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
     }
 
     fun showGameOverScreen(outcome: GameOverWindow.Outcome) {
+        // The run ends the moment this screen appears - win or lose - so
+        // mark it finished before the window opens. This is the single
+        // choke point for every game-over screen (the flagship win, the
+        // defeat checks and the debug command).
+        game.markRunEnded()
+
         currentWindow = GameOverWindow(game, outcome)
     }
 

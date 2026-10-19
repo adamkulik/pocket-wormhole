@@ -110,6 +110,10 @@ public class InGameState extends MainGame.GameState {
     private Beacon currentBeacon;
     private boolean paused;
 
+    // True once a game-over screen has been shown - the run is finished
+    // and can no longer be continued.
+    private boolean runEnded;
+
     // The list of all the sectors the ship has visited, including
     // the current one.
     private final ArrayList<GameMap.SectorInfo> visitedSectors = new ArrayList<>();
@@ -2209,6 +2213,32 @@ public class InGameState extends MainGame.GameState {
     }
 
     /**
+     * True once a game-over screen (victory or defeat) has been shown: the
+     * run is finished and must not be resumable. The Android port uses this
+     * to avoid writing (or keeping) a run save for a finished run.
+     */
+    public boolean isRunEnded() {
+        return runEnded;
+    }
+
+    /**
+     * Mark this run as finished, called when a game-over screen is shown -
+     * once it's up there's no way back into the game, so the run can't be
+     * continued. Notifies the main game so it can clean up after itself
+     * (on Android, deleting the run save).
+     */
+    public void markRunEnded() {
+        if (runEnded)
+            return;
+
+        runEnded = true;
+
+        if (mainGame != null) {
+            mainGame.onRunEnded();
+        }
+    }
+
+    /**
      * Called when the app loses focus (GitHub issue #96): open the pause
      * menu so returning to the app never resumes an unpaused battlefield.
      * One-way: it never closes or navigates anything - if any window is
@@ -2830,17 +2860,15 @@ public class InGameState extends MainGame.GameState {
      * (or backup DNA is preserving them) they can still come back. If the
      * clonebay is unpowered they'll die in short order and we'll end up here.
      *
-     * The defeat is final: the run save is deleted as the screen appears,
-     * so the main menu's Continue can't resurrect a dead run (vanilla
-     * semantics). Winning keeps the save - the flagship fight isn't
-     * implemented yet, so this only covers the loss outcomes in practice.
+     * Any game-over screen ends the run: PlayerShipUI.showGameOverScreen
+     * marks it finished, and the port deletes the run save there (issue
+     * #179), so the main menu's Continue cannot resurrect it.
      */
     private void checkForGameOver() {
         if (shipUI == null || shipUI.isWindowOpen())
             return;
 
         if (player.isGone()) {
-            mainGame.deleteRunSave();
             shipUI.showGameOverScreen(GameOverWindow.Outcome.LOOSE_HULL);
             return;
         }
@@ -2858,7 +2886,6 @@ public class InGameState extends MainGame.GameState {
         if (clonebay != null && !clonebay.getQueue().isEmpty())
             return;
 
-        mainGame.deleteRunSave();
         shipUI.showGameOverScreen(GameOverWindow.Outcome.LOOSE_CREW);
     }
 

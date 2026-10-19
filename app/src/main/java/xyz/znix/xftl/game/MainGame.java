@@ -396,6 +396,17 @@ public class MainGame implements Game {
         currentState.init(gameContainer);
     }
 
+    /**
+     * Called when the current run finishes - a game-over screen (victory or
+     * defeat) has been shown, so it can't be continued any more.
+     * <p>
+     * Deletes the run save so the main menu cannot offer Continue for a run
+     * that is already over (GitHub issue #179).
+     */
+    public void onRunEnded() {
+        deleteRunSave();
+    }
+
     public void quitGame() {
         // Save the current run so it can be resumed when the game is reopened.
         // (Upstream never saves here - the comment below is upstream's.)
@@ -422,6 +433,12 @@ public class MainGame implements Game {
      */
     public void writeRunSave() {
         if (!(currentState instanceof InGameState)) {
+            return;
+        }
+
+        // The game-over window's QUIT button (and Save+Quit) route through
+        // here - a run that's already over must not be written back out.
+        if (((InGameState) currentState).isRunEnded()) {
             return;
         }
 
