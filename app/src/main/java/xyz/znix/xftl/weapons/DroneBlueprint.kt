@@ -53,21 +53,31 @@ class DroneBlueprint(xml: Element) : Blueprint(xml) {
     // This version is used by the ship editor, since it doesn't have an InGameState instance.
     fun drawIconUI(animations: Animations, pos: IPoint, getImg: (String) -> Image) {
         var base: Image? = null
+        var layer: Image? = null
 
-        // For indoor drones, use their portrait.
-        // For some reason, the ion intruder drone (BOARDER_ION) doesn't set
-        // it's iconImage such that we can access it - likely due to it being
-        // hardcoded - so leave it null to use missingImage.
-        val indoorIcon = when (type) {
+        // Indoor drones are drawn the same way as vanilla's
+        // DroneBlueprint::RenderIcon: the walk_down frame 0 of
+        // people/<race>_base.png, overlaid with the matching frame of
+        // people/<race>_layer1.png tinted SYS_ENERGY_ACTIVE. The old port
+        // used the (different) portrait frame and skipped the layer, so the
+        // repair/battle/boarder icons showed the bare red/grey crew art
+        // instead of the green drone icon (GitHub issue #174).
+        // The ion intruder drone uses the BOARDER_ION race - vanilla
+        // special-cases its name here since the blueprint has no iconImage.
+        val indoorRace = when (type) {
             DroneType.REPAIR -> "repair"
-            DroneType.BATTLE, DroneType.BOARDER -> "battle"
+            DroneType.BATTLE -> "battle"
+            DroneType.BOARDER -> if (name == "BOARDER_ION") "boarder_ion" else "battle"
             else -> null
         }
-        if (indoorIcon != null) {
-            val portraitAnim = animations.animations["${indoorIcon}_portrait"]
-            if (portraitAnim != null) {
-                val img = getImg(portraitAnim.sheet.sheetPath)
-                base = portraitAnim.sheet.getSprite(img, portraitAnim.x, portraitAnim.y)
+        if (indoorRace != null) {
+            val walkAnim = animations.animations["${indoorRace}_walk_down"]
+            if (walkAnim != null) {
+                val img = getImg(walkAnim.sheet.sheetPath)
+                base = walkAnim.sheet.getSprite(img, walkAnim.x, walkAnim.y)
+
+                val layerImg = getImg("img/people/${indoorRace}_layer1.png")
+                layer = walkAnim.sheet.getSprite(layerImg, walkAnim.x, walkAnim.y)
             }
         }
 
@@ -96,6 +106,9 @@ class DroneBlueprint(xml: Element) : Blueprint(xml) {
         }
 
         base.draw(imgX.f, imgY.f)
+
+        // The tinted crew layer that gives indoor drones their green look.
+        layer?.draw(imgX.f, imgY.f, Constants.SYS_ENERGY_ACTIVE)
 
         // Draw the laser for defence drones.
         // Note that while the normal defence drones have a fully-charged
