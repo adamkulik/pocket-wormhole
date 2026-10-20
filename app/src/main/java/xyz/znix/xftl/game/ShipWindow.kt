@@ -243,11 +243,7 @@ class ShipWindow(val game: InGameState, val ship: Ship, initialTab: Tab, private
 
             val system = ship.mainSystems.getOrNull(i)
 
-            val price: Int? = when {
-                system == null -> null
-                system.energyLevels == system.blueprint.maxPower -> null
-                else -> system.blueprint.upgradeCost[system.energyLevels - 1]
-            }
+            val price: Int? = upgradePriceFor(system)
 
             val isFullyUpgraded = system != null && price == null
 
@@ -278,11 +274,7 @@ class ShipWindow(val game: InGameState, val ship: Ship, initialTab: Tab, private
 
             val system = if (i < subsystems.size) subsystems[i] else null
 
-            val price: Int? = when {
-                system == null -> null
-                system.energyLevels == system.blueprint.maxPower -> null
-                else -> system.blueprint.upgradeCost[system.energyLevels - 1]
-            }
+            val price: Int? = upgradePriceFor(system)
 
             val isFullyUpgraded = system != null && price == null
 
@@ -844,4 +836,29 @@ class ShipWindow(val game: InGameState, val ship: Ship, initialTab: Tab, private
     companion object {
         const val GLOW_WIDTH: Int = 7
     }
+}
+
+/**
+ * The scrap price to upgrade [system] to its next level, or null if it can't
+ * be upgraded: at or above its maximum power, or outside the range of the
+ * blueprint's upgradeCost list.
+ *
+ * A system's level can be 0 (a ship-layout slot with `power="0"`, as the
+ * hangar ship editor and some mods/tests produce) or above maxPower (modded
+ * blueprints, hand-edited saves). Indexing `upgradeCost[energyLevels - 1]`
+ * directly threw IndexOutOfBoundsException for those, which aborted the whole
+ * ship-upgrades window mid-draw: the background and ship name appeared but
+ * every button (tabs, upgrade slots, ACCEPT/UNDO) was missing - GitHub issue
+ * #105. Guarding here keeps the window renderable, which is also why this
+ * lives outside the class for the test kit.
+ */
+internal fun upgradePriceFor(system: AbstractSystem?): Int? {
+    if (system == null)
+        return null
+
+    val level = system.energyLevels
+    if (level < 1 || level >= system.blueprint.maxPower)
+        return null
+
+    return system.blueprint.upgradeCost.getOrNull(level - 1)
 }
