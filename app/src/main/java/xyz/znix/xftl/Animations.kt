@@ -66,7 +66,8 @@ class Animations {
     }
 
     private fun buildSheet(elem: Element, name: String): SpriteSheetSpec? {
-        // These have image sizes which don't match the XML, skip verification of them for now
+        // These have image sizes which don't match the XML, and don't work
+        // with the engine's sprite sheet handling.
         if (TMP_BROKEN_IMAGES.contains(name))
             return null
 
@@ -268,7 +269,15 @@ class Animations {
     }
 
     companion object {
-        val TMP_BROKEN_IMAGES = setOf("artillery_fed", "explosion_big1", "room_touch2x2", "room_touch2x1")
+        // Sheets that can't be loaded as-is.
+        //
+        // Note that 'artillery_fed' is deliberately NOT in this list. It's a
+        // 1x1 blank (transparent) image used by the vanilla Federation
+        // artillery launchers (ARTILLERY_FED and ARTILLERY_FED_C), and its
+        // declared 400x100/frame 40x100 geometry has to be kept so the weapon
+        // animation resolves. Skipping it made the artillery system fall back
+        // to the nullResource 'missing image' warning triangle.
+        val TMP_BROKEN_IMAGES = setOf("explosion_big1", "room_touch2x2", "room_touch2x1")
 
         // How long it takes a weapon animation to play from the charged frame to the end.
         // These were reverse-engineered from vanilla FTL.
