@@ -4,6 +4,7 @@ import org.jdom2.Element
 import xyz.znix.xftl.AnimationSpec
 import xyz.znix.xftl.Constants
 import xyz.znix.xftl.Ship
+import xyz.znix.xftl.augments.AugmentBlueprint
 import xyz.znix.xftl.math.RoomPoint
 import xyz.znix.xftl.savegame.SaveUtil
 
@@ -25,6 +26,15 @@ class BreachInstance(val room: Room, val slot: Int) {
 
     private val animation: AnimationSpec = ship.sys.animations["breach"]
 
+    /**
+     * Whether the Slug Repair Gel layer is drawn over this breach. Vanilla
+     * checks the SLUG_GEL augment value against zero (exe FUN_0063f220),
+     * which presence-only [Ship.hasAugment] wouldn't capture for modded
+     * augments with a zero value. Exposed for the test kit.
+     */
+    val hasGelOverlay: Boolean
+        get() = ship.getAugmentValue(AugmentBlueprint.SLUG_GEL) != 0f
+
     fun draw() {
         val screenX = pos.offsetX
         val screenY = pos.offsetY
@@ -44,6 +54,16 @@ class BreachInstance(val room: Room, val slot: Int) {
         val offsetY = (Constants.ROOM_SIZE - image.height) / 2
 
         image.draw(screenX + offsetX, screenY + offsetY)
+
+        // Slug Repair Gel (SLUG_GEL): vanilla draws a second, magenta-tinted
+        // copy of the same breach frame for ships with this augment. It's
+        // translated (-7,-7) from the normal sprite position (i.e. to the
+        // room cell's origin), so it reads as a purple gel layer over the
+        // breach that shrinks along with it while the augment seals it.
+        // FTLGame.exe 1.6.14 FUN_0063f220.
+        if (hasGelOverlay) {
+            image.draw(screenX + offsetX - 7, screenY + offsetY - 7, Constants.BREACH_GEL_OVERLAY)
+        }
     }
 
     fun saveToXML(elem: Element) {

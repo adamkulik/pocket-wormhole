@@ -173,6 +173,13 @@ public class Constants {
     public static final Colour SOLAR_FLARE_FILTER = new Colour(248, 129, 33);
     public static final Colour PULSAR_PULSE_FILTER = new Colour(133, 231, 237);
 
+    // Slug Repair Gel: vanilla draws a second, magenta-tinted copy of the
+    // breach sprite, translated (-7,-7) from the normal sprite, on breaches
+    // aboard a ship with this augment - the visible "gel is fixing it"
+    // layer. (FTLGame.exe 1.6.14 FUN_0063f220; the tint comes from the
+    // constant table entry copied to 0x91aaa0 at startup: 255,50,255,1.)
+    public static final Colour BREACH_GEL_OVERLAY = new Colour(255, 50, 255);
+
     public static final Colour DAMAGE_COLOUR_ION = new Colour(38, 210, 215);
     public static final Colour DAMAGE_COLOUR_ZOLTAN = new Colour(38, 240, 37);
     public static final Colour DAMAGE_COLOUR_SYSTEM = new Colour(243, 100, 93);
