@@ -24,6 +24,13 @@ class ShipList(private val state: SelectShipState, private val close: (LazyShipB
 
     private val ships: List<LazyShipBlueprint>
 
+    /**
+     * The names of the ship blueprints that the player hasn't unlocked
+     * yet. These are still listed (vanilla shows every ship), but are
+     * drawn darkened with a padlock and can't be selected.
+     */
+    private val lockedShips: Set<String>
+
     private var offsetY: Int = 0
     private var maxY: Int = 0
 
@@ -41,6 +48,8 @@ class ShipList(private val state: SelectShipState, private val close: (LazyShipB
         val nonFamilyShips = state.ships.filter { !state.shipFamilies.byShipId.containsKey(it.name) }
         val aVariants = state.shipFamilies.families.map { family -> state.ships.first { it.name == family.ships[0] } }
         ships = aVariants + nonFamilyShips
+
+        lockedShips = ships.filter { !state.isShipUnlocked(it.name) }.map { it.name }.toSet()
     }
 
     fun draw(container: GameContainer, g: Graphics) {
@@ -159,8 +168,7 @@ class ShipList(private val state: SelectShipState, private val close: (LazyShipB
             // Locked ships are still listed (vanilla shows all of them),
             // but they're darkened, have a padlock over them, and can't be
             // selected.
-            // This includes the AE-only ships while AE content is off.
-            val locked = !state.isShipSelectable(ship.name)
+            val locked = ship.name in lockedShips
             img.draw(x.f, y.f, if (locked) LOCKED_TINT else Colour.white)
             if (locked) {
                 lockIcon.draw(
