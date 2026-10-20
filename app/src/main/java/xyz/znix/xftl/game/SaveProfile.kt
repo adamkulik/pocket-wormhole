@@ -58,6 +58,19 @@ class SaveProfile private constructor() {
         private set
 
     /**
+     * The hangar's ADVANCED EDITION ON/OFF toggle, remembered between runs
+     * like vanilla. New runs use it; saved runs keep whatever they started
+     * with.
+     */
+    var advancedEdition = true
+        set(value) {
+            if (field == value)
+                return
+            field = value
+            dirty = true
+        }
+
+    /**
      * Set to true if this profile needs saving.
      */
     var dirty = false
@@ -180,6 +193,9 @@ class SaveProfile private constructor() {
         if (firstRunTipShown)
             root.addContent(Element("firstRunTipShown"))
 
+        if (!advancedEdition)
+            root.addContent(Element("advancedEditionOff"))
+
         return doc
     }
 
@@ -229,6 +245,7 @@ class SaveProfile private constructor() {
         }
 
         firstRunTipShown = root.getChild("firstRunTipShown") != null
+        advancedEdition = root.getChild("advancedEditionOff") == null
     }
 
     class AchievementUnlockInfo(val difficulty: Difficulty)

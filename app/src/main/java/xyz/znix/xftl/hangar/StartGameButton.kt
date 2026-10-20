@@ -15,6 +15,7 @@ class StartGameButton(val state: SelectShipState) {
     var selected: Difficulty = Difficulty.NORMAL
     private var hovered: Difficulty? = null
     private var hoveringStart: Boolean = false
+    private var hoveringAdvanced: Boolean = false
 
     fun draw(g: Graphics) {
         val image = state.getImg("img/customizeUI/box_start.png")
@@ -69,6 +70,29 @@ class StartGameButton(val state: SelectShipState) {
         }
 
         drawStartButton(g, x + startButtonX, y + 21, startButtonWidth, startText)
+
+        drawAdvancedButton(g, x, y - GLOW + image.height + 4, width)
+    }
+
+    /**
+     * Vanilla's ADVANCED EDITION ON/OFF toggle, under the start box.
+     */
+    private fun drawAdvancedButton(g: Graphics, x: Int, y: Int, width: Int) {
+        val height = 28
+
+        hoveringAdvanced = state.mousePos.x in x until x + width && state.mousePos.y in y until y + height
+
+        g.colour = when {
+            hoveringAdvanced -> Constants.UI_BUTTON_HOVER
+            else -> Constants.SECTOR_CUTOUT_TEXT
+        }
+
+        val key = if (state.advancedEdition) "advanced_on_button" else "advanced_off_button"
+        val text = state.translator.translations[key]
+            ?: if (state.advancedEdition) "ADVANCED EDITION: ON" else "ADVANCED EDITION: OFF"
+
+        Buttons.drawRounded(g, x, y, width, height, 4)
+        difficultyFont.drawStringCentred(x.f, y + 21f, width.f, text, Constants.JUMP_DISABLED_TEXT)
     }
 
     private fun drawDifficultyButton(g: Graphics, x: Int, yBase: Int, width: Int, difficulty: Difficulty) {
@@ -112,6 +136,10 @@ class StartGameButton(val state: SelectShipState) {
             return
 
         hovered?.let { selected = it }
+
+        if (hoveringAdvanced) {
+            state.advancedEdition = !state.advancedEdition
+        }
 
         if (hoveringStart) {
             state.startGame(selected)
