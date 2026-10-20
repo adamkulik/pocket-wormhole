@@ -307,12 +307,12 @@ class DialogueWindow private constructor(val game: InGameState, val playerShip: 
                 val lineY = textTop + FONT_HEIGHT
                 val textEndY = drawText(lineY, text, colour, rebuildBBs, maxTextX)
 
+                val boxPos: IPoint
                 if (textEndY == lineY) {
                     // The event is only one line long, draw the resource
                     // box after the text.
                     val boxX = textX + font.getWidth(text) + textResourceMargin
-                    val boxPos = ConstPoint(boxX, textY)
-                    drawResourceBox(g, option.choiceResources, boxPos, boxSize, colour)
+                    boxPos = ConstPoint(boxX, textY)
                 } else {
                     // The text was multiple lines long, draw the resource box
                     // on the right-mode side and centred on the text.
@@ -324,11 +324,20 @@ class DialogueWindow private constructor(val game: InGameState, val playerShip: 
                     val firstLineTop = lineY - FONT_HEIGHT
                     val textHeight = textEndY - firstLineTop
                     val centreY = firstLineTop + textHeight / 2 - boxSize.y / 2
-                    val boxPos = ConstPoint(maxBoxX, centreY)
-                    drawResourceBox(g, option.choiceResources, boxPos, boxSize, colour)
+                    boxPos = ConstPoint(maxBoxX, centreY)
                 }
 
-                textY = max(textEndY + TEXT_OPTION_BOTTOM_MARGIN, boxSize.y + RESOURCE_BOTTOM_MARGIN)
+                drawResourceBox(g, option.choiceResources, boxPos, boxSize, colour)
+
+                // Leave a 10px gap below the resource box. The box is
+                // drawn over the option's vertical span (its top is the
+                // option's top), so advancing by the text baseline alone
+                // let the next option's box overlap this one - in a crew
+                // hire event that clipped the crew portrait in half.
+                textY = max(
+                    textEndY + TEXT_OPTION_BOTTOM_MARGIN,
+                    boxPos.y + boxSize.y + RESOURCE_BOTTOM_MARGIN
+                )
             } else {
                 textY += TEXT_OPTION_TOP_OFFSET
                 textY = drawText(textY, text, colour, rebuildBBs)
