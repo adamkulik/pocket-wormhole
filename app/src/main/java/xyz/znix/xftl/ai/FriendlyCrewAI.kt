@@ -369,7 +369,10 @@ class FriendlyCrewAI(private val ship: Ship) {
         val teleporter = ship.teleporter ?: return
 
         val enemy = ship.sys.getEnemyOf(ship) ?: return
-        val boarders = enemy.crew.filterIsInstance<LivingCrew>().filter { it.mode == AbstractCrew.SlotType.INTRUDER }
+        // Only our own boarders - not an intruder some earlier ship left
+        // behind (GitHub issue #104), which the teleporter won't recall.
+        val boarders = enemy.crew.filterIsInstance<LivingCrew>()
+            .filter { it.mode == AbstractCrew.SlotType.INTRUDER && it.ownerShip == ship }
 
         val minHealthFraction = when (ship.type.boardingStrategy) {
             BoardingStrategy.INVASION -> -1f // Never teleport back

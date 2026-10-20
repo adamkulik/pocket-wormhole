@@ -118,6 +118,12 @@ class Teleporter(blueprint: SystemBlueprint) : MainSystem(blueprint) {
             if (!ship.isPlayerShip) {
                 // Don't abduct the player's mind-controlled crew.
                 ourCrew = ourCrew.filterNot { it.ownerShip?.isPlayerShip == true }
+
+                // Only recall our own boarders: an intruder left behind by
+                // an earlier ship would otherwise be pulled aboard, start
+                // wrecking a ship that isn't theirs and end the fight early
+                // (GitHub issue #104).
+                ourCrew = ourCrew.filter { belongsToShip(it) }
             }
 
             // Limit the crew we can teleport to four (at least on a two-person
