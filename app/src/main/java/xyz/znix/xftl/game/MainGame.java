@@ -68,7 +68,7 @@ public class MainGame implements Game {
 
         if (commandLineArgs.newGameShip != null) {
             // Switch right into a new game
-            startNewGame(commandLineArgs.newGameShip, Difficulty.NORMAL, null);
+            startNewGame(commandLineArgs.newGameShip, Difficulty.NORMAL, null, profile.getAdvancedEdition());
         } else if (commandLineArgs.debugLoad != null) {
             Path path = DebugConsole.DEBUG_SAVE_DIR.resolve(commandLineArgs.debugLoad + ".xml");
             Document doc;
@@ -172,7 +172,7 @@ public class MainGame implements Game {
                 }
                 return new kotlin.Pair<>(tiles, bp.getDoors().size());
             });
-            setCurrentState(new InGameState(this, content, data));
+            setCurrentState(new InGameState(this, getGameContent(data.getAdvanced()), data));
             // Consumed: rename to a backup so it can't shadow newer saves.
             try {
                 Files.move(path, path.resolveSibling("continue-imported.sav"),
@@ -206,20 +206,34 @@ public class MainGame implements Game {
         return content;
     }
 
+    /**
+     * The game content with Advanced Edition content on or off. Switching
+     * reloads it (and frees the old one), so this must only be called
+     * between states - when starting or loading a run.
+     */
+    public InGameState.GameContent getGameContent(boolean advancedEdition) {
+        if (content.enableAdvancedEdition != advancedEdition) {
+            content.freeResources();
+            content = new InGameState.GameContent(datafile, advancedEdition);
+        }
+        return content;
+    }
+
     public void switchToDatafileSelect() {
         setCurrentState(new DatafileSelectState(this));
     }
 
-    public void startNewGame(@NotNull String shipName, Difficulty difficulty, EditableShip customised) {
+    public void startNewGame(@NotNull String shipName, Difficulty difficulty, EditableShip customised, boolean advancedEdition) {
         // A new run replaces any saved one
         deleteRunSave();
-        InGameState inGameState = new InGameState(this, content, shipName, difficulty, customised);
+        InGameState inGameState = new InGameState(this, getGameContent(advancedEdition), shipName, difficulty, customised);
         setCurrentState(inGameState);
     }
 
     public void restartGame() {
         InGameState state = (InGameState) currentState;
-        startNewGame(state.getPlayer().getName(), state.getDifficulty(), state.getPlayer().getCustomised());
+        startNewGame(state.getPlayer().getName(), state.getDifficulty(), state.getPlayer().getCustomised(),
+                state.isAdvancedEdition());
     }
 
     /**
@@ -302,7 +316,9 @@ public class MainGame implements Game {
     }
 
     public void loadSavedGame(Document savedGame) {
-        InGameState inGameState = new InGameState(this, content, savedGame);
+        // The run keeps the Advanced Edition setting it was started with.
+        boolean advancedEdition = Boolean.parseBoolean(savedGame.getRootElement().getAttributeValue("enableAE"));
+        InGameState inGameState = new InGameState(this, getGameContent(advancedEdition), savedGame);
         setCurrentState(inGameState);
     }
 
