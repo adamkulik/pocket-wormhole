@@ -197,6 +197,27 @@ abstract class LivingCrew(blueprint: CrewBlueprint, anims: Animations, room: Roo
         if (currentAction != Action.DYING && getAugmentValue(AugmentBlueprint.RECONSTRUCTIVE_TELEPORT) != null) {
             health = maxHealth
         }
+
+        // Vanilla only has two sides - player crew and enemy crew - so a
+        // non-player crewmember teleported onto an enemy ship joins that
+        // ship's crew. This is the boarders-you-jumped-away-with case:
+        // "If you have boarders on your ship and you jump away ... and end
+        // up at a beacon with another neutral ship with a teleporter, the
+        // boarders will teleport away." (wiki, Boarding - Defending
+        // against boarders). Without this they keep their old (gone) owner
+        // ship, count as a stranded INTRUDER on the ship that recalled
+        // them, sabotage its systems, and leave it crewless for the defeat
+        // check before doing the same to the derelict (GitHub issue #104).
+        // Player crew keep their owner, so they stay hostile boarders, and
+        // crew still owned by a ship in the fight keep their own side
+        // (enemy crew sent onto the player ship stay its intruders).
+        val destination = room.ship
+        val owner = ownerShip
+        if (!destination.isPlayerShip && owner != destination &&
+            (owner == null || !game.isShipPresent(owner))
+        ) {
+            ownerShip = destination
+        }
     }
 
     override fun onFinishedDying() {
