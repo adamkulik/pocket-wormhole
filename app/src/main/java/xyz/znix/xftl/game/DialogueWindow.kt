@@ -341,12 +341,19 @@ class DialogueWindow private constructor(val game: InGameState, val playerShip: 
         var textY = position.y + 35
         textY = drawText(textY, text)
 
-        if (resourcesGained.hasAnything) {
+        // A resource set can be non-empty yet have nothing to display: an
+        // event hull repair at full health has no message (see
+        // getHullDamageText), so findResourceBoxSize returns a zero-height
+        // box. Drawing that left a lone white dot in the middle of the
+        // dialogue window, and the options below were pushed down by the
+        // reward spacing for nothing (issue #131).
+        val boxSize = if (resourcesGained.hasAnything) findResourceBoxSize(resourcesGained) else null
+
+        if (boxSize != null && boxSize.y > 0) {
             // The box is centred 43 pixels below the baseline of the last line of
             // the event text.
             val boxMiddleY = textY + 43
 
-            val boxSize = findResourceBoxSize(resourcesGained)
             val boxX = position.x + (size.x - boxSize.x) / 2
             val boxY = boxMiddleY - boxSize.y / 2
             val boxPos = ConstPoint(boxX, boxY)
