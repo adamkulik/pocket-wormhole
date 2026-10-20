@@ -208,6 +208,16 @@ class MindControl(blueprint: SystemBlueprint) : MainSystem(blueprint) {
         val suitableCrew = room.crew.filterIsInstance(LivingCrew::class.java)
             .filter { it.mode == targetMode }
             .filter { !it.isMindControlResistant }
+            // Enemies cannot cancel the player's mind control (wiki Mind
+            // Control: "Your crewmembers can be freed from enemy mind
+            // control (but enemies cannot cancel your mind control)"). The
+            // enemy AI aims at rooms on the player's ship, where a crewmember
+            // the player is controlling has mode CREW - so without this the
+            // enemy Mind Control would 'counter' the player's control as soon
+            // as it was ready. That removes the crew's friendly mode, making
+            // it impossible to teleport the mind-controlled crew back to its
+            // ship (GitHub issue #126).
+            .filter { ship.isPlayerShip || it.mindControlledBy == null || it.mindControlledBy == this }
         if (suitableCrew.isEmpty())
             return
 
