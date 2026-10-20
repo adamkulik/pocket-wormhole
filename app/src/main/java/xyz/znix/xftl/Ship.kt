@@ -1023,11 +1023,12 @@ class Ship(
             // ship is removed at isGone - skipping the clone bay
             // entirely (issue #167). Mirror what AbstractCrew.update
             // does at zero health: crew already mid-death-animation
-            // just get finished; everyone else starts dying (death
-            // sound, Zoltan blast) and finishes immediately, exactly
-            // like crew without a dying animation. The deaths are
-            // invisible either way - the interior stops rendering once
-            // the hull dies. Runs every dead frame, so crew
+            // just get finished; everyone else starts dying (Zoltan
+            // blast) and finishes immediately, exactly like crew
+            // without a dying animation. The deaths are invisible and
+            // silent - the interior stops rendering once the hull dies,
+            // and vanilla plays only the explosion, not a death sound
+            // per crew member. Runs every dead frame, so crew
             // teleporting in late are picked up too, and everything is
             // complete long before isGone drops the ship.
             for (crewMember in crew.toTypedArray()) {
@@ -1037,7 +1038,7 @@ class Ship(
                 }
 
                 crewMember.health = 0f
-                crewMember.onStartedDying()
+                crewMember.onStartedDying(playSound = false)
                 crewMember.onFinishedDying()
             }
 
