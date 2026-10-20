@@ -290,6 +290,12 @@ class Weapons(blueprint: SystemBlueprint) : MainSystem(blueprint) {
         }
 
         for (target in selectedTargets) {
+            // A stale aim at a ship that is no longer part of the save (the
+            // enemy was crew-killed and left, or jumped away) can't be
+            // restored - drop it rather than abort the save.
+            if (!refs.contains(target.targetShip))
+                continue
+
             val targetElem = Element("target")
             target.saveToXML(targetElem, refs)
             elem.addContent(targetElem)

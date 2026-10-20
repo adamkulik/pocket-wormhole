@@ -564,7 +564,7 @@ class BeamBlueprint(xml: Element) : AbstractWeaponBlueprint(xml) {
             SaveUtil.addTagFloat(elem, "fireDuration", fireDuration, this@BeamBlueprint.fireDuration)
             SaveUtil.addTagBoolIfTrue(elem, "superShieldReady", superShieldReady)
 
-            if (target != null) {
+            if (target != null && refs.contains(target!!.targetShip)) {
                 val targetElem = Element("target")
                 target!!.saveToXML(targetElem, refs)
                 elem.addContent(targetElem)

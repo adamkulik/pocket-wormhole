@@ -236,6 +236,13 @@ abstract class AbstractProjectile(
         rotation = atan2(targetPos.y - pos.yf, targetPos.x - pos.xf)
     }
 
+    override fun isSaveable(refs: ObjectRefs): Boolean {
+        // The target ship has to be part of the save for load to restore
+        // where this projectile was heading. A null targetShip is fine
+        // (defence-drone interceptor bolts don't target a ship).
+        return refs.contains(targetShip)
+    }
+
     override fun saveToXML(elem: Element, refs: ObjectRefs) {
         SaveUtil.addAttrFloat(elem, "x", pos.xf)
         SaveUtil.addAttrFloat(elem, "y", pos.yf)

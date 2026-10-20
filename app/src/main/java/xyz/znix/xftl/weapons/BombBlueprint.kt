@@ -257,6 +257,12 @@ class BombBlueprint(xml: Element) : AbstractWeaponBlueprint(xml) {
             return room == target && !missed && !hitSuperShield
         }
 
+        override fun isSaveable(refs: ObjectRefs): Boolean {
+            // A bomb aimed at a ship that is no longer in the save can't be
+            // restored - leave it out rather than aborting the save.
+            return refs.contains(target.ship)
+        }
+
         override fun saveToXML(elem: Element, refs: ObjectRefs) {
             SaveUtil.addAttr(elem, "type", type.name)
 

@@ -235,7 +235,7 @@ abstract class AbstractProjectileWeaponInstance(type: AbstractWeaponBlueprint, s
     override fun saveToXML(elem: Element, refs: ObjectRefs) {
         super.saveToXML(elem, refs)
 
-        if (waitingToFireAt != null) {
+        if (waitingToFireAt != null && refs.contains(waitingToFireAt!!.ship)) {
             val fireAtElem = Element("waitingToFireAt")
             SaveUtil.addAttr(fireAtElem, "ship", refs[waitingToFireAt!!.ship])
             SaveUtil.addAttrInt(fireAtElem, "roomId", waitingToFireAt!!.id)
@@ -249,6 +249,10 @@ abstract class AbstractProjectileWeaponInstance(type: AbstractWeaponBlueprint, s
         SaveUtil.addTagInt(elem, "firingChainCount", firingChainCount, 0)
 
         for (target in targets) {
+            // Drop aims at ships that are no longer part of the save.
+            if (!refs.contains(target.ship))
+                continue
+
             val targetElem = Element("target")
             SaveUtil.addAttr(targetElem, "ship", refs[target.ship])
             SaveUtil.addAttrInt(targetElem, "roomId", target.id)

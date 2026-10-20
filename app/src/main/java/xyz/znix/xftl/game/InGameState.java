@@ -2016,9 +2016,12 @@ public class InGameState extends MainGame.GameState {
         root.addContent(visitedSectorsXML);
 
         // If the player saves while they're currently in the event UI, save that.
-        Element shipUiXML = new Element("shipUI");
-        shipUI.saveToXML(shipUiXML, refs);
-        root.addContent(shipUiXML);
+        // (Automated tests have no UI - see isRunningAutomatedTest.)
+        if (shipUI != null) {
+            Element shipUiXML = new Element("shipUI");
+            shipUI.saveToXML(shipUiXML, refs);
+            root.addContent(shipUiXML);
+        }
 
         return new Document(root);
     }
@@ -2082,9 +2085,12 @@ public class InGameState extends MainGame.GameState {
         Element sectorXML = root.getChild("currentSector");
         new Sector(sectorXML, refs, this, mapRefLoader);
 
-        Element shipUiXML = root.getChild("shipUI");
-        shipUI = new PlayerShipUI(player, this);
-        shipUI.loadFromXML(shipUiXML, refs);
+        // Automated tests have no UI (fonts/images need a GL context).
+        if (!isRunningAutomatedTest()) {
+            Element shipUiXML = root.getChild("shipUI");
+            shipUI = new PlayerShipUI(player, this);
+            shipUI.loadFromXML(shipUiXML, refs);
+        }
 
         // This resolves any async-resolved object references.
         refs.switchToResolveMode();
@@ -2108,7 +2114,8 @@ public class InGameState extends MainGame.GameState {
         }
 
         // We might have loaded a beacon with a store
-        shipUI.updateButtons();
+        if (shipUI != null)
+            shipUI.updateButtons();
     }
 
     /**

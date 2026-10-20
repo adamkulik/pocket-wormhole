@@ -133,6 +133,17 @@ abstract class AbstractDrone(val type: DroneBlueprint) {
     open fun onEnemyShipUpdated() {
     }
 
+    /**
+     * Whether this drone can be included in a save file at all.
+     *
+     * Drones reference their owner ship; if that ship is not part of the
+     * save (it was crew-killed and left, or jumped away), serialising the
+     * reference would abort the whole save.
+     */
+    open fun isSaveable(refs: ObjectRefs): Boolean {
+        return !::ownerShip.isInitialized || refs.contains(ownerShip)
+    }
+
     open fun saveToXML(elem: Element, refs: ObjectRefs) {
         SaveUtil.addAttr(elem, "type", type.name)
         SaveUtil.addAttrRef(elem, "owner", refs, ownerShip)

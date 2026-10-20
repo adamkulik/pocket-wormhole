@@ -286,6 +286,11 @@ class Teleporter(blueprint: SystemBlueprint) : MainSystem(blueprint) {
         // crew to, remember that across saves.
         val command = commandedTeleport ?: return
 
+        // The destination ship may no longer be part of the save (a
+        // crew-killed enemy that was left behind); drop the pending order.
+        if (!refs.contains(command.room.ship))
+            return
+
         val commandElem = Element("teleportCommand")
         commandElem.setAttribute("roomId", command.room.id.toString())
         commandElem.setAttribute("roomShip", refs[command.room.ship])

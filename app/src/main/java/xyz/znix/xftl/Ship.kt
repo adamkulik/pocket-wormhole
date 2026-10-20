@@ -2174,7 +2174,7 @@ class Ship(
         val dronesElem = Element("drones")
         for (drone in externalDrones) {
             // Skip drones that are left over from a now-destroyed fight
-            if (!sys.isShipPresent(drone.ownerShip))
+            if (!sys.isShipPresent(drone.ownerShip) || !drone.isSaveable(refs))
                 continue
 
             // Power-surge drones are transient hazard spawns, like
@@ -2190,11 +2190,17 @@ class Ship(
             dronesElem.addContent(droneElem)
         }
         for (pawn in crew.mapNotNull { it as? AbstractIndoorsDrone.Pawn }) {
+            if (!pawn.drone.isSaveable(refs))
+                continue
+
             val droneElem = Element("drone")
             pawn.drone.saveToXML(droneElem, refs)
             dronesElem.addContent(droneElem)
         }
         for (flyingDrone in projectiles.mapNotNull { it as? FlyingDroneProjectile }) {
+            if (!flyingDrone.drone.isSaveable(refs))
+                continue
+
             val droneElem = Element("drone")
             flyingDrone.drone.saveToXML(droneElem, refs)
             dronesElem.addContent(droneElem)

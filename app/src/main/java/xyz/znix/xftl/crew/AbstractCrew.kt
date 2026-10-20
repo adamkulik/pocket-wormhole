@@ -1709,7 +1709,8 @@ abstract class AbstractCrew(
             elem.addContent(combat)
         }
 
-        if (teleportingTo != null) {
+        // Only save a teleport whose destination ship is part of the save.
+        if (teleportingTo != null && refs.contains(teleportingTo!!.ship)) {
             val teleport = Element("teleporting")
             teleport.setAttribute("destRoom", teleportingTo!!.id.toString())
             teleport.setAttribute("destShip", refs[teleportingTo!!.ship])

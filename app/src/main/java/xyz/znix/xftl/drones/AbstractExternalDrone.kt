@@ -269,6 +269,12 @@ abstract class AbstractExternalDrone(
         }
     }
 
+    override fun isSaveable(refs: ObjectRefs): Boolean {
+        // We also store the ship we were deployed against.
+        return super.isSaveable(refs) &&
+                (!this::targetShip.isInitialized || refs.contains(targetShip))
+    }
+
     override fun saveToXML(elem: Element, refs: ObjectRefs) {
         super.saveToXML(elem, refs)
 

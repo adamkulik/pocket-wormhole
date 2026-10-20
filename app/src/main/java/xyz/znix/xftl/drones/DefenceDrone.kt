@@ -414,6 +414,11 @@ class DefenceDrone(type: DroneBlueprint) : AbstractExternalDrone(type, false) {
             currentSpace.playCentredAnimation(hitAnimation, position)
         }
 
+        override fun isSaveable(refs: ObjectRefs): Boolean {
+            // The interceptor bolt stores its owner ship as a reference.
+            return refs.contains(ownerShip) && refs.contains(targetShip)
+        }
+
         override fun saveToXML(elem: Element, refs: ObjectRefs) {
             super.saveToXML(elem, refs)
 

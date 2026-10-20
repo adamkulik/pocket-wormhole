@@ -68,12 +68,13 @@ class ObjectRefs {
     }
 
     /**
-     * True if [obj] is [null], or if it has an ID in this ref set or one
-     * of its parents - i.e. whether it will be part of the save.
+     * True if [obj] is null, or if it has an ID in this ref set or one of
+     * its parents - i.e. whether it will be part of the save.
      *
-     * This lets objects with optional references (a hacking probe whose
-     * owner ship may have been left behind) decide whether they can be
-     * serialised at all.
+     * This lets objects with optional references (a projectile or hacking
+     * probe whose owner or target ship is no longer part of the save)
+     * decide whether they can be serialised at all, instead of aborting
+     * the whole save.
      */
     fun contains(obj: ISerialReferencable?): Boolean {
         return obj == null || lookup(obj) != null

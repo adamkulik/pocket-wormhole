@@ -84,11 +84,10 @@ interface IProjectile {
     /**
      * Whether this projectile can be included in a save file at all.
      *
-     * A few projectiles reference another ship that may not be part of the
-     * save (a hacking probe still attached to a system after the player
-     * jumped away from - or crew-killed - the ship that launched it). Those
-     * must be left out entirely, since there is no owner to restore them
-     * with and a dangling reference aborts the whole save.
+     * A projectile may reference a ship that is no longer part of the save
+     * (it was crew-killed and left as a derelict, or it jumped away). Those
+     * must be left out entirely: there is no ship to restore them with, and
+     * a dangling reference aborts the whole save.
      */
     fun isSaveable(refs: ObjectRefs): Boolean = true
 

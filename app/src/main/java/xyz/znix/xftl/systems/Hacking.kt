@@ -323,7 +323,7 @@ class Hacking(blueprint: SystemBlueprint) : MainSystem(blueprint) {
     override fun saveSystem(elem: Element, refs: ObjectRefs) {
         SaveUtil.addTagFloat(elem, "timeRemaining", timeRemaining, null)
 
-        if (selectedTarget != null) {
+        if (selectedTarget != null && refs.contains(selectedTarget!!.ship)) {
             SaveUtil.addRoomRef(elem, "selectedTarget", refs, selectedTarget!!)
         }
 
