@@ -91,6 +91,7 @@ class SelectShipState(private val datafile: Datafile, private val main: MainGame
     private lateinit var editor: ShipEditor
 
     private val startGameButton: StartGameButton
+    private val advancedBox: AdvancedEditionBox
 
     private val uiProvider: UIProvider = ShipSelectUIProvider()
     private val shipSelector: WidgetContainer
@@ -109,6 +110,7 @@ class SelectShipState(private val datafile: Datafile, private val main: MainGame
 
     init {
         startGameButton = StartGameButton(this)
+        advancedBox = AdvancedEditionBox(this)
         editFileControls = EditFileControls(this)
 
         val background = getImg("img/window_base.png")
@@ -183,6 +185,7 @@ class SelectShipState(private val datafile: Datafile, private val main: MainGame
         g.popTransform()
 
         startGameButton.draw(g)
+        advancedBox.draw(g)
 
         editFileControls.draw(g)
 
@@ -230,6 +233,7 @@ class SelectShipState(private val datafile: Datafile, private val main: MainGame
         }
 
         startGameButton.mouseClicked(button)
+        advancedBox.mouseClicked(button)
 
         editFileControls.mouseClicked(button)
 
