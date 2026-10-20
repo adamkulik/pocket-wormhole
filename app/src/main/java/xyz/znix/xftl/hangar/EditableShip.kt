@@ -67,6 +67,18 @@ class EditableShip(
         }
     }
 
+    /**
+     * Draw just the outside of the ship - the hull and weapons, without the
+     * floor and rooms - for the hangar's HIDE ROOMS mode.
+     */
+    fun drawHull(g: Graphics, state: SelectShipState) {
+        val blueprint = state.blueprints.getShip(baseBlueprint)
+        val hullImage = blueprint.hullImage.firstNotNullOf { state.getImgOrNull(it) }
+
+        drawWeapons(g, state, blueprint)
+        hullImage.draw(blueprint.hullOffset.x, blueprint.hullOffset.y)
+    }
+
     private fun drawWeapons(g: Graphics, state: SelectShipState, shipBlueprint: ShipBlueprint) {
         for ((index, weapon) in weapons.withIndex()) {
             val weaponBp = state.blueprints[weapon] as AbstractWeaponBlueprint
