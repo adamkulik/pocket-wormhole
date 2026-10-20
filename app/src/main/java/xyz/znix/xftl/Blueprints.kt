@@ -57,10 +57,13 @@ class BlueprintManager {
         it.loadFile(df, "blueprints.xml")
         it.loadFile(df, "autoBlueprints.xml")
         it.loadFile(df, "bosses.xml")
+        // Despite its name, this file also holds the base game's pirate
+        // ships (FED_SCOUT_P, ...) next to their AE versions (the _DLC
+        // ones), so it's needed without AE content too.
+        it.loadFile(df, "dlcPirateBlueprints.xml")
         if (enableAE) {
             it.loadFile(df, "dlcBlueprints.xml")
             it.loadFile(df, "dlcBlueprintsOverwrite.xml")
-            it.loadFile(df, "dlcPirateBlueprints.xml")
         }
     })
 
