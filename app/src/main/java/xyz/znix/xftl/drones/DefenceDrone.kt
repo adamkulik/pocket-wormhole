@@ -121,7 +121,10 @@ class DefenceDrone(type: DroneBlueprint) : AbstractExternalDrone(type, false) {
         cooldown = max(0f, cooldown - dt)
 
         var bestTarget: InterceptResult? = if (shootsAtDrones) {
-            pickBestDroneTarget()
+            // Hacking and boarding drones are projectiles while they fly
+            // over, but they're still drones: anti-drones shoot them down
+            // too (GitHub issue #71).
+            pickBestDroneTarget() ?: pickBestProjectileTarget(dronesOnly = true)
         } else {
             pickBestProjectileTarget()
         }
@@ -193,7 +196,11 @@ class DefenceDrone(type: DroneBlueprint) : AbstractExternalDrone(type, false) {
         return drone.onEnemy && drone.timeActive > 0.1f
     }
 
-    private fun pickBestProjectileTarget(): InterceptResult? {
+    /**
+     * Pick the incoming projectile to shoot at. With [dronesOnly], only
+     * drones flying in as projectiles (hacking and boarding drones) count.
+     */
+    private fun pickBestProjectileTarget(dronesOnly: Boolean = false): InterceptResult? {
         var best: InterceptResult? = null
         var bestPriority: Int = -1
 
@@ -221,6 +228,7 @@ class DefenceDrone(type: DroneBlueprint) : AbstractExternalDrone(type, false) {
 
             // Skip projectiles we're not allowed to shoot at.
             when {
+                dronesOnly -> if (!isFlyingDrone(projectile)) continue@projectileLoop
                 projectile.isLaserForDD && shootsAtLasers -> Unit
                 projectile.isMissileForDD && shootsAtMissiles -> Unit
                 else -> continue@projectileLoop
@@ -259,6 +267,10 @@ class DefenceDrone(type: DroneBlueprint) : AbstractExternalDrone(type, false) {
         }
 
         return best
+    }
+
+    private fun isFlyingDrone(projectile: AbstractProjectile): Boolean {
+        return projectile.isMissileForDD && projectile !is AbstractWeaponProjectile
     }
 
     private fun calculateIntercept(projectile: AbstractProjectile, ourSpeed: Float): InterceptResult? {
