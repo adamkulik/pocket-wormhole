@@ -78,6 +78,20 @@ class Beacon(
         }
 
     /**
+     * Whether the jump-map hazard icon should be drawn at this beacon
+     * (before the LRS/visited visibility gate is applied).
+     *
+     * Vanilla draws it for every environment type except [EnvironmentType.NORMAL]
+     * and [EnvironmentType.NEBULA] - asteroid, sun, ion storm and pulsar - and
+     * for PDS/anti-ship-battery events, which this engine models separately via
+     * [Event.asbTarget] rather than as an ambient environment. This is NOT the
+     * same condition as [EnvironmentType.isDangerous]: an ion storm shows the
+     * hazard icon but doesn't impose the IN DANGER ship-menu lockout.
+     */
+    val showsHazardIcon: Boolean
+        get() = !isOvertaken && (environmentType.isMapHazard || event.asbTarget != null)
+
+    /**
      * The sector this beacon resides within.
      *
      * It can only be set once, via [bindSector], and will throw an exception if used before it is set.
@@ -347,7 +361,18 @@ class Beacon(
         NEBULA(false, { game, beacon -> NebulaEnvironment(game, beacon, false) }),
         ION_STORM(false, { game, beacon -> NebulaEnvironment(game, beacon, true) });
 
-        // TODO how should we represent PDS/ABSes, given they can be targed at the player or enemy (or both?)
+        // PDS/ASBs aren't an ambient environment - they're carried by the
+        // event instead (Event.asbTarget), and Beacon.showsHazardIcon adds
+        // them to the jump-map hazard icons on top of these types.
+
+        /**
+         * True if vanilla draws the jump-map hazard icon for this environment.
+         *
+         * Vanilla's environment ids are 0=none, 1=asteroid, 2=sun, 3=nebula,
+         * 4=storm, 5=pulsar, 6=PDS; its star-map render skips only 0 and 3
+         * (FTLGame.exe 1.6.14, FUN_005fdbf0).
+         */
+        val isMapHazard: Boolean get() = this != NORMAL && this != NEBULA
 
         val isNebula: Boolean get() = this == NEBULA || this == ION_STORM
     }

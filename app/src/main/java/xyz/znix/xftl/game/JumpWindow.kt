@@ -317,7 +317,7 @@ class JumpWindow(val game: InGameState, showSectorMap: () -> Unit, val jump: (Be
             val showBasicInfo = beacon.visited || sector.mapRevealed || isNeighbour
             val showAdvInfo = beacon.visited || sector.mapRevealed || (isNeighbour && hasLRS)
 
-            if (showAdvInfo && beacon.environmentType.isDangerous) {
+            if (showAdvInfo && beacon.showsHazardIcon) {
                 beaconEnvironmentHazard.draw(pos.x - 5, pos.y - 5)
             }
 
