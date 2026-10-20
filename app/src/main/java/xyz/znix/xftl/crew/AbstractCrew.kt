@@ -1497,7 +1497,14 @@ abstract class AbstractCrew(
         room.ship.sys.updatePlayerCrew()
     }
 
-    open fun onStartedDying() {
+    /**
+     * [playSound] is false for crew going down with their destroyed ship:
+     * vanilla only plays the hull explosion then, not a scream per crew.
+     */
+    open fun onStartedDying(playSound: Boolean = true) {
+        if (!playSound)
+            return
+
         // Death sounds: engi, mantis, rock, zoltan and crystal crew have
         // race-specific ones (the engiDeath wiring is user-confirmed by
         // ear against vanilla); every other race (human, slug, ghost,
