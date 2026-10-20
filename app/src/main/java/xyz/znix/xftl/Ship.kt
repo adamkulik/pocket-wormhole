@@ -2277,6 +2277,12 @@ class Ship(
             if (projectile is FlyingDroneProjectile)
                 continue
 
+            // Leave out projectiles whose owner or target ship isn't being
+            // saved (a hacking probe whose enemy was left behind): their
+            // references would abort the save and they can't be restored.
+            if (!projectile.isSaveable(refs))
+                continue
+
             val projectileElem = Element("projectile")
             SaveUtil.addAttr(projectileElem, "loadType", projectile.serialisationType)
             projectile.saveToXML(projectileElem, refs)

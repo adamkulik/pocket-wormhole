@@ -1527,7 +1527,10 @@ public class InGameState extends MainGame.GameState {
         // This is called for the first beacon before the player is created.
         if (player != null) {
             // Make the store button appear and disappear.
-            shipUI.updateButtons();
+            // (No UI in automated tests - everything else here is already
+            // null-guarded for the same reason.)
+            if (shipUI != null)
+                shipUI.updateButtons();
 
             // Cancel pending weapon targeting - the fight it belonged to
             // doesn't survive the jump (GitHub issue #55).

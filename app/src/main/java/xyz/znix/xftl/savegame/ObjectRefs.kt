@@ -67,6 +67,18 @@ class ObjectRefs {
         return lookup(obj) ?: throw IllegalArgumentException("Unregistered object $obj")
     }
 
+    /**
+     * True if [obj] is [null], or if it has an ID in this ref set or one
+     * of its parents - i.e. whether it will be part of the save.
+     *
+     * This lets objects with optional references (a hacking probe whose
+     * owner ship may have been left behind) decide whether they can be
+     * serialised at all.
+     */
+    fun contains(obj: ISerialReferencable?): Boolean {
+        return obj == null || lookup(obj) != null
+    }
+
     private fun lookup(obj: ISerialReferencable): String? {
         objectIds[obj]?.let { return it }
 

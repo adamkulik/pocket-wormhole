@@ -82,6 +82,17 @@ interface IProjectile {
     val serialisationType: String
 
     /**
+     * Whether this projectile can be included in a save file at all.
+     *
+     * A few projectiles reference another ship that may not be part of the
+     * save (a hacking probe still attached to a system after the player
+     * jumped away from - or crew-killed - the ship that launched it). Those
+     * must be left out entirely, since there is no owner to restore them
+     * with and a dangling reference aborts the whole save.
+     */
+    fun isSaveable(refs: ObjectRefs): Boolean = true
+
+    /**
      * Called to update this projectile.
      *
      * [currentSpace] is the ship in whose space this projectile

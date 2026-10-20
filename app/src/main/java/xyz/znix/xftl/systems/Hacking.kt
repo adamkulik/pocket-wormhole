@@ -31,18 +31,37 @@ class Hacking(blueprint: SystemBlueprint) : MainSystem(blueprint) {
     override val hasWhiteLockingBox: Boolean get() = active
 
     /**
+     * True while the ship carrying this hacking system is still part of
+     * the fight.
+     *
+     * A hacking drone (and every effect it applies) belongs to the ship
+     * that launched it: once that ship jumps away, escapes or is removed,
+     * the drone is gone and the target system must go back to normal
+     * immediately. Without this check the effects are only dropped when
+     * the *target* system's own update next runs (AbstractSystem.update ->
+     * checkStillAttacking) - and that update does not run while the game
+     * is frozen, or after a save-load re-attaches [AbstractSystem.hackedBy]
+     * to a ship that isn't part of the loaded game. In those cases the
+     * pulse timer is frozen (the hacking ship is no longer updated) while
+     * `hackedBy.active` stays true, so the hack becomes permanent: oxygen
+     * keeps draining, the FTL won't charge, and mind control never expires
+     * (GitHub issue #138, and the crew-kill variant reported as #133).
+     */
+    private val isShipInFight: Boolean get() = ship.sys.isShipPresent(ship)
+
+    /**
      * Is the hacking module powered up, regardless
      * of whether it's actively hacking?
      *
      * This controls passive effects like locking doors
      * and disabling a room's console.
      */
-    val isPoweredUp: Boolean get() = powerSupplied != 0
+    val isPoweredUp: Boolean get() = powerSupplied != 0 && isShipInFight
 
     /**
      * If true, the main hacking pulse is currently active.
      */
-    val active: Boolean get() = timeRemaining != null
+    val active: Boolean get() = timeRemaining != null && isShipInFight
 
     val droneLaunched: Boolean get() = projectile != null
     val droneLanded: Boolean get() = projectile?.hasLanded == true
@@ -652,6 +671,16 @@ class Hacking(blueprint: SystemBlueprint) : MainSystem(blueprint) {
 
             return null
         }
+
+        /**
+         * A hacking probe only exists as part of the ship that launched it.
+         * If that ship isn't in the save (the player crew-killed it and left
+         * it behind while the probe was still attached - GitHub issue #138),
+         * leave the probe out: its owner reference is unresolvable and would
+         * abort the entire run auto-save.
+         */
+        override fun isSaveable(refs: ObjectRefs): Boolean =
+            refs.contains(hacking.ship) && refs.contains(target.ship)
 
         override fun saveToXML(elem: Element, refs: ObjectRefs) {
             super.saveToXML(elem, refs)
