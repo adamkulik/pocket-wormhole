@@ -33,6 +33,12 @@ class HostileShipUI(private val game: InGameState, private val enemy: Ship) {
     val shipPos: IPoint get() = mutableShipPos
 
     /**
+     * The screen X of the left edge of the enemy box's frame, as last drawn.
+     */
+    var boxScreenLeft: Int = 0
+        private set
+
+    /**
      * The scale the enemy's box - frame, labels, bars and the ship drawn
      * inside it - is rendered at. Vanilla is 1; on touch layouts the box
      * is drawn slightly smaller ([TOUCH_BOX_SCALE], or
@@ -190,6 +196,7 @@ class HostileShipUI(private val game: InGameState, private val enemy: Ship) {
         val localShipY = boxY + (box.height - enemy.hullImage.height) / 2
         mutableShipPos.x = (anchorX + scale * (localShipX - enemy.hullOffset.x)).roundToInt()
         mutableShipPos.y = (anchorY + scale * (localShipY - enemy.hullOffset.y)).roundToInt()
+        boxScreenLeft = (anchorX + scale * boxX).roundToInt()
 
         g.pushTransform()
         g.translate(anchorX.f, anchorY.f)

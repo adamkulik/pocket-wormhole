@@ -1248,13 +1248,6 @@ public class InGameState extends MainGame.GameState {
         // Render the tooltip
         ITooltipProvider tooltip = g.getTooltip();
 
-        // On touch the cursor stays where the weapon (or teleporter etc)
-        // button was tapped, so its description would pop up and cover
-        // the enemy rooms the player is trying to aim at. A mouse moves
-        // off the button to aim, which hides it there.
-        if (PlatformSpecific.INSTANCE.isTouchUi() && isTouchTargeting())
-            tooltip = null;
-
         if (tooltip != null) {
             Input in = container.getInput();
 
@@ -1266,6 +1259,19 @@ public class InGameState extends MainGame.GameState {
                         container.getWidth() - 220, container.getHeight() / 2,
                         tooltip != lastFameTooltip,
                         container.getWidth(), container.getHeight()
+                );
+            } else if (PlatformSpecific.INSTANCE.isTouchUi() && isTouchTargeting()
+                    && hostileShipUI != null && hostileShipUI.getBoxScreenLeft() > 0) {
+                // On touch the cursor stays where the weapon (or teleporter
+                // etc) button was tapped, so its description shows up while
+                // aiming. Keep it left of the enemy box, over the shrunken
+                // player ship, so it can still be read without covering the
+                // rooms being aimed at. The tooltips keep themselves 40px
+                // inside the screen width they're given.
+                tooltip.drawTooltip(g,
+                        in.getMouseX(), in.getMouseY(),
+                        tooltip != lastFameTooltip,
+                        hostileShipUI.getBoxScreenLeft() + 40 - 8, container.getHeight()
                 );
             } else {
                 tooltip.drawTooltip(g,
