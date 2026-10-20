@@ -725,14 +725,24 @@ class SystemInstallConfiguration(
                 defaultCompSlot = 0
             }
 
-            // For clonebay/medbay, this sets the position of the obstruction
+            // For clonebay/medbay, this sets the position of the obstruction.
+            //
+            // Only the player's ship gets a default: the ship-add code
+            // defaults a missing slot (-1) to 1 for ship id 0, which puts
+            // the cloning tub/medbay bed in the room and blocks that cell
+            // (a 2-cell clonebay then has 1 standing spot, a 4-cell one 3).
+            // Enemy ships keep the blueprint's -1: no obstruction, so an
+            // enemy 2-cell medical room fits 2 crew and a 4-cell one fits
+            // 4 (wiki: "enemy ships have either 2 or 4 standing spots in a
+            // Medbay"; the Clone Bay page repeats the same for enemy
+            // medical units). GitHub issue #137.
             Clonebay.INFO -> {
-                defaultCompSlot = 1
+                defaultCompSlot = if (room.ship.isPlayerShip) 1 else null
                 defaultCompDir = null
             }
 
             Medbay.INFO -> {
-                defaultCompSlot = 1
+                defaultCompSlot = if (room.ship.isPlayerShip) 1 else null
                 defaultCompDir = null
             }
 
