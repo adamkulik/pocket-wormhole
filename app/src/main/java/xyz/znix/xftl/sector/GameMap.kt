@@ -30,7 +30,9 @@ class GameMap private constructor(df: Datafile, private val eventManager: EventM
     var generationSeed: Int = Random.nextInt()
 
     private val sectorClasses = HashMap<SectorClass, List<SectorType>>()
-    private val sectorTypes = HashMap<String, SectorType>()
+    // Loaded on first use: the AE-only sector types reference AE events,
+    // which aren't loaded at all while Advanced Edition content is off.
+    private val sectorTypes = HashMap<String, Lazy<SectorType>>()
 
     private val specialEvents = SpecialEvents(
         eventManager["START_GAME"],
@@ -59,6 +61,11 @@ class GameMap private constructor(df: Datafile, private val eventManager: EventM
 
         val sectorClassesAE = HashMap<SectorClass, List<SectorType>>()
         outer@ for ((name, sectors) in namedSectorTypes) {
+            // Without AE content, its sector lists aren't used (and would
+            // load the AE sector types).
+            if (!enableAE && name.startsWith(BlueprintManager.AE_PREFIX))
+                continue
+
             val sectorClass = when (name.removePrefix(BlueprintManager.AE_PREFIX)) {
                 "CIVILIAN" -> SectorClass.CIVILIAN
                 "HOSTILE" -> SectorClass.HOSTILE
@@ -73,7 +80,7 @@ class GameMap private constructor(df: Datafile, private val eventManager: EventM
             val classes = if (name.startsWith(BlueprintManager.AE_PREFIX)) sectorClassesAE else sectorClasses
 
             classes[sectorClass] = sectors.map {
-                sectorTypes[it] ?: error("Missing sector $it specificed in category $name")
+                sectorTypes[it]?.value ?: error("Missing sector $it specificed in category $name")
             }
         }
 
@@ -98,7 +105,7 @@ class GameMap private constructor(df: Datafile, private val eventManager: EventM
         require(sectors is ArrayList)
 
         // Add the starting sector
-        val startingType = sectorTypes["CIVILIAN_SECTOR"] ?: error("Cannot find CIVILIAN_SECTOR for first sector")
+        val startingType = sectorTypes["CIVILIAN_SECTOR"]?.value ?: error("Cannot find CIVILIAN_SECTOR for first sector")
         val startingSector = SectorInfo(0, 0, startingType, SectorClass.CIVILIAN)
         sectors.add(listOf(startingSector))
 
@@ -201,7 +208,7 @@ class GameMap private constructor(df: Datafile, private val eventManager: EventM
         }
 
         // Add sector 8
-        val finalType = sectorTypes["FINAL"] ?: error("Cannot find FINAL sector for the boss fight")
+        val finalType = sectorTypes["FINAL"]?.value ?: error("Cannot find FINAL sector for the boss fight")
         val finalSector = SectorInfo(7, 0, finalType, SectorClass.HOSTILE)
         sectors.add(listOf(finalSector))
 
@@ -231,9 +238,11 @@ class GameMap private constructor(df: Datafile, private val eventManager: EventM
             println("Overwriting existing sector $name")
         }
 
-        val sector = SectorType(eventManager, elem)
-        check(name == sector.name)
-        sectorTypes[name] = sector
+        sectorTypes[name] = lazy {
+            val sector = SectorType(eventManager, elem)
+            check(name == sector.name)
+            sector
+        }
     }
 
     fun generateSector(sectorInfo: SectorInfo, game: InGameState): Sector {
@@ -438,7 +447,7 @@ class GameMap private constructor(df: Datafile, private val eventManager: EventM
         val typeName = elem.getAttributeValue("type")
         val sectorClass = SectorClass.valueOf(elem.getAttributeValue("class"))
 
-        val type = sectorTypes[typeName] ?: error("Missing sector type '$typeName'")
+        val type = sectorTypes[typeName]?.value ?: error("Missing sector type '$typeName'")
         val sector = SectorInfo(columnNumber, columnIndex, type, sectorClass)
 
         for (i in 1..2) {
