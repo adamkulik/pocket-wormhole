@@ -96,12 +96,9 @@ class StartGameButton(val state: SelectShipState) {
     private fun drawStartButton(g: Graphics, x: Int, y: Int, width: Int, text: String) {
         val height = 48
 
-        // Greyed out while an AE-only ship is shown with AE content off.
-        val disabled = state.currentShipNeedsAe
-        hoveringStart = !disabled && state.mousePos.x in x until x + width && state.mousePos.y in y until y + height
+        hoveringStart = state.mousePos.x in x until x + width && state.mousePos.y in y until y + height
 
         g.colour = when {
-            disabled -> Constants.JUMP_DISABLED
             hoveringStart -> Constants.UI_BUTTON_HOVER
             else -> Constants.SECTOR_CUTOUT_TEXT
         }

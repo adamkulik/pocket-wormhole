@@ -69,8 +69,8 @@ class SelectShipState(private val datafile: Datafile, private val main: MainGame
 
     /**
      * True when the ship being shown is AE-only and AE content is off:
-     * vanilla then draws hangar_advanced_warning over the ship and the run
-     * can't be started. An edited ship always gets AE content (see
+     * vanilla then draws hangar_advanced_warning over the ship and START
+     * does nothing. An edited ship always gets AE content (see
      * startGame), so it's never blocked.
      */
     val currentShipNeedsAe: Boolean
@@ -171,7 +171,7 @@ class SelectShipState(private val datafile: Datafile, private val main: MainGame
     }
 
     private fun firstSelectableShip(): ShipBlueprint {
-        return (ships.firstOrNull { isShipSelectable(it.name) } ?: ships.first()).real
+        return (ships.firstOrNull { isShipPlayable(it.name) } ?: ships.first()).real
     }
 
     override fun shutdown() {
@@ -340,8 +340,10 @@ class SelectShipState(private val datafile: Datafile, private val main: MainGame
     private fun drawAeWarning(g: Graphics) {
         val text = translator.translations["hangar_advanced_warning"] ?: "ENABLE ADVANCED EDITION\nCONTENT TO ACCESS"
         val lines = text.replace("\\n", "\n").split('\n')
-        val lineHeight = 30
-        val top = HANGAR_SHIP_CENTRE_Y - lines.size * lineHeight / 2
+        // Measured against a vanilla 1.6.14 screenshot: centred on the
+        // ship, 38px between the lines.
+        val lineHeight = 38
+        val top = HANGAR_SHIP_CENTRE_Y + 2 - lines.size * lineHeight / 2
 
         // Red text straight over the ship, like vanilla (no backdrop),
         // centred on the area the hangar ships fit in, (306,12)-(953,407).
@@ -349,7 +351,7 @@ class SelectShipState(private val datafile: Datafile, private val main: MainGame
             aeWarningFont.drawStringCentred(306f, top + 28f + i * lineHeight, (953 - 306).f, line, Constants.SYS_ENERGY_BROKEN)
     }
 
-    private val aeWarningFont by lazy { SILFontLoader(fontHL2).apply { scale = 2f } }
+    private val aeWarningFont by lazy { SILFontLoader(fontHL2).apply { scale = 3f } }
 
     fun startGame(selected: Difficulty) {
         if (currentShipNeedsAe)
@@ -432,13 +434,18 @@ class SelectShipState(private val datafile: Datafile, private val main: MainGame
     }
 
     /**
-     * Whether a ship can be picked: unlocked, and available with the
-     * current Advanced Edition setting.
+     * Whether a ship can be picked: it's unlocked. Like vanilla, AE-only
+     * ships can be picked with AE content off too - they're then shown with
+     * hangar_advanced_warning over them and can't be started (see
+     * currentShipNeedsAe).
      */
     fun isShipSelectable(shipName: String): Boolean {
-        if (!advancedEdition && shipName !in nonAeShips)
-            return false
         return isShipUnlocked(shipName)
+    }
+
+    /** Whether a run can be started with this ship, with the current AE setting. */
+    private fun isShipPlayable(shipName: String): Boolean {
+        return (advancedEdition || shipName in nonAeShips) && isShipUnlocked(shipName)
     }
 
     fun isFamilyUnlocked(family: ShipFamily): Boolean {
@@ -450,7 +457,7 @@ class SelectShipState(private val datafile: Datafile, private val main: MainGame
      * player has actually unlocked.
      */
     private fun randomUnlockedShip(): ShipBlueprint {
-        val unlocked = ships.filter { isShipSelectable(it.name) }
+        val unlocked = ships.filter { isShipPlayable(it.name) }
         return (unlocked.ifEmpty { ships }).random().real
     }
     private inner class ShipSelectUIProvider : UIProvider {
