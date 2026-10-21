@@ -58,6 +58,9 @@ class Hacking(blueprint: SystemBlueprint) : MainSystem(blueprint) {
      */
     val isPoweredUp: Boolean get() = powerSupplied != 0 && isShipInFight
 
+    /** Whether this ship's hacking drone is stuck to its target, in the fight. */
+    val isDroneAttached: Boolean get() = droneLanded && isShipInFight
+
     /**
      * If true, the main hacking pulse is currently active.
      */
