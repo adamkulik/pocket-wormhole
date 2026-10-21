@@ -55,8 +55,11 @@ data class Door(val position: ConstPoint, val left: Room?, val right: Room?, val
 
             val healths = BASE_HEALTHS.getValue(ship.sys.difficulty)
 
+            // Hacked doors are level 3 doors (wiki, Door System: "all doors
+            // temporarily become enemy level 3 (improved blast) doors"). The
+            // list starts at level 2.
             if (isHacked) {
-                return healths[2] // Level 3 equivalent
+                return healths[1]
             }
 
             val baseLevel = ship.doorsSystem?.effectivePower ?: 0
