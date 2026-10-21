@@ -21,6 +21,10 @@ import kotlin.math.roundToInt
 import kotlin.math.sin
 
 class Weapons(blueprint: SystemBlueprint) : MainSystem(blueprint) {
+    // The power manager turns the last items off when the ship can't
+    // supply them, and lowers the selection to match.
+    override val dropsPowerWhenStarved: Boolean get() = false
+
     override val sortingType: SortingType get() = SortingType.WEAPONS
 
     val selectedTargets = TargetList()
