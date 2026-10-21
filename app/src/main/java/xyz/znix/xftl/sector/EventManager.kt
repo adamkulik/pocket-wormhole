@@ -48,10 +48,12 @@ class EventManager(
     }
 
     /**
-     * Load the standard vanilla event files.
+     * Load the standard vanilla event files. The Advanced Edition ones are
+     * only loaded with [enableAE] set, like vanilla: they reference AE ships,
+     * crew and items that don't exist otherwise.
      */
-    constructor(df: Datafile, translator: Translator, bp: BlueprintManager) :
-            this(df, translator, bp, FILE_NAMES.map { "data/$it.xml" })
+    constructor(df: Datafile, translator: Translator, bp: BlueprintManager, enableAE: Boolean = true) :
+            this(df, translator, bp, (if (enableAE) FILE_NAMES + AE_FILE_NAMES else FILE_NAMES).map { "data/$it.xml" })
 
     operator fun get(name: String): IEvent = events[name] ?: error("Missing event $name")
 
@@ -269,7 +271,9 @@ class EventManager(
             "events_zoltan",
             "nameEvents",
             "newEvents",
+        )
 
+        private val AE_FILE_NAMES = listOf(
             "dlcEvents_anaerobic",
             // "dlcEventsOverwrite", // TODO set up overwrite support
             "dlcEvents"

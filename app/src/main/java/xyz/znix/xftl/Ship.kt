@@ -504,6 +504,13 @@ class Ship(
             }
         } else {
             for (node in type.systems) {
+                // FTL 1.6's ship layouts all list slots for the Advanced
+                // Edition systems (hacking, mind control, clonebay, backup
+                // battery). Without AE content those systems don't exist,
+                // so the slots are left out, like vanilla's non-AE mode.
+                if (sys.blueprintManager.getOrNull(node.systemName) == null)
+                    continue
+
                 val room = rooms[node.room.id]
 
                 // Load the information about the available system into the room.
