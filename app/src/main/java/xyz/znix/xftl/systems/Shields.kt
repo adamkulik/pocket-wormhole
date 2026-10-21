@@ -153,8 +153,10 @@ class Shields(blueprint: SystemBlueprint) : MainSystem(blueprint) {
         activeShields--
 
         // According to the wiki (on 08/06/2023) this skill is granted when
-        // the shields are hit, not when they recharge.
-        addSkillPoint(Skill.SHIELDS)
+        // the shields are hit, not when they recharge - and only in combat:
+        // asteroids after the fight is over don't train it (Crew skills).
+        if (ship.sys.getEnemyOf(ship) != null)
+            addSkillPoint(Skill.SHIELDS)
     }
 
     /**
