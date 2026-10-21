@@ -35,8 +35,11 @@ class Engines(blueprint: SystemBlueprint) : MainSystem(blueprint) {
             if (powerSupplied == 0)
                 return 0f
 
-            // TODO manning bonus of 1.1, 1.17 and 1.25 times for different skill levels
-            return CHARGE_RATES[powerSupplied - 1]
+            // Manning the engines speeds the FTL drive up 1.1, 1.17 or 1.25
+            // times, depending on the skill level. Timed in vanilla with the
+            // Kestrel's engines at one bar: 63.8s manned vs 70.0s unmanned.
+            val manning = getSkillLevel(Skill.ENGINES)?.let { MANNING_CHARGE_RATES[it.ordinal] } ?: 1f
+            return CHARGE_RATES[powerSupplied - 1] * manning
         }
 
     val evasionMultiplier: Float
@@ -83,6 +86,7 @@ class Engines(blueprint: SystemBlueprint) : MainSystem(blueprint) {
         val EVASIONS: Array<Int> = arrayOf(5, 10, 15, 20, 25, 28, 31, 35)
         val CHARGE_RATES = arrayOf(1f, 1.26f, 1.58f, 1.84f, 2.11f, 2.4f, 2.68f, 2.96f)
         val SKILL_BONUSES = listOf(5, 7, 10)
+        val MANNING_CHARGE_RATES = listOf(1.1f, 1.17f, 1.25f)
 
         val INFO: SystemInfo = EngineInfo
     }
