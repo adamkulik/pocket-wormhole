@@ -779,17 +779,20 @@ public class InGameState extends MainGame.GameState {
 
         // Set the default power levels. Don't turn on weapons or drones, both
         // to avoid running out of power for other stuff, and to avoid wasting
-        // drone parts.
+        // drone parts. Like vanilla, the engines start with a single bar
+        // whatever their level (checked against vanilla 1.6.14's saves for
+        // every player ship: Kestrel 1/2, Stealth 1/4, Lanius 1/1...).
         player.updateAvailablePower();
         for (MainSystem system : player.getMainSystems()) {
             if (system instanceof Weapons || system instanceof Drones)
                 continue;
 
-            // As a hack, turn artillery off so what's below doesn't charge it.
+            // Artillery is powered below, so what's below doesn't charge it.
             if (system instanceof Artillery)
                 continue;
 
-            for (int i = 0; i < system.getBlueprint().getMaxPower(); i++) {
+            int bars = system instanceof Engines ? 1 : system.getBlueprint().getMaxPower();
+            for (int i = 0; i < bars; i++) {
                 system.increasePower();
             }
         }
@@ -801,6 +804,16 @@ public class InGameState extends MainGame.GameState {
         // on Mantis B. This is a bit hacky, but it's fine for now.
         for (int i = 0; i < 5; i++) {
             player.update(10f);
+        }
+
+        // Vanilla starts the Federation cruiser's artillery powered (but not
+        // charged): turn it on now that the shields have charged.
+        for (MainSystem system : player.getMainSystems()) {
+            if (!(system instanceof Artillery))
+                continue;
+            for (int i = 0; i < system.getBlueprint().getMaxPower(); i++) {
+                system.increasePower();
+            }
         }
     }
 
