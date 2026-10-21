@@ -13,6 +13,10 @@ import xyz.znix.xftl.weapons.DroneBlueprint
 import kotlin.math.max
 
 class Drones(blueprint: SystemBlueprint) : MainSystem(blueprint) {
+    // The power manager turns the last items off when the ship can't
+    // supply them, and lowers the selection to match.
+    override val dropsPowerWhenStarved: Boolean get() = false
+
     override val sortingType: SortingType get() = SortingType.DRONES
 
     val drones = ArrayList<DroneInfo?>()
