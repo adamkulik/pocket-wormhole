@@ -202,6 +202,9 @@ class BlueprintManager {
             // the hull) is implemented by the vision code in Ship.
             AugmentBlueprint.LIFE_SCANNER -> AugmentBlueprint(elem)
 
+            // Hacking Stun is implemented by the Hacking system's pulse.
+            AugmentBlueprint.HACKING_STUN -> AugmentBlueprint(elem)
+
             else -> {
                 println("WARNING: Adding unknown augment '$name'")
                 AugmentBlueprint(elem)
