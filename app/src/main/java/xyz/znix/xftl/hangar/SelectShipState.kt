@@ -31,6 +31,7 @@ class SelectShipState(private val datafile: Datafile, private val main: MainGame
     // vanilla 1.6.14, issue #109 - see the render code that uses it).
     private val HANGAR_SHIP_CENTRE_X = 630
     private val HANGAR_SHIP_CENTRE_Y = 210
+    private val AE_WARNING_OUTLINE = Colour(40, 0, 0, 220)
 
     private val shipSelectorPos = ConstPoint(20, 50)
 
@@ -347,8 +348,15 @@ class SelectShipState(private val datafile: Datafile, private val main: MainGame
 
         // Red text straight over the ship, like vanilla (no backdrop),
         // centred on the area the hangar ships fit in, (306,12)-(953,407).
-        for ((i, line) in lines.withIndex())
-            aeWarningFont.drawStringCentred(306f, top + 28f + i * lineHeight, (953 - 306).f, line, Constants.SYS_ENERGY_BROKEN)
+        for ((i, line) in lines.withIndex()) {
+            val y = top + 28f + i * lineHeight
+            // A dark outline first, like vanilla's, so it reads over the ship.
+            for (dx in -2..2) for (dy in -2..2) {
+                if (dx != 0 || dy != 0)
+                    aeWarningFont.drawStringCentred(306f + dx, y + dy, (953 - 306).f, line, AE_WARNING_OUTLINE)
+            }
+            aeWarningFont.drawStringCentred(306f, y, (953 - 306).f, line, Constants.SYS_ENERGY_BROKEN)
+        }
     }
 
     // Vanilla draws it in JustinFont12Bold at twice the size: that matches
