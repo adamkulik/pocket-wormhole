@@ -31,7 +31,9 @@ class SelectShipState(private val datafile: Datafile, private val main: MainGame
     // vanilla 1.6.14, issue #109 - see the render code that uses it).
     private val HANGAR_SHIP_CENTRE_X = 630
     private val HANGAR_SHIP_CENTRE_Y = 210
-    private val AE_WARNING_OUTLINE = Colour(40, 0, 0, 220)
+    // Sampled from a vanilla 1.6.14 screenshot
+    private val AE_WARNING_RED = Colour(235, 10, 8)
+    private val AE_WARNING_GLOW = Colour(130, 0, 0, 22)
 
     private val shipSelectorPos = ConstPoint(20, 50)
 
@@ -349,13 +351,14 @@ class SelectShipState(private val datafile: Datafile, private val main: MainGame
         // Red text straight over the ship, like vanilla (no backdrop),
         // centred on the area the hangar ships fit in, (306,12)-(953,407).
         for ((i, line) in lines.withIndex()) {
-            val y = top + 28f + i * lineHeight
-            // A dark outline first, like vanilla's, so it reads over the ship.
-            for (dx in -2..2) for (dy in -2..2) {
-                if (dx != 0 || dy != 0)
-                    aeWarningFont.drawStringCentred(306f + dx, y + dy, (953 - 306).f, line, AE_WARNING_OUTLINE)
+            val y = top + 32f + i * lineHeight
+            // Vanilla's soft dark-red glow, about 4px wide and fading out:
+            // many faint copies around the text, which add up near it.
+            for (dx in -4..4) for (dy in -4..4) {
+                if ((dx != 0 || dy != 0) && dx * dx + dy * dy <= 16)
+                    aeWarningFont.drawStringCentred(306f + dx, y + dy, (953 - 306).f, line, AE_WARNING_GLOW)
             }
-            aeWarningFont.drawStringCentred(306f, y, (953 - 306).f, line, Constants.SYS_ENERGY_BROKEN)
+            aeWarningFont.drawStringCentred(306f, y, (953 - 306).f, line, AE_WARNING_RED)
         }
     }
 
