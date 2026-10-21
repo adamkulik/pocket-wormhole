@@ -79,11 +79,19 @@ class ModsPanel(
         val speedOn = profile.gameSpeedButton
         g.colour = ROW_A
         g.fillRect(X + 12, Y + 54, W - 24, ROW_H - 4)
-        textFont.drawString(X + 24f, Y + 54 + 26f, "Game speed button, 1x to 16x (built in)",
+        textFont.drawString(X + 24f, Y + 54 + 26f, "Game speed button (built in)",
             if (speedOn) Constants.SECTOR_CUTOUT_TEXT else DISABLED_TEXT)
         button(g, mouseX, mouseY, X + W - 24 - DELETE_W - 12 - TOGGLE_W, Y + 54 + 4, TOGGLE_W, ROW_H - 12,
             if (speedOn) "ON" else "OFF", speedOn) {
             profile.gameSpeedButton = !speedOn
+            confirmDelete = null
+        }
+        // The fastest speed the button offers: lower it on a slow phone.
+        val limits = MainGame.GAME_SPEED_LIMITS
+        button(g, mouseX, mouseY, X + W - 24 - DELETE_W, Y + 54 + 4, DELETE_W, ROW_H - 12,
+            "MAX ${profile.gameSpeedMax}x", false, speedOn) {
+            val i = limits.indexOf(profile.gameSpeedMax)
+            profile.gameSpeedMax = limits[(i + 1) % limits.size]
             confirmDelete = null
         }
 

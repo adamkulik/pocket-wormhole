@@ -596,9 +596,12 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
     private inner class GameSpeedButton(pos: ConstPoint) : Button(game, pos, ConstPoint(GAME_SPEED_BUTTON_WIDTH, 34)) {
         private val tooltip = object : StandardTooltip(game) {
             override fun getText(): String {
-                return "Game speed: ${game.mainGame.gameSpeed}x\nTap to cycle 1x, 2x, 4x, 8x and 16x.\n\n" +
+                val speed = game.mainGame.gameSpeed
+                val max = game.mainGame.profile.gameSpeedMax
+                val actual = if (isLimited) "\nThis device manages about ${game.effectiveGameSpeed.roundToInt()}x." else ""
+                return "Game speed: ${speed}x$actual\nTap to cycle up to ${max}x (change the limit in MODS on the main menu).\n\n" +
                         "Not in vanilla FTL - everything runs faster together, so the game plays the same. " +
-                        "Slower phones may not reach the highest speeds."
+                        "If the device can't keep up it runs as fast as it can, shown by red text."
             }
         }
 
@@ -612,7 +615,11 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
             Buttons.drawRounded(g, pos.x + 2, pos.y + 2, size.x - 4, size.y - 4, 3)
 
             val text = "${speed}x"
-            val textColour = if (fast) JUMP_DISABLED_TEXT else SECTOR_CUTOUT_TEXT
+            val textColour = when {
+                isLimited -> SYS_ENERGY_BROKEN
+                fast -> JUMP_DISABLED_TEXT
+                else -> SECTOR_CUTOUT_TEXT
+            }
             font.drawString(pos.x + (size.x - font.getWidth(text)) / 2f, pos.y + 24f, text, textColour)
 
             if (hovered)
@@ -622,6 +629,10 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
         override fun click(button: Int) {
             game.mainGame.cycleGameSpeed()
         }
+
+        // Well below the selected speed: the device can't keep up.
+        private val isLimited: Boolean
+            get() = game.mainGame.gameSpeed > 1 && game.effectiveGameSpeed < game.mainGame.gameSpeed * 0.8f
     }
 
     /**

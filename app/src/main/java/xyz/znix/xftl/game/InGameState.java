@@ -838,10 +838,23 @@ public class InGameState extends MainGame.GameState {
         // dropping the frame rate: the game then runs as fast as it can.
         int steps = mainGame.getGameSpeed();
         long stepsStart = System.nanoTime();
+        int stepsDone = 0;
+        boolean outOfTime = false;
         for (int i = 0; i < steps && !isPaused() && !isJumpAnimationPlaying(); i++) {
-            if (i > 0 && System.nanoTime() - stepsStart > SPEED_STEP_BUDGET_NS)
+            if (i > 0 && System.nanoTime() - stepsStart > SPEED_STEP_BUDGET_NS) {
+                outOfTime = true;
                 break;
+            }
             updateGameState(delta);
+            stepsDone++;
+        }
+
+        // Track the speed the device actually manages, for the speed button.
+        // Frames cut short by a pause don't say anything about that.
+        if (steps == 1) {
+            effectiveGameSpeed = 1f;
+        } else if (stepsDone == steps || outOfTime) {
+            effectiveGameSpeed += (stepsDone - effectiveGameSpeed) * 0.05f;
         }
 
         // Tick the jump-out animations (issue #4). When the player's
@@ -1465,6 +1478,15 @@ public class InGameState extends MainGame.GameState {
 
     /** How long the sped-up game updates may take per frame (see update). */
     private static final long SPEED_STEP_BUDGET_NS = 25_000_000L;
+
+    // The average number of game steps per frame recently achieved at the
+    // selected game speed. Lower than the selected speed on a device too
+    // slow for it.
+    private float effectiveGameSpeed = 1f;
+
+    public float getEffectiveGameSpeed() {
+        return effectiveGameSpeed;
+    }
 
     private static final float JUMP_OUT_SCALE_END = 0.35f;
 

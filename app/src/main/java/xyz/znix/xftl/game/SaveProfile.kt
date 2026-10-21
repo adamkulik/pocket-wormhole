@@ -68,6 +68,13 @@ class SaveProfile private constructor() {
             markDirty()
         }
 
+    /** The fastest the game speed button goes, picked in the MODS panel. */
+    var gameSpeedMax = 8
+        set(value) {
+            field = value
+            markDirty()
+        }
+
     /**
      * Set to true if this profile needs saving.
      */
@@ -193,6 +200,7 @@ class SaveProfile private constructor() {
 
         if (gameSpeedButton)
             root.addContent(Element("gameSpeedButton"))
+        root.addContent(Element("gameSpeedMax").setAttribute("value", gameSpeedMax.toString()))
 
         return doc
     }
@@ -244,6 +252,7 @@ class SaveProfile private constructor() {
 
         firstRunTipShown = root.getChild("firstRunTipShown") != null
         gameSpeedButton = root.getChild("gameSpeedButton") != null
+        root.getChild("gameSpeedMax")?.getAttributeValue("value")?.toIntOrNull()?.let { gameSpeedMax = it }
     }
 
     class AchievementUnlockInfo(val difficulty: Difficulty)
