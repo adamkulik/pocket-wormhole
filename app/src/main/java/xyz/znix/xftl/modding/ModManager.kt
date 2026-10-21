@@ -1,10 +1,12 @@
 package xyz.znix.xftl.modding
 
+import com.pocketwormhole.android.SafeXML
 import xyz.znix.xftl.sys.PlatformSpecific
 import java.io.ByteArrayInputStream
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.zip.ZipFile
 import java.util.zip.ZipInputStream
 
 /**
@@ -17,6 +19,9 @@ import java.util.zip.ZipInputStream
  */
 object ModManager {
     class Entry(val name: String, val enabled: Boolean)
+
+    /** What a mod says about itself, in its mod-appendix/metadata.xml. */
+    class Info(val title: String?, val author: String?, val version: String?, val description: String?)
 
     class InvalidModException(message: String) : Exception(message)
 
@@ -59,6 +64,29 @@ object ModManager {
         }
 
         return entries
+    }
+
+    /** Read a mod's metadata, or null if it has none (or can't be read). */
+    fun info(name: String): Info? {
+        val path = modDir.resolve(name)
+        return try {
+            val bytes = if (Files.isDirectory(path)) {
+                val file = path.resolve("mod-appendix/metadata.xml")
+                if (!Files.isRegularFile(file)) return null
+                Files.readAllBytes(file)
+            } else {
+                ZipFile(path.toFile()).use { zip ->
+                    val entry = zip.getEntry("mod-appendix/metadata.xml") ?: return null
+                    zip.getInputStream(entry).use { it.readBytes() }
+                }
+            }
+            val root = SafeXML.builder().build(ByteArrayInputStream(bytes)).rootElement
+            fun text(tag: String): String? = root.getChildText(tag)
+                ?.lines()?.joinToString("\n") { it.trim() }?.trim()?.ifEmpty { null }
+            Info(text("title"), text("author"), text("version"), text("description"))
+        } catch (e: Exception) {
+            null
+        }
     }
 
     fun setEnabled(name: String, enabled: Boolean) {
