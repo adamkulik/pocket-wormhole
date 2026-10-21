@@ -59,6 +59,23 @@ sealed interface PlatformSpecific {
         fun importSave(onResult: (ByteArray?) -> Unit)
     }
 
+    /**
+     * Hooks for installing mods on platforms where the mods directory isn't
+     * user-accessible (Android). Null where the user can put files in the
+     * mods directory themselves.
+     */
+    open val modImport: ModImport? get() = null
+
+    interface ModImport {
+        /** Ask the user to pick a mod file; [onResult] receives its file
+         * name and bytes, or nulls if the user cancelled. May be invoked
+         * on any thread. */
+        fun pickMod(onResult: (String?, ByteArray?) -> Unit)
+
+        /** Restart the game, so mod changes take effect. */
+        fun restartGame()
+    }
+
     companion object {
         @JvmField
         val INSTANCE: PlatformSpecific = AndroidPlatform
@@ -84,6 +101,9 @@ object AndroidPlatform : PlatformSpecific {
 
     /** Wired up by [com.pocketwormhole.android.MainActivity] at startup. */
     override var saveTransfer: PlatformSpecific.SaveTransfer? = null
+
+    /** Wired up by [com.pocketwormhole.android.MainActivity] at startup. */
+    override var modImport: PlatformSpecific.ModImport? = null
 
     override val saveGamePath: Path
         get() = baseDir.resolve("ProjectWormhole")
