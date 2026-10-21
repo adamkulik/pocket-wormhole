@@ -341,8 +341,8 @@ class SelectShipState(private val datafile: Datafile, private val main: MainGame
         val text = translator.translations["hangar_advanced_warning"] ?: "ENABLE ADVANCED EDITION\nCONTENT TO ACCESS"
         val lines = text.replace("\\n", "\n").split('\n')
         // Measured against a vanilla 1.6.14 screenshot: centred on the
-        // ship, 38px between the lines.
-        val lineHeight = 38
+        // ship, 38px between the lines (the font's line spacing).
+        val lineHeight = aeWarningFont.lineSpacing * 2
         val top = HANGAR_SHIP_CENTRE_Y + 2 - lines.size * lineHeight / 2
 
         // Red text straight over the ship, like vanilla (no backdrop),
@@ -351,7 +351,9 @@ class SelectShipState(private val datafile: Datafile, private val main: MainGame
             aeWarningFont.drawStringCentred(306f, top + 28f + i * lineHeight, (953 - 306).f, line, Constants.SYS_ENERGY_BROKEN)
     }
 
-    private val aeWarningFont by lazy { SILFontLoader(fontHL2).apply { scale = 3f } }
+    // Vanilla draws it in JustinFont12Bold at twice the size: that matches
+    // its screenshot's line widths (about 440 and 335px) and 38px spacing.
+    private val aeWarningFont by lazy { getFont("JustinFont12Bold").apply { scale = 2f } }
 
     fun startGame(selected: Difficulty) {
         if (currentShipNeedsAe)
