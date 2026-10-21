@@ -3,6 +3,7 @@ package xyz.znix.xftl
 import org.jdom2.Document
 import org.jdom2.Element
 import xyz.znix.xftl.augments.AugEngiMedbots
+import xyz.znix.xftl.augments.AugFireSuppression
 import xyz.znix.xftl.augments.AugPreigniter
 import xyz.znix.xftl.augments.AugSlugGel
 import xyz.znix.xftl.augments.AugZoltanShield
@@ -159,6 +160,7 @@ class BlueprintManager {
     private fun buildAugmentBlueprint(elem: Element): IBlueprint {
         return when (val name = elem.getAttributeValue("name")) {
             AugEngiMedbots.NAME -> AugEngiMedbots(elem)
+            AugFireSuppression.NAME -> AugFireSuppression(elem)
             AugPreigniter.NAME -> AugPreigniter(elem)
             AugZoltanShield.NAME -> AugZoltanShield(elem)
 
