@@ -2,6 +2,7 @@ package xyz.znix.xftl.drones
 
 import org.jdom2.Element
 import xyz.znix.xftl.*
+import xyz.znix.xftl.augments.AugmentBlueprint
 import xyz.znix.xftl.game.InGameState
 import xyz.znix.xftl.math.ConstPoint
 import xyz.znix.xftl.math.FPoint
@@ -107,7 +108,7 @@ abstract class AbstractExternalDrone(
         // If the drone disappears (for example, when jumping) then don't
         // leave it as being active, as that prevents it from being used again.
         if (!targetShip.externalDrones.contains(this)) {
-            removeInstance()
+            removeRecovered()
         }
 
         if (isRunning) {
@@ -153,8 +154,22 @@ abstract class AbstractExternalDrone(
 
         // TODO don't explode in the case of enemy combat drones when
         //  the enemy ship surrenders.
-        removeInstance()
+        removeRecovered()
         targetShip.externalDrones.remove(this)
+    }
+
+    /**
+     * Remove a drone that's leaving without being destroyed: the fight it
+     * was sent to is over, or its ship jumped away. With the Drone Recovery
+     * Arm its drone part comes back (wiki: "Non-destroyed drones will be
+     * retrieved when jumping, allowing their parts to be reused" - combat
+     * drones after the fight, defense drones on the jump). Only external
+     * drones are recovered, not boarding drones or ion intruders.
+     */
+    private fun removeRecovered() {
+        if (ownerShip.hasAugment(AugmentBlueprint.DRONE_RECOVERY))
+            ownerShip.dronesCount++
+        removeInstance()
     }
 
     /**
