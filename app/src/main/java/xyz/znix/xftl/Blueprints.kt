@@ -178,6 +178,7 @@ class BlueprintManager {
             AugmentBlueprint.SYSTEM_CASING -> AugmentBlueprint(elem)
             AugmentBlueprint.CRYSTAL_SHARDS -> AugmentBlueprint(elem)
             AugmentBlueprint.DRONE_SPEED -> AugmentBlueprint(elem)
+            AugmentBlueprint.DRONE_RECOVERY -> AugmentBlueprint(elem)
             AugmentBlueprint.SCRAP_COLLECTOR -> AugmentBlueprint(elem)
             AugmentBlueprint.ION_ARMOR -> AugmentBlueprint(elem)
             AugmentBlueprint.FTL_BOOSTER -> AugmentBlueprint(elem)
