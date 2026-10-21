@@ -31,6 +31,7 @@ class SelectShipState(private val datafile: Datafile, private val main: MainGame
     // vanilla 1.6.14, issue #109 - see the render code that uses it).
     private val HANGAR_SHIP_CENTRE_X = 630
     private val HANGAR_SHIP_CENTRE_Y = 210
+    private val AE_WARNING_BACKGROUND = Colour(0, 0, 0, 170)
 
     private val shipSelectorPos = ConstPoint(20, 50)
 
@@ -61,12 +62,20 @@ class SelectShipState(private val datafile: Datafile, private val main: MainGame
         set(value) {
             main.profile.advancedEdition = value
 
-            // Move off an AE-only ship, and refresh the A/B/C buttons.
-            if (!isShipSelectable(current.baseBlueprint))
-                selectShip(firstSelectableShip())
-            else
-                selectShip(currentBlueprint)
+            // Refresh the A/B/C buttons. Like vanilla, an AE-only ship that's
+            // being shown stays, with a warning over it (see
+            // currentShipNeedsAe) and START disabled.
+            selectShip(currentBlueprint)
         }
+
+    /**
+     * True when the ship being shown is AE-only and AE content is off:
+     * vanilla then draws hangar_advanced_warning over the ship and the run
+     * can't be started. An edited ship always gets AE content (see
+     * startGame), so it's never blocked.
+     */
+    val currentShipNeedsAe: Boolean
+        get() = !advancedEdition && !isShipEdited && current.baseBlueprint !in nonAeShips
 
     /**
      * The player ships that exist without Advanced Edition content - the
@@ -208,6 +217,9 @@ class SelectShipState(private val datafile: Datafile, private val main: MainGame
         editor.draw(g)
         g.popTransform()
 
+        if (currentShipNeedsAe)
+            drawAeWarning(g)
+
         if (shipListVisible) {
             shipList.draw(container, g)
         }
@@ -325,7 +337,26 @@ class SelectShipState(private val datafile: Datafile, private val main: MainGame
         return SILFontLoader(font)
     }
 
+    /** "ENABLE ADVANCED EDITION CONTENT TO ACCESS", centred over the ship. */
+    private fun drawAeWarning(g: Graphics) {
+        val text = translator.translations["hangar_advanced_warning"] ?: "ENABLE ADVANCED EDITION\nCONTENT TO ACCESS"
+        val lines = text.replace("\\n", "\n").split('\n')
+        val lineHeight = 36
+        val top = HANGAR_SHIP_CENTRE_Y - lines.size * lineHeight / 2
+
+        // A band across the area the hangar ships fit in, (306,12)-(953,407).
+        g.colour = AE_WARNING_BACKGROUND
+        g.fillRect(306, top - 10, 953 - 306, lines.size * lineHeight + 16)
+        for ((i, line) in lines.withIndex())
+            aeWarningFont.drawStringCentred(306f, top + 28f + i * lineHeight, (953 - 306).f, line, Constants.SECTOR_CUTOUT_TEXT)
+    }
+
+    private val aeWarningFont by lazy { SILFontLoader(fontHL2).apply { scale = 3f } }
+
     fun startGame(selected: Difficulty) {
+        if (currentShipNeedsAe)
+            return
+
         val editedShip = if (isShipEdited) editor.ship else null
 
         // A ship edited in the hangar can use any system, AE ones included,
