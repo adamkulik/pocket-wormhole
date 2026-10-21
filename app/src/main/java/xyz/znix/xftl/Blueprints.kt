@@ -186,6 +186,7 @@ class BlueprintManager {
             AugmentBlueprint.ADV_HULL_ARMOR -> AugmentBlueprint(elem)
             AugmentBlueprint.EXPLOSIVE_REPLICATOR -> AugmentBlueprint(elem)
             AugmentBlueprint.FTL_JAMMER -> AugmentBlueprint(elem)
+            AugmentBlueprint.DEFENSE_SCRAMBLER -> AugmentBlueprint(elem)
 
             // The Zoltan Shield Bypass mechanic (teleporting crew and bombs,
             // and mind control through super shields) lives in the systems
