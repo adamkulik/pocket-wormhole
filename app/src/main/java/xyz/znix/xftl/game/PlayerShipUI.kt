@@ -599,7 +599,8 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
                 val speed = game.mainGame.gameSpeed
                 val max = game.mainGame.profile.gameSpeedMax
                 val actual = if (isLimited) "\nThis device manages about ${game.effectiveGameSpeed.roundToInt()}x." else ""
-                return "Game speed: ${speed}x$actual\nTap to cycle up to ${max}x (change the limit in MODS on the main menu).\n\n" +
+                return "Game speed: ${speed}x$actual\nTap to cycle up to ${max}x (change the limit in MODS on the main menu).\n" +
+                        "Long-press (or right-click) to go straight back to 1x.\n\n" +
                         "Not in vanilla FTL - everything runs faster together, so the game plays the same. " +
                         "If the device can't keep up it runs as fast as it can, shown by red text."
             }
@@ -627,7 +628,12 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
         }
 
         override fun click(button: Int) {
-            game.mainGame.cycleGameSpeed()
+            // A long-press is a right click on touch: a quick way back to
+            // normal speed without cycling through the rest.
+            if (button == Input.MOUSE_RIGHT_BUTTON)
+                game.mainGame.resetGameSpeed()
+            else
+                game.mainGame.cycleGameSpeed()
         }
 
         // Well below the selected speed: the device can't keep up.

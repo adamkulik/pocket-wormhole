@@ -219,6 +219,11 @@ public class MainGame implements Game {
         return Math.min(gameSpeed, getProfile().getGameSpeedMax());
     }
 
+    /** Go straight back to normal speed. */
+    public void resetGameSpeed() {
+        gameSpeed = 1;
+    }
+
     /** Step to the next speed, wrapping back to 1 after the fastest allowed. */
     public void cycleGameSpeed() {
         int current = getGameSpeed();
