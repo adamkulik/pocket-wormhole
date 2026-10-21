@@ -833,10 +833,16 @@ public class InGameState extends MainGame.GameState {
         // Speeding the game up runs extra normal-length steps rather than
         // one long one, so everything (combat, fires, oxygen, crew) plays
         // out exactly as at normal speed, just sooner. Stop early if a step
-        // pauses the game, eg by opening an event window.
+        // pauses the game, eg by opening an event window. If a slow device
+        // can't fit all the steps into a frame, skip the rest rather than
+        // dropping the frame rate: the game then runs as fast as it can.
         int steps = mainGame.getGameSpeed();
-        for (int i = 0; i < steps && !isPaused() && !isJumpAnimationPlaying(); i++)
+        long stepsStart = System.nanoTime();
+        for (int i = 0; i < steps && !isPaused() && !isJumpAnimationPlaying(); i++) {
+            if (i > 0 && System.nanoTime() - stepsStart > SPEED_STEP_BUDGET_NS)
+                break;
             updateGameState(delta);
+        }
 
         // Tick the jump-out animations (issue #4). When the player's
         // jump-out finishes, the beacon actually changes and the arrival
@@ -1456,6 +1462,10 @@ public class InGameState extends MainGame.GameState {
         crewLostInJump.clear();
     }
     private static final float JUMP_OUT_TIME = 1.2f;
+
+    /** How long the sped-up game updates may take per frame (see update). */
+    private static final long SPEED_STEP_BUDGET_NS = 25_000_000L;
+
     private static final float JUMP_OUT_SCALE_END = 0.35f;
 
     // Same animation for an enemy ship jumping away mid-combat.

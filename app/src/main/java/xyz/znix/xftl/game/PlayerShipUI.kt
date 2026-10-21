@@ -582,15 +582,16 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
 
     /**
      * The game speed toggle, right of the options wrench: tap to cycle
-     * 1x, 2x, 3x, 4x. Vanilla FTL has no speed control (the ftlspeed mod
+     * 1x, 2x, 4x, 8x, 16x. Vanilla FTL has no speed control (the ftlspeed mod
      * adds one), so it's drawn like the box labels rather than imitating
      * a vanilla button.
      */
     private inner class GameSpeedButton(pos: ConstPoint) : Button(game, pos, ConstPoint(GAME_SPEED_BUTTON_WIDTH, 34)) {
         private val tooltip = object : StandardTooltip(game) {
             override fun getText(): String {
-                return "Game speed: ${game.mainGame.gameSpeed}x\nTap to cycle 1x, 2x, 3x and 4x.\n\n" +
-                        "Not in vanilla FTL - everything runs faster together, so the game plays the same."
+                return "Game speed: ${game.mainGame.gameSpeed}x\nTap to cycle 1x, 2x, 4x, 8x and 16x.\n\n" +
+                        "Not in vanilla FTL - everything runs faster together, so the game plays the same. " +
+                        "Slower phones may not reach the highest speeds."
             }
         }
 

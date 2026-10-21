@@ -205,7 +205,9 @@ public class MainGame implements Game {
      */
     private int gameSpeed = 1;
 
-    public static final int MAX_GAME_SPEED = 4;
+    /** The speeds the speed button cycles through. The fast ones are for
+     * grinding, eg training crew at an asteroid field. */
+    private static final int[] GAME_SPEEDS = {1, 2, 4, 8, 16};
 
     public int getGameSpeed() {
         return gameSpeed;
@@ -213,7 +215,14 @@ public class MainGame implements Game {
 
     /** Step to the next speed, wrapping back to 1 after the fastest. */
     public void cycleGameSpeed() {
-        gameSpeed = gameSpeed >= MAX_GAME_SPEED ? 1 : gameSpeed + 1;
+        int next = GAME_SPEEDS[0];
+        for (int speed : GAME_SPEEDS) {
+            if (speed > gameSpeed) {
+                next = speed;
+                break;
+            }
+        }
+        gameSpeed = next;
     }
 
     /**
