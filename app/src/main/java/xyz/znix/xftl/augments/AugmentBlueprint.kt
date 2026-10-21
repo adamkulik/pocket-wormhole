@@ -71,6 +71,9 @@ open class AugmentBlueprint(elem: Element) : Blueprint(elem) {
          */
         const val LIFE_SCANNER: String = "LIFE_SCANNER"
 
+        // Hacking Stun: see Hacking.update.
+        const val HACKING_STUN: String = "HACKING_STUN"
+
         // Quest prop - granted and traded by events, no passive effect.
         const val STASIS_POD: String = "STASIS_POD"
     }
