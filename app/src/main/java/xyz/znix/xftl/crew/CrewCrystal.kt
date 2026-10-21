@@ -14,7 +14,7 @@ class CrewCrystal(blueprint: CrewBlueprint, animations: Animations, room: Room, 
         }
 
     override val movementSpeed: Float get() = BASE_MOVEMENT_SPEED * 0.8f
-    override val maxHealth: Float get() = 125f
+    override val raceMaxHealth: Float get() = 125f
     override val fireFightingSpeed: Float get() = 0.83f
 
     // The Crystal Lockdown ability (wiki: "Crystals possess a Lockdown
