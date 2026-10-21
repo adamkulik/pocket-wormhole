@@ -31,7 +31,6 @@ class SelectShipState(private val datafile: Datafile, private val main: MainGame
     // vanilla 1.6.14, issue #109 - see the render code that uses it).
     private val HANGAR_SHIP_CENTRE_X = 630
     private val HANGAR_SHIP_CENTRE_Y = 210
-    private val AE_WARNING_BACKGROUND = Colour(0, 0, 0, 170)
 
     private val shipSelectorPos = ConstPoint(20, 50)
 
@@ -341,17 +340,16 @@ class SelectShipState(private val datafile: Datafile, private val main: MainGame
     private fun drawAeWarning(g: Graphics) {
         val text = translator.translations["hangar_advanced_warning"] ?: "ENABLE ADVANCED EDITION\nCONTENT TO ACCESS"
         val lines = text.replace("\\n", "\n").split('\n')
-        val lineHeight = 36
+        val lineHeight = 30
         val top = HANGAR_SHIP_CENTRE_Y - lines.size * lineHeight / 2
 
-        // A band across the area the hangar ships fit in, (306,12)-(953,407).
-        g.colour = AE_WARNING_BACKGROUND
-        g.fillRect(306, top - 10, 953 - 306, lines.size * lineHeight + 16)
+        // Red text straight over the ship, like vanilla (no backdrop),
+        // centred on the area the hangar ships fit in, (306,12)-(953,407).
         for ((i, line) in lines.withIndex())
-            aeWarningFont.drawStringCentred(306f, top + 28f + i * lineHeight, (953 - 306).f, line, Constants.SECTOR_CUTOUT_TEXT)
+            aeWarningFont.drawStringCentred(306f, top + 28f + i * lineHeight, (953 - 306).f, line, Constants.SYS_ENERGY_BROKEN)
     }
 
-    private val aeWarningFont by lazy { SILFontLoader(fontHL2).apply { scale = 3f } }
+    private val aeWarningFont by lazy { SILFontLoader(fontHL2).apply { scale = 2f } }
 
     fun startGame(selected: Difficulty) {
         if (currentShipNeedsAe)
