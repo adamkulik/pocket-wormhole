@@ -20,15 +20,11 @@ enum class Resource {
     DRONES,
     SCRAP;
 
-    private var image: Image? = null
-
-    fun getIcon(game: InGameState): Image {
-        image?.let { return it }
-
-        val img = game.getImg("img/ui_icons/icon_${name.toLowerCase(Locale.UK)}.png")
-        image = img
-        return img
-    }
+    // Not cached here: the game caches its images itself, and an enum lives
+    // longer than the game content - switching AE content on or off frees
+    // the old content's textures, and a kept icon then draws black.
+    fun getIcon(game: InGameState): Image =
+        game.getImg("img/ui_icons/icon_${name.toLowerCase(Locale.UK)}.png")
 
     fun getBlueprint(game: InGameState): ItemBlueprint? {
         if (this == SCRAP)
