@@ -199,6 +199,24 @@ public class MainGame implements Game {
     }
 
     /**
+     * How many game-time steps run per frame: 1 is normal speed. Not a
+     * vanilla feature (it's what the ftlspeed mod does for vanilla). It
+     * lives here so it carries over between runs, but isn't saved.
+     */
+    private int gameSpeed = 1;
+
+    public static final int MAX_GAME_SPEED = 4;
+
+    public int getGameSpeed() {
+        return gameSpeed;
+    }
+
+    /** Step to the next speed, wrapping back to 1 after the fastest. */
+    public void cycleGameSpeed() {
+        gameSpeed = gameSpeed >= MAX_GAME_SPEED ? 1 : gameSpeed + 1;
+    }
+
+    /**
      * The game content, for states (like the main menu) that need sounds or
      * other shared resources without a full InGameState.
      */

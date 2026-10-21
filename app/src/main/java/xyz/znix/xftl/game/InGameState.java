@@ -830,7 +830,12 @@ public class InGameState extends MainGame.GameState {
 
         // The game stays frozen while an arrival or jump-out animation
         // plays (issue #4).
-        if (!isPaused() && !isJumpAnimationPlaying())
+        // Speeding the game up runs extra normal-length steps rather than
+        // one long one, so everything (combat, fires, oxygen, crew) plays
+        // out exactly as at normal speed, just sooner. Stop early if a step
+        // pauses the game, eg by opening an event window.
+        int steps = mainGame.getGameSpeed();
+        for (int i = 0; i < steps && !isPaused() && !isJumpAnimationPlaying(); i++)
             updateGameState(delta);
 
         // Tick the jump-out animations (issue #4). When the player's
