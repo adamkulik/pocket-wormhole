@@ -37,6 +37,9 @@ import kotlin.math.roundToInt
  * validated against real vanilla saves.
  */
 object VanillaSaveWriter {
+    // A vanilla breach's health when untouched (xftl's is 0-1).
+    private const val BREACH_HEALTH_SCALE = 100f
+
     fun write(game: InGameState, out: OutputStream) {
         out.use { it.write(writeToByteArray(game)) }
     }
@@ -291,20 +294,22 @@ object VanillaSaveWriter {
             }
         }
 
-        // Breaches: (room, square, health). xftl breach health is 0-1; write
-        // it scaled to vanilla's 0-10 style numbers.
+        // Breaches: (x, y, health), x/y being the breached square in the
+        // ship's grid, layout X/Y_OFFSET included - not a room id and slot,
+        // which vanilla takes for a square outside the ship and drops.
+        // Health is out of 100 (FTL Profile Editor's SavedGameParser).
         val breaches = ArrayList<Triple<Int, Int, Int>>()
         for (room in ship.rooms) {
             for ((idx, breach) in room.breaches.withIndex()) {
                 if (breach != null) {
-                    breaches.add(Triple(room.id, idx, (breach.health * 10f).roundToInt()))
+                    breaches.add(Triple(ship.offset.x + room.x + idx % room.width, ship.offset.y + room.y + idx / room.width, (breach.health * BREACH_HEALTH_SCALE).roundToInt()))
                 }
             }
         }
         w.int(breaches.size)
-        for ((roomId, square, health) in breaches) {
-            w.int(roomId)
-            w.int(square)
+        for ((x, y, health) in breaches) {
+            w.int(x)
+            w.int(y)
             w.int(health)
         }
 
