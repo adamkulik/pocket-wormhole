@@ -143,7 +143,7 @@ class MainMenuState(private val main: MainGame, private val datafile: Datafile) 
         }
 
         if (isOverModsButton(x, y)) {
-            modsPanel = ModsPanel(getFont("JustinFont12Bold"), getFont("JustinFont10"), buttonFont()) {
+            modsPanel = ModsPanel(getFont("JustinFont12Bold"), getFont("JustinFont10"), buttonFont(), main.profile) {
                 modsPanel = null
             }
             return

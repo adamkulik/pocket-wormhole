@@ -20,6 +20,7 @@ class ModsPanel(
     private val titleFont: SILFontLoader,
     private val textFont: SILFontLoader,
     private val buttonFont: SILFontLoader,
+    private val profile: SaveProfile,
     private val close: () -> Unit
 ) {
     private val modImport = PlatformSpecific.INSTANCE.modImport
@@ -73,7 +74,20 @@ class ModsPanel(
 
         titleFont.drawString(X + 20f, Y + 34f, "MODS", Constants.SECTOR_CUTOUT_TEXT)
 
-        val listTop = Y + 54
+        // Built-in extras that aren't vanilla, so they're off by default
+        // and switched on here like a mod. They apply straight away.
+        val speedOn = profile.gameSpeedButton
+        g.colour = ROW_A
+        g.fillRect(X + 12, Y + 54, W - 24, ROW_H - 4)
+        textFont.drawString(X + 24f, Y + 54 + 26f, "Game speed button, 1x to 16x (built in)",
+            if (speedOn) Constants.SECTOR_CUTOUT_TEXT else DISABLED_TEXT)
+        button(g, mouseX, mouseY, X + W - 24 - DELETE_W - 12 - TOGGLE_W, Y + 54 + 4, TOGGLE_W, ROW_H - 12,
+            if (speedOn) "ON" else "OFF", speedOn) {
+            profile.gameSpeedButton = !speedOn
+            confirmDelete = null
+        }
+
+        val listTop = Y + 54 + ROW_H + 8
         if (mods.isEmpty()) {
             val lines = textFont.wrapString(
                 "No mods installed. Tap ADD MOD and pick a Slipstream mod file (.ftl or .zip) " +
@@ -223,7 +237,7 @@ class ModsPanel(
         private const val X = (1280 - W) / 2
         private const val Y = (720 - H) / 2
 
-        private const val ROWS = 8
+        private const val ROWS = 7
         private const val ROW_H = 40
         private const val TOGGLE_W = 80
         private const val DELETE_W = 110

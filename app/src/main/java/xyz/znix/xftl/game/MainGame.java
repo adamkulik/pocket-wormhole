@@ -210,7 +210,8 @@ public class MainGame implements Game {
     private static final int[] GAME_SPEEDS = {1, 2, 4, 8, 16};
 
     public int getGameSpeed() {
-        return gameSpeed;
+        // Turning the button off in the MODS panel goes back to normal speed.
+        return getProfile().getGameSpeedButton() ? gameSpeed : 1;
     }
 
     /** Step to the next speed, wrapping back to 1 after the fastest. */

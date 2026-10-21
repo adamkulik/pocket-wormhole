@@ -525,9 +525,11 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
         if (PlatformSpecific.INSTANCE.isTouchUi) {
             startX = 531 + 40
             val hasStore = game.currentBeacon?.hasStore == true
-            // The trailing 17 + GAME_SPEED_BUTTON_WIDTH is the speed button.
-            val widths = (if (hasStore) 74 + 60 + 88 + 41 else 74 + 60 + 41) + GAME_SPEED_BUTTON_WIDTH
-            val gaps = (if (hasStore) 27 + 17 + 17 else 27 + 17) + 17
+            // The speed button, if it's turned on, adds 17 + its width.
+            val speedWidth = if (showSpeedButton) GAME_SPEED_BUTTON_WIDTH else 0
+            val speedGap = if (showSpeedButton) 17 else 0
+            val widths = (if (hasStore) 74 + 60 + 88 + 41 else 74 + 60 + 41) + speedWidth
+            val gaps = (if (hasStore) 27 + 17 + 17 else 27 + 17) + speedGap
             val rightBound = if (game.enemy != null) 905 else Int.MAX_VALUE
             buttonScale = min(
                 1.25f,
@@ -571,14 +573,19 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
         settings.renderScale = buttonScale
         nextPos += ConstPoint(step(41, 17), 0)
 
-        val speed = GameSpeedButton(nextPos + ConstPoint(0, 7))
-        speed.renderScale = buttonScale
-
         buttons += jump
         buttons += ship
         buttons += settings
-        buttons += speed
+
+        if (showSpeedButton) {
+            val speed = GameSpeedButton(nextPos + ConstPoint(0, 7))
+            speed.renderScale = buttonScale
+            buttons += speed
+        }
     }
+
+    /** The speed button is opt-in, from the main menu's MODS panel. */
+    private val showSpeedButton: Boolean get() = game.mainGame.profile.gameSpeedButton
 
     /**
      * The game speed toggle, right of the options wrench: tap to cycle
