@@ -66,8 +66,10 @@ class SelectShipState(private val datafile: Datafile, private val main: MainGame
 
             // Refresh the A/B/C buttons. Like vanilla, an AE-only ship that's
             // being shown stays, with a warning over it (see
-            // currentShipNeedsAe) and START disabled.
-            selectShip(currentBlueprint)
+            // currentShipNeedsAe) and START disabled. The ship itself is
+            // kept: rebuilding its editor would drop any edits, and draws
+            // the rooms without their system icons for a frame.
+            updateTypeButtons(currentBlueprint)
         }
 
     /**
@@ -390,8 +392,11 @@ class SelectShipState(private val datafile: Datafile, private val main: MainGame
 
     private fun selectShip(blueprint: ShipBlueprint) {
         editor = ShipEditor(this, EditableShip.fromBlueprint(blueprint))
+        updateTypeButtons(blueprint)
+    }
 
-        // Update the A/B/C variant buttons
+    /** Update the A/B/C variant buttons for the given ship. */
+    private fun updateTypeButtons(blueprint: ShipBlueprint) {
         val family = shipFamilies.byShipId[blueprint.name]
         val typeId = family?.ships?.indexOf(blueprint.name) ?: 0
 
