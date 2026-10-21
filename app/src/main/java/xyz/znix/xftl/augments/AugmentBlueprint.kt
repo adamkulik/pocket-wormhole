@@ -54,6 +54,9 @@ open class AugmentBlueprint(elem: Element) : Blueprint(elem) {
         const val EXPLOSIVE_REPLICATOR: String = "EXPLOSIVE_REPLICATOR"
         const val FTL_JAMMER: String = "FTL_JAMMER"
 
+        // Defense Scrambler: see DefenceDrone.update.
+        const val DEFENSE_SCRAMBLER: String = "DEFENSE_SCRAMBLER"
+
         /**
          * Zoltan Shield Bypass: lets this ship teleport crew and bomb
          * weapons through a super shield, and mind-control crew aboard
