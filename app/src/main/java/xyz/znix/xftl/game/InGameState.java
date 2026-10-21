@@ -3216,7 +3216,7 @@ public class InGameState extends MainGame.GameState {
             sounds = new RealSoundManager(datafile, resourceContext);
             generator = new ShipGenerator(datafile, blueprintManager);
             translator = new Translator(datafile, "en");
-            eventManager = new EventManager(datafile, translator, blueprintManager);
+            eventManager = new EventManager(datafile, translator, blueprintManager, enableAdvancedEdition);
             nameManager = new CrewNameManager(datafile, "en");
             achievements = new Achievement.AchievementTable(datafile);
             hotkeyManager = new HotkeyManager();

@@ -50,6 +50,34 @@ class SelectShipState(private val datafile: Datafile, private val main: MainGame
     val ships: List<LazyShipBlueprint>
 
     private val current: EditableShip get() = editor.ship
+
+    /**
+     * Vanilla's ADVANCED EDITION ON/OFF toggle, saved in the profile. With
+     * it off, the AE-only ships (the Lanius and every type C layout) can't
+     * be picked, and the run is played without any AE content.
+     */
+    var advancedEdition: Boolean
+        get() = main.profile.advancedEdition
+        set(value) {
+            main.profile.advancedEdition = value
+
+            // Move off an AE-only ship, and refresh the A/B/C buttons.
+            if (!isShipSelectable(current.baseBlueprint))
+                selectShip(firstSelectableShip())
+            else
+                selectShip(currentBlueprint)
+        }
+
+    /**
+     * The player ships that exist without Advanced Edition content - the
+     * ones defined outside the dlc blueprint files.
+     */
+    private val nonAeShips: Set<String> by lazy {
+        BlueprintManager(datafile, false).blueprints.keys
+            .filter { it.startsWith("PLAYER_SHIP_") }
+            .toSet()
+    }
+
     private val currentBlueprint: ShipBlueprint get() = blueprints.getShip(current.baseBlueprint)
 
     var isShipEdited = false
@@ -63,6 +91,7 @@ class SelectShipState(private val datafile: Datafile, private val main: MainGame
     private lateinit var editor: ShipEditor
 
     private val startGameButton: StartGameButton
+    private val advancedBox: AdvancedEditionBox
 
     private val uiProvider: UIProvider = ShipSelectUIProvider()
     private val shipSelector: WidgetContainer
@@ -81,6 +110,7 @@ class SelectShipState(private val datafile: Datafile, private val main: MainGame
 
     init {
         startGameButton = StartGameButton(this)
+        advancedBox = AdvancedEditionBox(this)
         editFileControls = EditFileControls(this)
 
         val background = getImg("img/window_base.png")
@@ -129,7 +159,11 @@ class SelectShipState(private val datafile: Datafile, private val main: MainGame
             }
         }
 
-        selectShip(ships.firstOrNull { isShipUnlocked(it.name) }?.real ?: ships.first().real)
+        selectShip(firstSelectableShip())
+    }
+
+    private fun firstSelectableShip(): ShipBlueprint {
+        return (ships.firstOrNull { isShipSelectable(it.name) } ?: ships.first()).real
     }
 
     override fun shutdown() {
@@ -151,6 +185,7 @@ class SelectShipState(private val datafile: Datafile, private val main: MainGame
         g.popTransform()
 
         startGameButton.draw(g)
+        advancedBox.draw(g)
 
         editFileControls.draw(g)
 
@@ -198,6 +233,7 @@ class SelectShipState(private val datafile: Datafile, private val main: MainGame
         }
 
         startGameButton.mouseClicked(button)
+        advancedBox.mouseClicked(button)
 
         editFileControls.mouseClicked(button)
 
@@ -291,7 +327,10 @@ class SelectShipState(private val datafile: Datafile, private val main: MainGame
 
     fun startGame(selected: Difficulty) {
         val editedShip = if (isShipEdited) editor.ship else null
-        main.startNewGame(currentBlueprint.name, selected, editedShip)
+
+        // A ship edited in the hangar can use any system, AE ones included,
+        // so it always gets the AE content to find their blueprints.
+        main.startNewGame(currentBlueprint.name, selected, editedShip, advancedEdition || editedShip != null)
     }
 
     fun startEditingShip() {
@@ -318,7 +357,7 @@ class SelectShipState(private val datafile: Datafile, private val main: MainGame
             // A family may only list variants that exist as blueprints - e.g.
             // there's no Crystal or Lanius type C (GitHub issue #108).
             val variantExists = family?.ships?.getOrNull(idx)?.let { shipId ->
-                ships.any { it.name == shipId }
+                ships.any { it.name == shipId } && isShipSelectable(shipId)
             } == true
 
             if (idx == typeId) {
@@ -347,6 +386,7 @@ class SelectShipState(private val datafile: Datafile, private val main: MainGame
         if (!isFamilyUnlocked(family)) return
 
         val shipId = family.ships.getOrNull(index) ?: return
+        if (!isShipSelectable(shipId)) return
 
         val blueprint = ships.firstOrNull { it.name == shipId } ?: return
         selectShip(blueprint.real)
@@ -362,6 +402,16 @@ class SelectShipState(private val datafile: Datafile, private val main: MainGame
         return isFamilyUnlocked(family)
     }
 
+    /**
+     * Whether a ship can be picked: unlocked, and available with the
+     * current Advanced Edition setting.
+     */
+    fun isShipSelectable(shipName: String): Boolean {
+        if (!advancedEdition && shipName !in nonAeShips)
+            return false
+        return isShipUnlocked(shipName)
+    }
+
     fun isFamilyUnlocked(family: ShipFamily): Boolean {
         return family.isUnlocked(main.profile)
     }
@@ -371,7 +421,7 @@ class SelectShipState(private val datafile: Datafile, private val main: MainGame
      * player has actually unlocked.
      */
     private fun randomUnlockedShip(): ShipBlueprint {
-        val unlocked = ships.filter { isShipUnlocked(it.name) }
+        val unlocked = ships.filter { isShipSelectable(it.name) }
         return (unlocked.ifEmpty { ships }).random().real
     }
     private inner class ShipSelectUIProvider : UIProvider {
