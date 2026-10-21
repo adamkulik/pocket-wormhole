@@ -95,7 +95,12 @@ class ModsPanel(
             confirmDelete = null
         }
 
-        val listTop = Y + 54 + ROW_H + 8
+        // What the speed button does, under its row.
+        val speedLines = textFont.wrapString(SPEED_DESCRIPTION, W - 48)
+        for ((i, line) in speedLines.withIndex())
+            textFont.drawString(X + 24f, Y + 54 + ROW_H + 14f + i * textFont.lineSpacing, line, DISABLED_TEXT)
+
+        val listTop = Y + 54 + ROW_H + speedLines.size * textFont.lineSpacing + 12
         if (mods.isEmpty()) {
             val lines = textFont.wrapString(
                 "No mods installed. Tap ADD MOD and pick a Slipstream mod file (.ftl or .zip) " +
@@ -245,7 +250,12 @@ class ModsPanel(
         private const val X = (1280 - W) / 2
         private const val Y = (720 - H) / 2
 
-        private const val ROWS = 7
+        private const val ROWS = 6
+
+        internal const val SPEED_DESCRIPTION =
+            "Not in vanilla FTL, and some players count it as cheating. When ON, a button right of the " +
+                    "options wrench speeds the whole game up - tap it to go faster (up to MAX), long-press for " +
+                    "1x. Red text means your phone can't keep up; it then just runs as fast as it can."
         private const val ROW_H = 40
         private const val TOGGLE_W = 80
         private const val DELETE_W = 110
