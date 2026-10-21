@@ -138,6 +138,16 @@ class BoardingDrone(type: DroneBlueprint) : AbstractIndoorsDrone(type) {
 
     override fun makePawn(room: Room): Pawn = BoardingPawn(room)
 
+    // A drone still flying when the ship it was sent at leaves (destroyed,
+    // or it jumped away) is destroyed on its next update - but a save made
+    // before that (eg when the dialogue about the fight's end closes) would
+    // reference its target room on a ship that isn't in the save. That
+    // aborted the whole save, and the next load crashed.
+    override fun isSaveable(refs: ObjectRefs): Boolean {
+        val flying = projectile
+        return super.isSaveable(refs) && (flying == null || refs.contains(flying.target.ship))
+    }
+
     override fun saveToXML(elem: Element, refs: ObjectRefs) {
         super.saveToXML(elem, refs)
 
