@@ -92,8 +92,11 @@ class ModsPanel(
         val speedOn = profile.gameSpeedButton
         g.colour = ROW_A
         g.fillRect(X + 12, Y + 54, W - 24, ROW_H - 4)
-        textFont.drawString(X + 24f, Y + 54 + 26f, "Game speed button (built in)",
+        drawName(X + 24, Y + 54 + 26, "Game speed button (built in)",
             if (speedOn) Constants.SECTOR_CUTOUT_TEXT else DISABLED_TEXT)
+        hits += Hit(X + 12, Y + 54, NAME_W + 24, ROW_H - 4) {
+            showDetails(Details("Game speed button", "Built in  ·  not part of vanilla FTL", SPEED_DESCRIPTION))
+        }
         button(g, mouseX, mouseY, X + W - 24 - DELETE_W - 12 - TOGGLE_W, Y + 54 + 4, TOGGLE_W, ROW_H - 12,
             if (speedOn) "ON" else "OFF", speedOn) {
             profile.gameSpeedButton = !speedOn
@@ -108,12 +111,7 @@ class ModsPanel(
             confirmDelete = null
         }
 
-        // What the speed button does, under its row.
-        val speedLines = textFont.wrapString(SPEED_DESCRIPTION, W - 48)
-        for ((i, line) in speedLines.withIndex())
-            textFont.drawString(X + 24f, Y + 54 + ROW_H + 14f + i * textFont.lineSpacing, line, DISABLED_TEXT)
-
-        val listTop = Y + 54 + ROW_H + speedLines.size * textFont.lineSpacing + 12
+        val listTop = Y + 54 + ROW_H + 8
         if (mods.isEmpty()) {
             val lines = textFont.wrapString(
                 "No mods installed. Tap ADD MOD and pick a Slipstream mod file (.ftl or .zip) " +
@@ -302,16 +300,22 @@ class ModsPanel(
 
     companion object {
         private const val W = 720
-        private const val H = 560
+        private const val H = 520
         private const val X = (1280 - W) / 2
         private const val Y = (720 - H) / 2
 
-        private const val ROWS = 6
+        private const val ROWS = 7
 
-        internal const val SPEED_DESCRIPTION =
-            "Not in vanilla FTL, and some players count it as cheating. When ON, a button right of the " +
-                    "options wrench speeds the whole game up - tap it to go faster (up to MAX), long-press for " +
-                    "1x. Red text means your phone can't keep up; it then just runs as fast as it can."
+        private const val SPEED_DESCRIPTION =
+            "When ON, a button appears right of the options wrench in the top bar that speeds the whole game " +
+                    "up: combat, fires, oxygen and crew all run faster together, so the game plays the same, " +
+                    "just sooner - handy for training crew at an asteroid field.\n\n" +
+                    "Tap the button to go faster, up to the MAX chosen here. Long-press it to go straight back " +
+                    "to 1x.\n\n" +
+                    "If the button's text turns red, your phone can't keep up with that speed: the game then " +
+                    "just runs as fast as the phone allows. Lower MAX if that happens a lot.\n\n" +
+                    "This isn't part of vanilla FTL, and some players count it as cheating, so it's off unless " +
+                    "you turn it on."
         private const val ROW_H = 40
         private const val TOGGLE_W = 80
         private const val DELETE_W = 110
