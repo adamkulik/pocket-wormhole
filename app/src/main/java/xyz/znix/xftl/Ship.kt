@@ -2062,9 +2062,13 @@ class Ship(
     }
 
     fun loadCrewPositions() {
-        // Note that since we change the crew target positions one at a time,
-        // if crew need to swap positions then we can end up not being able
-        // to do that, even if it should be valid.
+        // Crew are sent one at a time, and a crewmember's slot only frees
+        // up once they set off - so someone heading for a station a
+        // crewmate is still standing on has to wait for that crewmate to
+        // leave. Keep going round until nobody else can move, instead of
+        // giving up after one pass (which sent crew to the wrong slot, or
+        // nowhere at all, depending on the crew list order).
+        val pending = ArrayList<Pair<LivingCrew, RoomPoint>>()
         for (member in crew) {
             if (member.mode != AbstractCrew.SlotType.CREW)
                 continue
@@ -2077,11 +2081,29 @@ class Ship(
 
             val saved = member.savedPosition ?: continue
             val roomPos = shipToRoomPos(saved) ?: continue
+            pending += Pair(member, roomPos)
+        }
 
-            if (!member.setTargetRoom(roomPos.room, roomPos)) {
-                // If our spot is taken, go somewhere else in the room.
-                member.setTargetRoom(roomPos.room)
-            }
+        val steppedAside = HashSet<LivingCrew>()
+        while (pending.isNotEmpty()) {
+            val moved = pending.removeAll { (member, roomPos) -> member.setTargetRoom(roomPos.room, roomPos) }
+            if (moved)
+                continue
+
+            // Nobody could move: the rest are swapping stations with each
+            // other (or their station is taken by someone staying put).
+            // Step one of them aside, which frees their slot for the others.
+            val (stuck, _) = pending.firstOrNull { it.first !in steppedAside } ?: break
+            steppedAside += stuck
+            val aside = findSpaceForCrew(stuck.room, stuck.mode)
+            if (!stuck.setTargetRoom(aside.room, aside))
+                stuck.setTargetRoom(aside.room)
+        }
+
+        // Whoever is left has their station taken for good: get as close
+        // to it as possible.
+        for ((member, roomPos) in pending) {
+            member.setTargetRoom(roomPos.room)
         }
     }
 
