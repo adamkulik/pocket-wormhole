@@ -47,14 +47,20 @@ with or endorsed by them.
 
 ## Saves & data
 
-Everything lives in the app's private storage
-(`/Android/data/com.pocketwormhole.android/files/`):
+Everything lives in the app's internal private storage (`Context.filesDir`,
+`/data/data/com.pocketwormhole.android/files/`), which file managers can't
+open without root:
 
+- `ftl.dat` — the copied game data
 - `ProjectWormhole/save-profile.xml` — profile (unlocks, achievements, options)
 - `ProjectWormhole/run-save.xml` — your in-progress run
 - `ProjectWormhole/ftl-path.txt` — pointer to the copied `ftl.dat`
-- `ProjectWormhole/mods/` — mods, loaded like on desktop
-- `log-session-*.txt` — session logs (useful for bug reports)
+- `ProjectWormhole/mods/` — mods, loaded like on desktop (with an `order.txt`
+  listing them); since the folder is private, there's currently no way to put
+  mods there on an unrooted phone
+- `log-session-*.txt` — session logs (useful for bug reports); these are also
+  written to `/Android/data/com.pocketwormhole.android/files/`, which you can
+  reach over USB or with a file manager on most Android versions
 
 **Save + Quit** (escape menu) saves your run; the next time you open the app
 the run resumes automatically, exactly where you left it. Starting a new run
