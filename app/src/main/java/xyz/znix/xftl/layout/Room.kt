@@ -130,17 +130,20 @@ data class Room(val ship: Ship, val id: Int, val x: Int, val y: Int, val width: 
     /**
      * One crystal of the lockdown coating, pinned from the exe
      * (LockdownCrystal ctor FUN_00489af0 + spawner FUN_00494f50): it sits on
-     * one of the room's walls, picks one of the dat's two "crystal_1/2"
-     * growth strips at random (50/50), holds its full-cluster look for a
-     * random 1-2s, then plays the strip BACKWARDS over 0.5s - the cluster
-     * crumbles down to a pebble (user-confirmed vanilla behaviour) - and is
-     * gone. Transient, like the lockdown timer itself.
+     * one of the room's walls and picks one of the dat's two "crystal_1/2"
+     * growth strips at random (50/50). Like vanilla (checked against 1.6.14:
+     * the coating stays up for the whole lockdown), it grows in over the
+     * strip's 0.5s, holds its full-cluster look until a random 1-2s before
+     * the lockdown ends, then plays the strip BACKWARDS - the cluster
+     * crumbles down to a pebble - and is gone. Transient, like the lockdown
+     * timer itself.
      */
-    private class LockdownShard(val x: Float, val y: Float, val anim: FTLAnimation, val holdTime: Float) {
-        var age: Float = 0f
+    private class LockdownShard(val x: Float, val y: Float, val spec: AnimationSpec, val crumbleAt: Float, grow: FTLAnimation) {
+        var anim: FTLAnimation = grow
+        var crumbling = false
 
         val isDone: Boolean
-            get() = age >= holdTime && anim.isStopped
+            get() = crumbling && anim.isStopped
     }
 
     private var lockdownCrystals: List<LockdownShard> = emptyList()
@@ -153,12 +156,12 @@ data class Room(val ship: Ship, val id: Int, val x: Int, val y: Int, val width: 
         val list = ArrayList<LockdownShard>()
 
         fun addShard(x: Float, y: Float) {
-            // Reversed one-shot: starts on the full-cluster last frame and
-            // crumbles down to the pebble first frame over the strip's 0.5s.
+            // Grows in from the pebble first frame to the full-cluster last
+            // frame, and stays on it until it's time to crumble.
             val spec = ship.sys.animations["crystal_${rng.nextInt(2) + 1}"]
-            val anim = spec.startSingle(ship.sys, 1f, backwards = true)
-            val hold = LOCKDOWN_HOLD_MIN + rng.nextFloat() * (LOCKDOWN_HOLD_MAX - LOCKDOWN_HOLD_MIN)
-            list.add(LockdownShard(x, y, anim, hold))
+            val grow = spec.startSingle(ship.sys, 1f, backwards = false)
+            val crumbleAt = LOCKDOWN_CRUMBLE_MIN + rng.nextFloat() * (LOCKDOWN_CRUMBLE_MAX - LOCKDOWN_CRUMBLE_MIN)
+            list.add(LockdownShard(x, y, spec, crumbleAt, grow))
         }
 
         // Vanilla coats the room's perimeter: three crystals per 35px tile
@@ -194,17 +197,20 @@ data class Room(val ship: Ship, val id: Int, val x: Int, val y: Int, val width: 
         updateCrewInRoom()
 
         // Crystal Lockdown coating (the Crystal crew ability and lockdown
-        // bombs): tick it down, crumble the shards once their holds expire,
+        // bombs): tick it down, crumble the shards as it runs out,
         // and when it melts absorb any damage the doors took while sealed -
         // vanilla leaves the doors fresh once the crystals are gone (the
         // coating is what took the punches).
         if (lockdownTimer > 0f) {
             lockdownTimer = (lockdownTimer - dt).coerceAtLeast(0f)
             for (c in lockdownCrystals) {
-                c.age += dt
-                // The crumble strip only plays once the shard's hold expires.
-                if (c.age >= c.holdTime)
-                    c.anim.update(dt)
+                if (!c.crumbling && lockdownTimer <= c.crumbleAt) {
+                    // Reversed one-shot: from the full cluster down to the
+                    // pebble over the strip's 0.5s.
+                    c.anim = c.spec.startSingle(ship.sys, 1f, backwards = true)
+                    c.crumbling = true
+                }
+                c.anim.update(dt)
             }
             lockdownCrystals = lockdownCrystals.filterNot { it.isDone }
             if (lockdownTimer == 0f) {
@@ -323,7 +329,7 @@ data class Room(val ship: Ship, val id: Int, val x: Int, val y: Int, val width: 
 
         // Crystal Lockdown coating: shards sit on the walls (under crew,
         // like everything else in here), holding their full-cluster look
-        // before crumbling away staggered. Vision-gated like fires and
+        // until they crumble away staggered at the end. Vision-gated like fires and
         // breaches - a coating glowing on a room the player can't see into
         // would leak that something locked down there.
         if (lockdownTimer > 0f && playerHasVision) {
@@ -1049,8 +1055,9 @@ data class Room(val ship: Ship, val id: Int, val x: Int, val y: Int, val width: 
     companion object {
         // Crystal Lockdown visual constants (exe pins; see the plan file's
         // "LOCKDOWN VISUALS - EXE PINS" section).
-        private const val LOCKDOWN_HOLD_MIN = 1f
-        private const val LOCKDOWN_HOLD_MAX = 2f
+        // How long before the lockdown ends each crystal starts crumbling.
+        private const val LOCKDOWN_CRUMBLE_MIN = 1f
+        private const val LOCKDOWN_CRUMBLE_MAX = 2f
         private const val LOCKDOWN_STRIDE = 12f
         private const val LOCKDOWN_JITTER = 12
     }
