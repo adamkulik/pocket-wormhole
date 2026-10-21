@@ -246,7 +246,7 @@ class ModsPanel(
 
     companion object {
         private const val W = 720
-        private const val H = 520
+        private const val H = 560
         private const val X = (1280 - W) / 2
         private const val Y = (720 - H) / 2
 
