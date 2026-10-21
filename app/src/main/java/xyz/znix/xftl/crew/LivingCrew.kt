@@ -233,9 +233,9 @@ abstract class LivingCrew(blueprint: CrewBlueprint, anims: Animations, room: Roo
         // Deduct 20% (of a single level) from all skills. This deduction
         // is then rounded down to an integer number of actions.
         for (skill in Skill.values()) {
-            val actionsToDeduct = (skill.actionsPerLevel * 0.20f).toInt()
+            val actionsToDeduct = (actionsPerLevel(skill) * 0.20f).toInt()
             val oldLevel = info.skills.getValue(skill)
-            val newLevel = (oldLevel - actionsToDeduct * skill.amountPerAction).coerceIn(0f..1f)
+            val newLevel = (oldLevel - actionsToDeduct * skillAmountPerAction(skill)).coerceIn(0f..1f)
             info.skills[skill] = newLevel
         }
     }
@@ -270,9 +270,15 @@ abstract class LivingCrew(blueprint: CrewBlueprint, anims: Animations, room: Roo
     /**
      * A quick way for systems to credit the crewmember with performing a single action.
      */
+    /** The actions to make one colour change of [skill] (humans need fewer). */
+    open fun actionsPerLevel(skill: Skill): Int = skill.actionsPerLevel
+
+    /** The progress (0-1) one action of [skill] gives. */
+    fun skillAmountPerAction(skill: Skill): Float = 1f / (actionsPerLevel(skill) * 2f)
+
     fun addSkillPoint(skill: Skill) {
         val oldProgress = info.skills.getValue(skill)
-        val newProgress = (oldProgress + skill.amountPerAction).coerceIn(0f..1f)
+        val newProgress = (oldProgress + skillAmountPerAction(skill)).coerceIn(0f..1f)
         info.skills[skill] = newProgress
 
         // Show the experience indicator on this crewmember's crew box -
@@ -620,18 +626,25 @@ enum class Skill(
      * to increase their skill level from 0->50% or 50->100% (a single
      * colour change).
      */
-    val actionsPerLevel: Int
+    val actionsPerLevel: Int,
+
+    /**
+     * The same for humans, who learn about 10% faster (wiki, Humans:
+     * "-10% experience requirements", XP/level 13/13/50/58/16/7).
+     */
+    val humanActionsPerLevel: Int
 ) {
-    PILOTING("pilot", 15),
-    ENGINES("engines", 15),
-    SHIELDS("shields", 55),
-    WEAPONS("weapons", 65),
-    REPAIRS("repair", 18),
-    COMBAT("combat", 8),
+    PILOTING("pilot", 15, 13),
+    ENGINES("engines", 15, 13),
+    SHIELDS("shields", 55, 50),
+    WEAPONS("weapons", 65, 58),
+    REPAIRS("repair", 18, 16),
+    COMBAT("combat", 8, 7),
     ;
 
     val iconPath: String = "img/people/skill_${xmlName}_white.png"
 
+    // For non-humans; crew use LivingCrew.skillAmountPerAction.
     // Divide by 2f since the skill level from 0-1 represents the range
     // of no skills to yellow (with green being 0.5), while actionsPerLevel
     // is the number of actions to make one colour change (or 0.5 progress).
