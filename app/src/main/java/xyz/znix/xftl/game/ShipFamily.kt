@@ -29,6 +29,14 @@ class ShipFamily(elem: Element) {
         if (unlockId == null)
             return true
 
+        return profile.allShipsUnlocked || isReallyUnlocked(profile)
+    }
+
+    /** Unlocked by its quest or an import, ignoring UNLOCK ALL. */
+    fun isReallyUnlocked(profile: SaveProfile): Boolean {
+        if (unlockId == null)
+            return true
+
         return profile.getShipUnlock(this) != null
     }
 

@@ -57,6 +57,9 @@ sealed interface PlatformSpecific {
          * bytes, or null if the user cancelled. May be invoked on any
          * thread. */
         fun importSave(onResult: (ByteArray?) -> Unit)
+
+        /** Like [exportSave] for another file, suggesting [fileName]. */
+        fun exportFile(bytes: ByteArray, fileName: String) = exportSave(bytes)
     }
 
     companion object {

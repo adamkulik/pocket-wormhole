@@ -148,6 +148,9 @@ public class MainGame implements Game {
         switchToShipSelect();
     }
 
+    /** Why the last {@link #continueVanillaSave()} failed, to show the player. */
+    public String lastVanillaSaveError;
+
     /**
      * Try to continue from a vanilla-format continue.sav, e.g. one copied in
      * from a PC install. The save is consumed on success so stale copies
@@ -156,6 +159,7 @@ public class MainGame implements Game {
      * @return true if a run was loaded
      */
     public boolean continueVanillaSave() {
+        lastVanillaSaveError = null;
         Path path = getVanillaSavePath();
         if (!Files.exists(path)) {
             return false;
@@ -187,6 +191,7 @@ public class MainGame implements Game {
             // can retry after installing it.
             System.err.println("Failed to load vanilla-format save (file kept):");
             ex.printStackTrace(System.err);
+            lastVanillaSaveError = ex.toString();
             return false;
         }
     }
