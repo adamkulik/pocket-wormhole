@@ -274,10 +274,13 @@ class Hacking(blueprint: SystemBlueprint) : MainSystem(blueprint) {
         if (!projectile.hasLanded)
             return
 
-        // The exact vanilla chances are unpinned - the wiki only says higher
-        // level hacking has a higher chance. Scale 25/50/75% by level for
-        // now, and tune if the user's vanilla experience disagrees.
-        if (Random.nextFloat() >= disruptLevel * 0.25f)
+        // Wiki, Hacking: "The chance to destroy a drone is 39%, 62%, 77%
+        // with level 1, 2, 3 hacking (after a one-second delay, there's a
+        // 15% chance to destroy the drone every second)" - the same as
+        // drones stunned by a Drone Control disruption, over the 4/7/10 s
+        // pulse.
+        val chance = DISRUPT_DESTROY_CHANCE[(disruptLevel - 1).coerceIn(DISRUPT_DESTROY_CHANCE.indices)]
+        if (Random.nextFloat() >= chance)
             return
 
         projectile.destroyByDisrupt()
@@ -742,6 +745,9 @@ class Hacking(blueprint: SystemBlueprint) : MainSystem(blueprint) {
         val INFO: SystemInfo = HackingInfo
 
         const val PROBE_SERIALISATION_TYPE = "hackingProbe"
+
+        // By the disrupting hacking system's level, 1-3.
+        private val DISRUPT_DESTROY_CHANCE = listOf(0.39f, 0.62f, 0.77f)
 
         fun loadProjectileFromXML(game: InGameState, elem: Element, refs: RefLoader, callback: (IProjectile) -> Unit) {
             SaveUtil.getRoomRef(elem, "target", refs) { target ->
