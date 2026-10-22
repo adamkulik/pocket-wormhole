@@ -104,6 +104,16 @@ object VanillaProfileSync {
         return bytes
     }
 
+    /**
+     * The stats as FTL will show them after the next export: the ones
+     * kept from FTL plus the runs played here since.
+     */
+    fun currentStats(profile: SaveProfile): VanillaProfile.Stats {
+        val stats = keptProfile(profile)?.stats ?: VanillaProfile.Stats()
+        addRuns(stats, profile.runs.drop(profile.runsExported))
+        return stats
+    }
+
     /** Count [runs] in vanilla's [stats], like vanilla does at the end of a run. */
     fun addRuns(stats: VanillaProfile.Stats, runs: List<RunRecord>) {
         val r = stats.records

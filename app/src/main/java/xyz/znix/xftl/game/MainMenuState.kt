@@ -123,7 +123,7 @@ class MainMenuState(private val main: MainGame, private val datafile: Datafile) 
         )
         profilePanel = ProfilePanel(
             font("JustinFont12Bold"), font("JustinFont10"), font("HL2").apply { scale = 2f },
-            main.profile, main.gameContent.achievements, families
+            main.profile, main.gameContent.achievements, families, main.gameContent.translator
         ) { profilePanel = null }
     }
 

@@ -2,6 +2,7 @@ package xyz.znix.xftl.game
 
 import xyz.znix.xftl.Constants
 import xyz.znix.xftl.SILFontLoader
+import xyz.znix.xftl.Translator
 import xyz.znix.xftl.f
 import xyz.znix.xftl.rendering.Colour
 import xyz.znix.xftl.rendering.Graphics
@@ -12,8 +13,9 @@ import java.util.concurrent.ConcurrentLinkedQueue
 
 /**
  * The main menu's STATS panel: the profile's progress, and moving it to and
- * from vanilla FTL's profile (ae_prof.sav) - achievements and unlocked
- * ships, both ways. See [VanillaProfileSync].
+ * from vanilla FTL's profile (ae_prof.sav) - achievements, unlocked ships
+ * and stats, both ways (see [VanillaProfileSync]). Its other pages list the
+ * achievements and show the stats screen's scores and records.
  */
 class ProfilePanel(
     private val titleFont: SILFontLoader,
@@ -22,6 +24,7 @@ class ProfilePanel(
     private val profile: SaveProfile,
     private val achievements: Achievement.AchievementTable,
     private val families: ShipFamily.FamilyTable,
+    private val translator: Translator,
     private val close: () -> Unit
 ) {
     private val transfer = PlatformSpecific.INSTANCE.saveTransfer
@@ -35,6 +38,11 @@ class ProfilePanel(
     private class Hit(val x: Int, val y: Int, val w: Int, val h: Int, val action: () -> Unit)
 
     private val hits = ArrayList<Hit>()
+
+    private enum class Page { PROFILE, ACHIEVEMENTS, RECORDS }
+
+    private var page = Page.PROFILE
+    private var achievementPage = 0
 
     fun update() {
         while (true) {
@@ -55,8 +63,26 @@ class ProfilePanel(
         g.colour = BACKGROUND
         Buttons.drawRounded(g, X, Y, W, H, 6)
 
-        titleFont.drawString(X + 20f, Y + 34f, "PROFILE", Constants.SECTOR_CUTOUT_TEXT)
+        titleFont.drawString(X + 20f, Y + 34f, page.name, Constants.SECTOR_CUTOUT_TEXT)
 
+        var tabX = X + W - 20
+        for (tab in Page.values().reversed()) {
+            val w = if (tab == Page.ACHIEVEMENTS) 184 else 110
+            tabX -= w
+            button(g, mouseX, mouseY, tabX, Y + 14, w, 28, tab.name, selected = tab == page) { page = tab }
+            tabX -= 8
+        }
+
+        when (page) {
+            Page.PROFILE -> drawProfile(g, mouseX, mouseY)
+            Page.ACHIEVEMENTS -> drawAchievements(g, mouseX, mouseY)
+            Page.RECORDS -> drawRecords()
+        }
+
+        button(g, mouseX, mouseY, X + W - 20 - 140, Y + H - 44, 140, 32, "CLOSE") { close() }
+    }
+
+    private fun drawProfile(g: Graphics, mouseX: Int, mouseY: Int) {
         val lockable = families.families.filter { it.unlockId != null }
         val ships = lockable.count { it.isUnlocked(profile) }
         val achieved = achievements.achievements.values.count { profile.getAchievement(it) != null }
@@ -90,19 +116,101 @@ class ProfilePanel(
         }
 
         val bottomY = Y + H - 44
+        var buttonX = X + 20
         if (transfer != null) {
-            button(g, mouseX, mouseY, X + 20, bottomY, 200, 32, "IMPORT FROM FTL") { importProfile() }
-            button(g, mouseX, mouseY, X + 20 + 216, bottomY, 200, 32, "EXPORT FOR FTL") { exportProfile() }
+            button(g, mouseX, mouseY, buttonX, bottomY, 180, 32, "IMPORT FROM FTL") { importProfile() }
+            button(g, mouseX, mouseY, buttonX + 188, bottomY, 180, 32, "EXPORT FOR FTL") { exportProfile() }
+            buttonX += 376
         }
-        button(g, mouseX, mouseY, X + W - 20 - 140, bottomY, 140, 32, "CLOSE") { close() }
+        button(g, mouseX, mouseY, buttonX, bottomY, 140, 32, "UNLOCK ALL") { unlockAllShips() }
+    }
+
+    /** Every achievement, earned ones lit with the difficulty they were earned on. */
+    private fun drawAchievements(g: Graphics, mouseX: Int, mouseY: Int) {
+        val all = achievements.achievements.values.toList()
+        val pages = (all.size + PER_PAGE - 1) / PER_PAGE
+        achievementPage = achievementPage.coerceIn(0, maxOf(0, pages - 1))
+
+        val colW = (W - 40) / 2
+        for ((i, ach) in all.drop(achievementPage * PER_PAGE).take(PER_PAGE).withIndex()) {
+            val x = X + 20 + (i / ROWS) * colW
+            val y = Y + 76 + (i % ROWS) * textFont.lineSpacing
+            val info = profile.getAchievement(ach)
+            val name = translator[ach.name]
+            val text = if (info == null) name else "$name (${info.difficulty.name.lowercase()})"
+            val fitted = textFont.wrapString(text, colW - 10).firstOrNull() ?: ""
+            textFont.drawString(x.f, y.f, fitted, if (info != null) Constants.SYS_ENERGY_ACTIVE else DISABLED_TEXT)
+        }
+
+        val bottomY = Y + H - 44
+        if (pages > 1) {
+            button(g, mouseX, mouseY, X + 20, bottomY, 100, 32, "PREV") { achievementPage = (achievementPage - 1 + pages) % pages }
+            button(g, mouseX, mouseY, X + 128, bottomY, 100, 32, "NEXT") { achievementPage = (achievementPage + 1) % pages }
+            textFont.drawString(X + 244f, bottomY + 21f, "Page ${achievementPage + 1} of $pages", DISABLED_TEXT)
+        }
+    }
+
+    /** The stats screen's scores and records, as FTL will show them after exporting. */
+    private fun drawRecords() {
+        val stats = VanillaProfileSync.currentStats(profile)
+        val r = stats.records
+        val colW = (W - 40) / 2
+        var y = Y + 76
+
+        fun line(x: Int, text: String, colour: Colour = Constants.SECTOR_CUTOUT_TEXT) {
+            textFont.drawString(x.f, y.f, textFont.wrapString(text, colW - 10).firstOrNull() ?: "", colour)
+        }
+
+        line(X + 20, "TOP SCORES")
+        y += textFont.lineSpacing
+        if (stats.topScores.isEmpty()) {
+            line(X + 20, "None yet", DISABLED_TEXT)
+            y += textFont.lineSpacing
+        }
+        for (score in stats.topScores) {
+            val difficulty = Difficulty.values().getOrNull(score.difficulty)?.name?.lowercase() ?: ""
+            val result = if (score.victory) "victory" else "sector ${score.sector}"
+            line(X + 20, "${score.score}  ${score.shipName}, $result, $difficulty")
+            y += textFont.lineSpacing
+        }
+
+        y += textFont.lineSpacing
+        val S = VanillaProfile.Stats
+        for ((label, most, total) in listOf(
+            Triple("Ships defeated", S.MOST_SHIPS_DEFEATED, S.TOTAL_SHIPS_DEFEATED),
+            Triple("Beacons explored", S.MOST_BEACONS_EXPLORED, S.TOTAL_BEACONS_EXPLORED),
+            Triple("Scrap collected", S.MOST_SCRAP_COLLECTED, S.TOTAL_SCRAP_COLLECTED),
+            Triple("Crew hired", S.MOST_CREW_HIRED, S.TOTAL_CREW_HIRED),
+        )) {
+            line(X + 20, "$label: most ${r[most]}, total ${r[total]}")
+            y += textFont.lineSpacing
+        }
+        line(X + 20, "Games played: ${r[S.TOTAL_GAMES_PLAYED]}, victories: ${r[S.TOTAL_VICTORIES]}")
+
+        y = Y + 76
+        val x2 = X + 20 + colW
+        line(x2, "CREW RECORDS")
+        y += textFont.lineSpacing
+        for ((label, rec) in CREW_RECORDS.zip(stats.crewRecords)) {
+            line(x2, if (rec.value == 0) "$label: -" else "$label: ${rec.value} (${rec.name})")
+            y += textFont.lineSpacing
+        }
+
+        y += textFont.lineSpacing
+        line(x2, "BEST PER SHIP")
+        y += textFont.lineSpacing
+        for (score in stats.shipBest.sortedByDescending { it.score }.take(8)) {
+            line(x2, "${score.score}  ${score.shipName}")
+            y += textFont.lineSpacing
+        }
     }
 
     private fun button(
         g: Graphics, mouseX: Int, mouseY: Int,
         x: Int, y: Int, w: Int, h: Int,
-        label: String, action: () -> Unit
+        label: String, selected: Boolean = false, action: () -> Unit
     ) {
-        val hovering = mouseX in x until x + w && mouseY in y until y + h
+        val hovering = selected || (mouseX in x until x + w && mouseY in y until y + h)
 
         g.colour = Constants.SECTOR_CUTOUT_TEXT
         Buttons.drawRounded(g, x, y, w, h, 4)
@@ -146,6 +254,21 @@ class ProfilePanel(
         setStatus("Saved as ae_prof.sav: put it in FTL's profile folder (back up the old one first).", false)
     }
 
+    /**
+     * Unlock every ship (all layouts) without importing, e.g. for testing.
+     * Achievements are left to be earned.
+     */
+    private fun unlockAllShips() {
+        var count = 0
+        for (family in families.families) {
+            if (family.unlockId == null || family.isUnlocked(profile))
+                continue
+            profile.unlockShip(family, Difficulty.EASY)
+            count++
+        }
+        setStatus(if (count == 0) "Every ship is already unlocked." else "Unlocked $count ships. Achievements are still to be earned.", false)
+    }
+
     private fun setStatus(text: String, error: Boolean) {
         status = text
         statusIsError = error
@@ -162,6 +285,11 @@ class ProfilePanel(
     }
 
     companion object {
+        private const val ROWS = 15
+        private const val PER_PAGE = ROWS * 2
+
+        private val CREW_RECORDS = listOf("Repairs", "Combat kills", "Piloted evasions", "Jumps survived", "Skill masteries")
+
         private const val W = 720
         private const val H = 420
         private const val X = (1280 - W) / 2
