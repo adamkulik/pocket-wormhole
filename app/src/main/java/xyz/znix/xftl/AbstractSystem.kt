@@ -270,8 +270,11 @@ abstract class AbstractSystem(val blueprint: SystemBlueprint) {
     fun repair(progress: Float): Boolean {
         var modifiedProgress = progress
 
-        // If a system is hacked, repairs run at half-speed
-        if (hackedBy?.isPoweredUp == true) {
+        // Repairs run at half-speed while a hacking drone is attached,
+        // powered or not (wiki, Hacking: a passive effect of the attached
+        // drone, apart from the "additional passive effects if the Hacking
+        // system is powered").
+        if (hackedBy?.isDroneAttached == true) {
             modifiedProgress /= 2f
         }
 
