@@ -128,7 +128,7 @@ class MainMenuState(private val main: MainGame, private val datafile: Datafile) 
                 val path = main.vanillaSavePath
                 java.nio.file.Files.createDirectories(path.parent)
                 java.nio.file.Files.write(path, bytes)
-                main.continueVanillaSave()
+                if (main.continueVanillaSave()) null else main.lastVanillaSaveError ?: "no save found"
             }
         ) { profilePanel = null }
     }

@@ -25,8 +25,8 @@ class ProfilePanel(
     private val achievements: Achievement.AchievementTable,
     private val families: ShipFamily.FamilyTable,
     private val translator: Translator,
-    /** Continue a run from a vanilla continue.sav; false if it can't be loaded. */
-    private val importRun: (ByteArray) -> Boolean,
+    /** Continue a run from a vanilla continue.sav; null if it loaded, else why not. */
+    private val importRun: (ByteArray) -> String?,
     private val close: () -> Unit
 ) {
     private val transfer = PlatformSpecific.INSTANCE.saveTransfer
@@ -235,8 +235,7 @@ class ProfilePanel(
                     status = null
                 } else {
                     if (isRunSave(bytes)) {
-                        if (!importRun(bytes))
-                            setStatus("Couldn't load that continue.sav (is it from a mod that isn't installed?)", true)
+                        importRun(bytes)?.let { setStatus("Couldn't load that continue.sav (a mod on here that the save wasn't made with, or the other way round?): $it", true) }
                     } else try {
                         val result = VanillaProfileSync.import(profile, bytes, achievements, families)
                         setStatus(
