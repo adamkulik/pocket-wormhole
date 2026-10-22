@@ -99,14 +99,16 @@ class Sector {
         events: List<Event>,
 
         specialEvents: GameMap.SpecialEvents,
-        difficulty: Difficulty
+        difficulty: Difficulty,
+
+        /** Everything random about the layout comes from here; see [GameMap.generateSector]. */
+        rand: Random,
+        layoutSeed: Int
     ) {
         this.info = info
+        this.layoutSeed = layoutSeed
 
-        val eventPool = ArrayDeque(events.shuffled())
-
-        val rand = Random.Default
-        layoutSeed = Random.nextInt()
+        val eventPool = ArrayDeque(events.shuffled(rand))
 
         // Generate a random 6x6 grid. Each beacon to be placed will be offset from one position on the grid.
         val grid = ArrayList<IPoint>()
@@ -128,7 +130,7 @@ class Sector {
         var skipped = 0
         val beaconCount = GRID_SIZE.x * GRID_SIZE.y - rand.nextInt(3)
         for (i in 1..beaconCount) {
-            val gridPos = grid.random()
+            val gridPos = grid.random(rand)
             grid.remove(gridPos)
 
             // There's a 20% chance to omit a given beacon. See doc/sector-map.
@@ -175,37 +177,37 @@ class Sector {
                 else -> 2..3
             }
             if (gridPos.x in exitRange && tmpFinishBeacon == null) {
-                event = specialEvents.exit.resolve()
+                event = specialEvents.exit.resolve(rand)
                 isFinish = true
 
                 if (isLastStand) {
-                    event = specialEvents.fedBase.resolve()
+                    event = specialEvents.fedBase.resolve(rand)
                 }
             }
 
             // Same goes for the start beacon
             if (gridPos.x == 0 && tmpStartBeacon == null) {
-                event = type.startEvent.resolve()
+                event = type.startEvent.resolve(rand)
                 isStart = true
 
                 // If this is the very first beacon in the game, it's replaced
                 // with the START_GAME event.
                 if (sectorNumber == 0) {
-                    event = specialEvents.startGame.resolve()
+                    event = specialEvents.startGame.resolve(rand)
                 }
             }
 
             // Otherwise, just use a standard beacon from our event pool - or
             // if we ran out of those, use a filler event.
             if (event == null) {
-                event = eventPool.pollFirst() ?: specialEvents.filler.resolve()
+                event = eventPool.pollFirst() ?: specialEvents.filler.resolve(rand)
             }
 
             val beacon = Beacon(
                 pos.const, event,
                 isFinish && !isLastStand,
                 isFinish && isLastStand,
-                Random.nextInt()
+                rand.nextInt()
             )
             require(beacon.gridPos posEq gridPos)
             beacons += beacon
