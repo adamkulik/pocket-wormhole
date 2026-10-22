@@ -226,6 +226,16 @@ class StoreData {
 
             crew[idx] = LivingCrewInfo.loadFromXML(crewElem, game)
         }
+
+        // Stores imported from a vanilla save by older builds were saved
+        // with their items but no sections, which shows them empty.
+        if (sections.isEmpty()) {
+            if (systems.isNotEmpty()) sections += Section.SYSTEMS
+            if (weapons.isNotEmpty()) sections += Section.WEAPONS
+            if (drones.isNotEmpty()) sections += Section.DRONES
+            if (augments.isNotEmpty()) sections += Section.AUGMENTS
+            if (crew.isNotEmpty()) sections += Section.CREW
+        }
     }
 
     private fun saveBlueprints(elem: Element, name: String, items: List<Blueprint?>) {
