@@ -245,12 +245,20 @@ class GameMap private constructor(df: Datafile, private val eventManager: EventM
         }
     }
 
-    fun generateSector(sectorInfo: SectorInfo, game: InGameState): Sector {
+    /**
+     * Generate a sector. Its layout, events and stores all come from [seed],
+     * which is written to vanilla-format saves as the sector's layout seed,
+     * so loading such a save rebuilds the same sector (only for saves we
+     * wrote: vanilla lays sectors out differently from the same seed).
+     */
+    @JvmOverloads
+    fun generateSector(sectorInfo: SectorInfo, game: InGameState, seed: Int = Random.nextInt()): Sector {
+        val rand = Random(seed)
         val eventPool = ArrayList<Event>()
         for (ev in sectorInfo.type.events) {
-            val count = ev.count.random()
+            val count = ev.count.random(rand)
             for (i in 1..count) {
-                eventPool += ev.event.resolve()
+                eventPool += ev.event.resolve(rand)
             }
         }
 
@@ -258,7 +266,7 @@ class GameMap private constructor(df: Datafile, private val eventManager: EventM
         var attemptCount = 0
         var sector: Sector
         while (true) {
-            sector = Sector(sectorInfo, eventPool, specialEvents, game.difficulty)
+            sector = Sector(sectorInfo, eventPool, specialEvents, game.difficulty, rand, seed)
 
             val path = sector.findShortestPath(sector.startBeacon, sector.finishBeacon)
 
@@ -285,7 +293,7 @@ class GameMap private constructor(df: Datafile, private val eventManager: EventM
                 attemptCount++
 
                 // The flagship goes on one of the two right-most columns.
-                val flagshipBeacon = sector.beacons.filter { it.gridPos.x >= 4 }.random()
+                val flagshipBeacon = sector.beacons.filter { it.gridPos.x >= 4 }.random(rand)
 
                 // Make sure we have a path to the base!
                 val path = sector.findShortestPath(flagshipBeacon, sector.finishBeacon) ?: continue

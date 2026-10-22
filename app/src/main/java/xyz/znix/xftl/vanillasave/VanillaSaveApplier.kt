@@ -13,13 +13,31 @@ import xyz.znix.xftl.sector.Sector
  * what the run consists of.
  */
 object VanillaSaveApplier {
+    /**
+     * The sector's beacons in the save's order. A save we wrote rebuilds the
+     * same sector (same beacon count); its writer puts the entry beacon in
+     * slot 1 when the player stands on it (see VanillaSaveWriter), which is
+     * undone here. Other saves keep our order.
+     */
+    fun beaconOrder(data: VanillaSaveData, sector: Sector): List<Beacon> {
+        val beacons = sector.beacons
+        if (beacons.size >= 2 && data.beacons.size == beacons.size) {
+            val others = beacons.filter { it !== sector.startBeacon }
+            val exportOrder = listOf(others[0], sector.startBeacon) + others.drop(1)
+            if (exportOrder.getOrNull(data.currentBeaconId) === sector.startBeacon)
+                return exportOrder
+        }
+        return beacons
+    }
+
     fun applyBeacons(data: VanillaSaveData, sector: Sector, game: InGameState) {
+        val order = beaconOrder(data, sector)
         sector.fleetAdvanceModifier = data.pursuitMod
         sector.dangerZoneCentre.x = data.fleetOffset
         sector.dangerZoneCentre.y = data.fleetFudge
 
         for ((index, vb) in data.beacons.withIndex()) {
-            val beacon: Beacon = sector.beacons.getOrNull(index) ?: break
+            val beacon: Beacon = order.getOrNull(index) ?: break
 
             beacon.visited = vb.visitCount > 0
             if (vb.fleetPresence > 0) {
@@ -41,7 +59,7 @@ object VanillaSaveApplier {
 
         // Quests parked on beacons
         for ((eventId, beaconId) in data.questEvents) {
-            val beacon = sector.beacons.getOrNull(beaconId)
+            val beacon = order.getOrNull(beaconId)
             val event = game.eventManager.getByDeserialisationIdOrNull(eventId)
             if (event == null) {
                 continue
