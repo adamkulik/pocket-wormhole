@@ -85,6 +85,15 @@ abstract class AbstractSystem(val blueprint: SystemBlueprint) {
     val isIonised: Boolean get() = ionTimer > 0
 
     /**
+     * End a cooldown early: the ion timer set by a system's cooldown, as
+     * opposed to real ion damage (which also sets [ionPowerLimit]).
+     */
+    fun clearCooldown() {
+        if (ionPowerLimit == null)
+            ionTimer = 0f
+    }
+
+    /**
      * If non-null, this is the hacking system that's attacking this system.
      */
     var hackedBy: Hacking? = null

@@ -28,6 +28,13 @@ class BackupBattery(blueprint: SystemBlueprint) : SubSystem(blueprint) {
 
     // TODO draw the white power padlock around the system's power bars while it's active.
 
+    override fun onJump() {
+        super.onJump()
+
+        // "Backup Battery's cooldown is immediately reset by an FTL jump" (wiki).
+        clearCooldown()
+    }
+
     override fun update(dt: Float) {
         super.update(dt)
 
