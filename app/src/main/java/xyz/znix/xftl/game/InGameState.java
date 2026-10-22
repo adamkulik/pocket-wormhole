@@ -187,7 +187,11 @@ public class InGameState extends MainGame.GameState {
         this(mainGame, content);
         this.difficulty = difficulty;
 
-        gameMap = new GameMap(df, eventManager, enableAdvancedEdition, Random.Default);
+        // The sector tree comes from a seed, written to vanilla-format saves,
+        // so importing one rebuilds the same tree.
+        int mapSeed = Random.Default.nextInt();
+        gameMap = new GameMap(df, eventManager, enableAdvancedEdition, xyz.znix.xftl.vanillasave.VanillaSaveFormat.seededRandom(mapSeed));
+        gameMap.setGenerationSeed(mapSeed);
 
         // Start at the first beacon of the first sector
         // Be sure we do this after creating the player ship, it's used by the enemy AI
@@ -313,18 +317,35 @@ public class InGameState extends MainGame.GameState {
         isCurrentlyLoadingSave = true;
 
         // Rebuild the sector tree from the save's seed and walk to the saved
-        // sector, always taking the first option of each column - the save
-        // doesn't record which sectors were on offer, so this is the most
-        // faithful deterministic reconstruction available to us.
+        // sector: along the save's route if it fits the tree, else taking
+        // the first option of each column (vanilla's own saves - its tree
+        // from the same seed differs from ours).
         gameMap = new GameMap(df, eventManager, enableAdvancedEdition, xyz.znix.xftl.vanillasave.VanillaSaveFormat.seededRandom(data.getSectorTreeSeed()));
         gameMap.setGenerationSeed(data.getSectorTreeSeed());
 
         GameMap.SectorInfo info = gameMap.getSectors().get(0).get(0);
-        visitedSectors.add(info);
         int targetColumn = Math.min(data.getSectorNumber(), gameMap.getSectors().size() - 1);
-        for (int column = 1; column <= targetColumn; column++) {
-            info = gameMap.getSectors().get(column).get(0);
+        java.util.List<GameMap.SectorInfo> allSectors = new java.util.ArrayList<>();
+        for (java.util.List<GameMap.SectorInfo> column : gameMap.getSectors())
+            allSectors.addAll(column);
+        java.util.List<GameMap.SectorInfo> route = new java.util.ArrayList<>();
+        if (data.getSectorRoute().size() == allSectors.size()) {
+            // The save's route matches this tree (saves we wrote, from the
+            // same seed): follow the sectors actually visited.
+            for (int i = 0; i < allSectors.size(); i++) {
+                if (data.getSectorRoute().get(i))
+                    route.add(allSectors.get(i));
+            }
+        }
+        if (route.size() == targetColumn + 1) {
+            visitedSectors.addAll(route);
+            info = route.get(route.size() - 1);
+        } else {
             visitedSectors.add(info);
+            for (int column = 1; column <= targetColumn; column++) {
+                info = gameMap.getSectors().get(column).get(0);
+                visitedSectors.add(info);
+            }
         }
 
         // Saves we wrote rebuild the same sector from its layout seed.
