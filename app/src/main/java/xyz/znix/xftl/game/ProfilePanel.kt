@@ -118,11 +118,11 @@ class ProfilePanel(
         val bottomY = Y + H - 44
         var buttonX = X + 20
         if (transfer != null) {
-            button(g, mouseX, mouseY, buttonX, bottomY, 180, 32, "IMPORT FROM FTL") { importProfile() }
-            button(g, mouseX, mouseY, buttonX + 188, bottomY, 180, 32, "EXPORT FOR FTL") { exportProfile() }
-            buttonX += 376
+            button(g, mouseX, mouseY, buttonX, bottomY, 220, 32, "IMPORT FROM FTL") { importProfile() }
+            button(g, mouseX, mouseY, buttonX + 228, bottomY, 220, 32, "EXPORT FOR FTL") { exportProfile() }
+            buttonX += 456
         }
-        button(g, mouseX, mouseY, buttonX, bottomY, 140, 32, "UNLOCK ALL") { unlockAllShips() }
+        button(g, mouseX, mouseY, buttonX, bottomY, 160, 32, "UNLOCK ALL") { unlockAllShips() }
     }
 
     /** Every achievement, earned ones lit with the difficulty they were earned on. */
@@ -290,7 +290,7 @@ class ProfilePanel(
 
         private val CREW_RECORDS = listOf("Repairs", "Combat kills", "Piloted evasions", "Jumps survived", "Skill masteries")
 
-        private const val W = 720
+        private const val W = 840
         private const val H = 420
         private const val X = (1280 - W) / 2
         private const val Y = (720 - H) / 2
