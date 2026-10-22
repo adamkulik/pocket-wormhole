@@ -246,7 +246,7 @@ class Ship(
         get() {
             // For the FTL to charge, the engines and piloting must
             // be working, and a pilot must be present.
-            val hasPilot = isAutoScout || isAutomated || friendlyCrew.any { it.room == piloting!!.room }
+            val hasPilot = isAutoScout || isAutomated || piloting!!.isPilotPresent
             return engines!!.powerSupplied > 0 && piloting!!.undamagedEnergy > 0 && hasPilot
                     && !engines!!.isHackActive && !piloting!!.isHackActive
         }

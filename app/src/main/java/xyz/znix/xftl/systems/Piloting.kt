@@ -4,8 +4,8 @@ import org.jdom2.Element
 import xyz.znix.xftl.SystemInfo
 import xyz.znix.xftl.Translator
 import xyz.znix.xftl.crew.AbstractCrew
+import xyz.znix.xftl.crew.LivingCrew
 import xyz.znix.xftl.crew.Skill
-import xyz.znix.xftl.math.ConstPoint
 import xyz.znix.xftl.rendering.Graphics
 import xyz.znix.xftl.savegame.ObjectRefs
 import xyz.znix.xftl.savegame.RefLoader
@@ -19,9 +19,18 @@ class Piloting(blueprint: SystemBlueprint) : SubSystem(blueprint) {
         // actually manning the system - being in the room isn't enough.
         get() = getSkillLevel(Skill.PILOTING)?.let { SKILL_BONUSES[it.ordinal] } ?: 0
 
-    private val computerPoint by lazy { configuration.computerPoint ?: ConstPoint.ZERO }
 
     override val sortingType = SortingType.PILOTING
+
+    /**
+     * Whether someone's flying the ship: "Crew presence in the Piloting
+     * room ... [is] required ... Manning the Piloting console is not
+     * required", and "Stunned or mind-controlled ship crew and crew drones
+     * do not count towards the crew presence in the Piloting" (wiki,
+     * Piloting). This decides evasion and whether the FTL drive charges.
+     */
+    val isPilotPresent: Boolean
+        get() = room!!.crew.any { it is LivingCrew && it.mode == AbstractCrew.SlotType.CREW && !it.isStunned }
 
     val evasionMultiplier: Float
         get() {
@@ -29,16 +38,9 @@ class Piloting(blueprint: SystemBlueprint) : SubSystem(blueprint) {
             if (undamagedEnergy == 0 || isHackActive)
                 return 0f
 
-            val room = this.room!!
-
-            // Find the pilot at the computer point, or the top-left if the computer point is not defined
-            val pilot = room.crew.firstOrNull {
-                it.mode == AbstractCrew.SlotType.CREW && it.standingPosition?.posEq(computerPoint) == true && it.canManSystem
-            }
-
-            // If a pilot is present (not just walking there), we get 100% of our original piloting.
-            // We've filtered out anyone walking by checking standingPosition.
-            if (pilot != null || ship.isAutoScout)
+            // Anyone in the room flies the ship at full evasion - manning the
+            // console only adds the piloting skill bonus (see [evasion]).
+            if (isPilotPresent || ship.isAutoScout)
                 return 1f
 
             // At this point, the system is not broken and we don't have a pilot. Use the evasion
