@@ -34,8 +34,9 @@ class Artillery(blueprint: SystemBlueprint) : MainSystem(blueprint) {
     override val title: GameText? get() = weapon.type.title
     override val description: GameText? get() = weapon.type.desc
 
+    // Artillery goes up to level 4: there's no button_artillery_5.png.
     private val barImages: List<Image> by onInit { game ->
-        (1..5).map { game.getImg("img/systemUI/button_artillery_$it.png") }
+        (1..4).map { game.getImg("img/systemUI/button_artillery_$it.png") }
     }
 
     // The blueprint's cooldown is correct for a level-2 artillery system.
@@ -138,7 +139,7 @@ class Artillery(blueprint: SystemBlueprint) : MainSystem(blueprint) {
         val boxX = x + 22 - 6
         val boxY = y - 53 - 6
 
-        val imageId = max(0, powerSupplied - 1)
+        val imageId = (powerSupplied - 1).coerceIn(barImages.indices)
 
         // Draw the image of the box the charge bar sits in
         barImages[imageId].draw(boxX, boxY)
