@@ -23,7 +23,9 @@ import kotlin.random.Random
  * When this is to be used, [resolve] is called which provides a concrete event.
  */
 interface IEvent {
-    fun resolve(): Event
+    fun resolve(rand: Random): Event
+
+    fun resolve(): Event = resolve(Random.Default)
 
     val debugId: String
 }
@@ -304,7 +306,7 @@ class Event(
         }
     }
 
-    override fun resolve() = this
+    override fun resolve(rand: Random) = this
 
     /**
      * Evaluate all the random values in this event's rewards, and pack them into a ResourceSet
@@ -435,7 +437,7 @@ enum class ASBTarget {
 class EventList(val name: String, events: List<Lazy<IEvent>>) : IEvent {
     val events by lazy { events.map { it.value } }
 
-    override fun resolve() = events.random().resolve()
+    override fun resolve(rand: Random) = events.random(rand).resolve(rand)
 
     override val debugId: String get() = name
 }

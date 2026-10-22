@@ -327,7 +327,8 @@ public class InGameState extends MainGame.GameState {
             visitedSectors.add(info);
         }
 
-        Sector sector = gameMap.generateSector(info, this);
+        // Saves we wrote rebuild the same sector from its layout seed.
+        Sector sector = gameMap.generateSector(info, this, data.getSectorLayoutSeed());
         VanillaSaveApplier.INSTANCE.applyBeacons(data, sector, this);
 
         // Build the player ship from its blueprint, then patch the freshly
@@ -344,9 +345,19 @@ public class InGameState extends MainGame.GameState {
         // This block MUST stay before createNewPlayerShip: its update pass
         // reaches Sensors.getBlocked -> getCurrentBeacon(), which NPE'd
         // while currentBeacon was still null.
-        currentBeacon = sector.getStartBeacon();
+        //
+        // A save we wrote ourselves rebuilds the same layout from its seed
+        // (see GameMap.generateSector); there the beacon count matches, and
+        // the player is put back where they were.
+        java.util.List<Beacon> beaconOrder = VanillaSaveApplier.INSTANCE.beaconOrder(data, sector);
+        int savedBeacon = data.getCurrentBeaconId();
+        if (data.getBeacons().size() == sector.getBeacons().size() && savedBeacon >= 0 && savedBeacon < beaconOrder.size()) {
+            currentBeacon = beaconOrder.get(savedBeacon);
+        } else {
+            currentBeacon = sector.getStartBeacon();
+        }
         currentBeacon.setVisited(true);
-        int beaconId = sector.getBeacons().indexOf(currentBeacon);
+        int beaconId = beaconOrder.indexOf(currentBeacon);
 
         createNewPlayerShip(data.getBlueprintName(), null);
         player = applyVanillaShip(data, data.getShip());
