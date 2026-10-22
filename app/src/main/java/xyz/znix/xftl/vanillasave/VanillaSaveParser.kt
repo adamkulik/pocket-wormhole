@@ -363,16 +363,16 @@ object VanillaSaveParser {
         }
 
         trace?.invoke(r.pos, "afterConditionals")
-        // Rooms: per room (o2, a, b) + 3 ints per tile; the tile values and
-        // a/b are transient state we don't consume. The oxygen percentage is
-        // kept (0-1 floats for the loader).
+        // Rooms: o2, then 3 ints per tile (fire health, ignition, extinguish
+        // progress), then the station's square and direction. Only the
+        // oxygen percentage is kept (0-1 floats for the loader).
         ship.roomOxygen.clear()
         for (tiles in roomTiles) {
             ship.roomOxygen.add(r.int() / 100f)
-            r.int(); r.int()
             repeat(tiles) {
                 r.int(); r.int(); r.int()
             }
+            r.int(); r.int()
         }
 
         trace?.invoke(r.pos, "afterRooms")

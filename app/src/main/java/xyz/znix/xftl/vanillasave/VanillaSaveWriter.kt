@@ -9,6 +9,7 @@ import xyz.znix.xftl.game.InGameState
 import xyz.znix.xftl.game.StoreData
 import xyz.znix.xftl.sector.Beacon
 import xyz.znix.xftl.layout.Door
+import xyz.znix.xftl.math.Direction
 import xyz.znix.xftl.systems.Artillery
 import xyz.znix.xftl.systems.BackupBattery
 import xyz.znix.xftl.systems.Cloaking
@@ -37,6 +38,9 @@ import kotlin.math.roundToInt
  * validated against real vanilla saves.
  */
 object VanillaSaveWriter {
+    /** A room with no crew station. */
+    private const val STATION_NONE = 4
+
     fun write(game: InGameState, out: OutputStream) {
         out.use { it.write(writeToByteArray(game)) }
     }
@@ -277,17 +281,25 @@ object VanillaSaveWriter {
             w.int(((cloaking.timeRemaining ?: 0f) * VanillaSaveFormat.TICKS_PER_SECOND).toInt())
         }
 
-        // Rooms: (o2, a, b) per room + 3 ints per tile. The a/b/tile values
-        // are transient state we don't model - zeros match pristine saves.
+        // Rooms: o2, then per tile (fire health, ignition progress,
+        // extinguish progress), then the station's square and direction
+        // (FTL Profile Editor's SavedGameParser.readRoom). No fires: (0, 0, -1).
         val layoutRooms = ship.type.rooms
         for ((index, layoutRoom) in layoutRooms.withIndex()) {
             val room = ship.rooms.getOrNull(index)
             w.int(((room?.oxygen ?: 1f) * 100f).roundToInt())
-            w.int(0)
-            w.int(0)
             val tiles = layoutRoom.size.x * layoutRoom.size.y
             repeat(tiles) {
-                w.int(-1); w.int(0); w.int(0)
+                w.int(0); w.int(0); w.int(-1)
+            }
+            val config = room?.system?.configuration
+            val station = config?.computerPoint
+            if (room != null && station != null) {
+                w.int(station.x + station.y * room.width)
+                w.int(stationDirection(config.computerDirection))
+            } else {
+                w.int(-1)
+                w.int(STATION_NONE)
             }
         }
 
@@ -731,6 +743,15 @@ object VanillaSaveWriter {
      * been byte-verified against vanilla's own writer - see the validation
      * checklist.
      */
+
+    /** Vanilla's station direction: 0 down, 1 right, 2 up, 3 left. */
+    private fun stationDirection(dir: Direction?): Int = when (dir) {
+        Direction.DOWN -> 0
+        Direction.RIGHT -> 1
+        Direction.UP -> 2
+        Direction.LEFT -> 3
+        else -> STATION_NONE
+    }
 
     private val Difficulty.saveFormatValue: Int
         get() = when (this) {
