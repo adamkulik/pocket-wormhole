@@ -49,7 +49,14 @@ class Shields(blueprint: SystemBlueprint) : MainSystem(blueprint) {
     var discharging: Boolean = false
         private set
 
-    val rechargeDelay: Float get() = 2f
+    /**
+     * How long the layer being charged takes, unmanned: the first two take
+     * 2 s, the later ones less (wiki, Shields: "1 and 2 layers restore in
+     * 2 seconds, 3rd layer - in 1.72, 4th - in 1.5, 5th - in 1.33 seconds";
+     * checked in vanilla 1.6.14: four layers come back in about 7.2 s,
+     * not 8).
+     */
+    val rechargeDelay: Float get() = LAYER_RECHARGE_TIMES[activeShields.coerceIn(LAYER_RECHARGE_TIMES.indices)]
 
     val hackDrainTime: Float get() = 2f
 
@@ -240,6 +247,9 @@ class Shields(blueprint: SystemBlueprint) : MainSystem(blueprint) {
     companion object {
         val INFO: SystemInfo = ShieldsInfo
         val SKILL_BONUSES = listOf(10, 20, 30)
+
+        // Seconds to charge the 1st, 2nd, ... layer (see rechargeDelay).
+        private val LAYER_RECHARGE_TIMES = listOf(2f, 2f, 1.72f, 1.5f, 1.33f)
     }
 }
 
