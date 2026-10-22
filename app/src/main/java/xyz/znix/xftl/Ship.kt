@@ -224,7 +224,12 @@ class Ship(
     var dronesCount: Int = 0
 
     // How much scrap the player has
-    var scrap: Int = if (sys.difficulty == Difficulty.EASY) 30 else 10
+    // Vanilla starts runs with 30 scrap on easy, 10 on normal and none on hard
+    var scrap: Int = when (sys.difficulty) {
+        Difficulty.EASY -> 30
+        Difficulty.NORMAL -> 10
+        Difficulty.HARD -> 0
+    }
 
     // How far through charging the FTL drive, 1=fully charged.
     // These only apply to the player, enemies use a fixed timer.
