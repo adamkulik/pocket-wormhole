@@ -25,6 +25,8 @@ class ProfilePanel(
     private val achievements: Achievement.AchievementTable,
     private val families: ShipFamily.FamilyTable,
     private val translator: Translator,
+    /** Continue a run from a vanilla continue.sav; false if it can't be loaded. */
+    private val importRun: (ByteArray) -> Boolean,
     private val close: () -> Unit
 ) {
     private val transfer = PlatformSpecific.INSTANCE.saveTransfer
@@ -226,13 +228,16 @@ class ProfilePanel(
 
     private fun importProfile() {
         val transfer = transfer ?: return
-        setStatus("Pick ae_prof.sav...", false)
+        setStatus("Pick ae_prof.sav, or continue.sav to continue a run...", false)
         transfer.importSave { bytes ->
             pending += {
                 if (bytes == null) {
                     status = null
                 } else {
-                    try {
+                    if (isRunSave(bytes)) {
+                        if (!importRun(bytes))
+                            setStatus("Couldn't load that continue.sav (is it from a mod that isn't installed?)", true)
+                    } else try {
                         val result = VanillaProfileSync.import(profile, bytes, achievements, families)
                         setStatus(
                             "Imported: ${result.newAchievements} new achievements, ${result.newShips} new ships. " +
@@ -247,6 +252,10 @@ class ProfilePanel(
             }
         }
     }
+
+    /** A vanilla continue.sav rather than a profile: its file format is 11. */
+    private fun isRunSave(bytes: ByteArray): Boolean =
+        bytes.size >= 4 && bytes[0].toInt() == 11 && bytes[1].toInt() == 0 && bytes[2].toInt() == 0 && bytes[3].toInt() == 0
 
     private fun exportProfile() {
         val transfer = transfer ?: return
@@ -298,7 +307,7 @@ class ProfilePanel(
         private const val EXPLANATION =
             "Move your progress between FTL on a computer and this game, both ways: unlocked ships, " +
                     "achievements and the stats screen's scores and records. IMPORT FROM FTL adds what's in FTL's profile to this one; nothing here is " +
-                    "lost. EXPORT FOR FTL saves an ae_prof.sav with everything from both. FTL keeps it in " +
+                    "lost (pick a continue.sav instead to continue that run here). EXPORT FOR FTL saves an ae_prof.sav with everything from both. FTL keeps it in " +
                     "Documents\\My Games\\FasterThanLight on Windows, ~/.local/share/FasterThanLight on Linux " +
                     "and ~/Library/Application Support/FasterThanLight on a Mac."
 

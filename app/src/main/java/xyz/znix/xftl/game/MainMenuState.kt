@@ -123,7 +123,13 @@ class MainMenuState(private val main: MainGame, private val datafile: Datafile) 
         )
         profilePanel = ProfilePanel(
             font("JustinFont12Bold"), font("JustinFont10"), font("HL2").apply { scale = 2f },
-            main.profile, main.gameContent.achievements, families, main.gameContent.translator
+            main.profile, main.gameContent.achievements, families, main.gameContent.translator,
+            { bytes ->
+                val path = main.vanillaSavePath
+                java.nio.file.Files.createDirectories(path.parent)
+                java.nio.file.Files.write(path, bytes)
+                main.continueVanillaSave()
+            }
         ) { profilePanel = null }
     }
 
