@@ -168,6 +168,16 @@ class JumpWindow(val game: InGameState, showSectorMap: () -> Unit, val jump: (Be
     private var preConfirmButtons: List<Button> = emptyList()
     private var leaveCrewButtons: List<Button> = emptyList()
 
+    // Vanilla asks the leave-crew question when the JUMP button is pressed,
+    // before the map is shown, not when a beacon is picked (GitHub issue
+    // #165). While this is set only the confirm box is drawn; YES reveals
+    // the map, NO closes the window again.
+    private var confirmBeforeMap = false
+
+    // Set once the player has said YES, so picking a beacon or the next
+    // sector doesn't ask a second time.
+    private var leaveCrewAccepted = false
+
     private var playerRotation: Float = (0f..10f).random(VisualRandom)
 
     private val outOfFuel: Boolean get() = game.player.fuelCount == 0
@@ -221,7 +231,12 @@ class JumpWindow(val game: InGameState, showSectorMap: () -> Unit, val jump: (Be
         leaveCrewWidgetPos.x = (size.x - leaveCrewWidget.root.size.x) / 2
         leaveCrewWidgetPos.y = (size.y - leaveCrewWidget.root.size.y) / 2
         leaveCrewWidget.addButtonListener("yes") { confirmLeaveCrew() }
-        leaveCrewWidget.addButtonListener("no") { closeLeaveCrewConfirm() }
+        leaveCrewWidget.addButtonListener("no") { declineLeaveCrew() }
+
+        if (game.enemy?.hasCrewOwnedByShip(game.player) == true) {
+            confirmBeforeMap = true
+            openLeaveCrewConfirm(null)
+        }
     }
 
     /**
@@ -559,6 +574,11 @@ class JumpWindow(val game: InGameState, showSectorMap: () -> Unit, val jump: (Be
     }
 
     override fun draw(g: Graphics) {
+        if (confirmBeforeMap) {
+            drawLeaveCrewConfirm(g)
+            return
+        }
+
         Utils.drawStenciled(Utils.StencilMode.MASKING, {
             // Draw the stencil
             g.colour = Colour.red // Any non-transparent colour will work
@@ -655,14 +675,17 @@ class JumpWindow(val game: InGameState, showSectorMap: () -> Unit, val jump: (Be
         }
 
         // The leave-crew confirm box (issue #98), on top of everything.
-        if (leaveCrewConfirm) {
-            g.pushTransform()
-            g.translate(position.x + leaveCrewWidgetPos.x.f, position.y + leaveCrewWidgetPos.y.f)
-            leaveCrewWidget.draw(g)
-            g.popTransform()
-            for (button in leaveCrewButtons)
-                button.draw(g)
-        }
+        if (leaveCrewConfirm)
+            drawLeaveCrewConfirm(g)
+    }
+
+    private fun drawLeaveCrewConfirm(g: Graphics) {
+        g.pushTransform()
+        g.translate(position.x + leaveCrewWidgetPos.x.f, position.y + leaveCrewWidgetPos.y.f)
+        leaveCrewWidget.draw(g)
+        g.popTransform()
+        for (button in leaveCrewButtons)
+            button.draw(g)
     }
 
     // It's a bit horrible, but this function can both draw and create buttons, since
@@ -863,7 +886,7 @@ class JumpWindow(val game: InGameState, showSectorMap: () -> Unit, val jump: (Be
 
         // Jumping away abandons any crew still aboard the enemy ship
         // (GitHub issue #98) - vanilla asks for confirmation first.
-        if (hovered != game.currentBeacon && game.enemy?.hasCrewOwnedByShip(game.player) == true) {
+        if (hovered != game.currentBeacon && !leaveCrewAccepted && game.enemy?.hasCrewOwnedByShip(game.player) == true) {
             openLeaveCrewConfirm(hovered)
             return
         }
@@ -906,7 +929,7 @@ class JumpWindow(val game: InGameState, showSectorMap: () -> Unit, val jump: (Be
      * sector is picked, so cancelling the map loses nothing.
      */
     private fun nextSectorClicked() {
-        if (game.enemy?.hasCrewOwnedByShip(game.player) == true) {
+        if (!leaveCrewAccepted && game.enemy?.hasCrewOwnedByShip(game.player) == true) {
             openLeaveCrewConfirm(null)
             return
         }
@@ -926,7 +949,18 @@ class JumpWindow(val game: InGameState, showSectorMap: () -> Unit, val jump: (Be
         positionUpdated()
     }
 
+    private fun declineLeaveCrew() {
+        // NO to the on-open question closes the map entirely, like vanilla.
+        if (confirmBeforeMap) {
+            closeLeaveCrewConfirm()
+            cancelClicked()
+            return
+        }
+        closeLeaveCrewConfirm()
+    }
+
     private fun closeLeaveCrewConfirm() {
+        confirmBeforeMap = false
         leaveCrewConfirm = false
         pendingJumpBeacon = null
         buttons.clear()
@@ -940,7 +974,14 @@ class JumpWindow(val game: InGameState, showSectorMap: () -> Unit, val jump: (Be
         // sector exit), removed once the beacon changes. The confirm is
         // purely the UI gate: YES just performs what was asked for.
         val target = pendingJumpBeacon
+        val beforeMap = confirmBeforeMap
         closeLeaveCrewConfirm()
+        leaveCrewAccepted = true
+
+        // Asked on opening the map: YES just reveals it.
+        if (beforeMap)
+            return
+
         if (target != null)
             performJump(target)
         else
@@ -980,7 +1021,7 @@ class JumpWindow(val game: InGameState, showSectorMap: () -> Unit, val jump: (Be
         // Escape dismisses the confirm first (issue #98); vanilla's other
         // confirms behave the same way.
         if (leaveCrewConfirm) {
-            closeLeaveCrewConfirm()
+            declineLeaveCrew()
             return
         }
         cancelClicked()
