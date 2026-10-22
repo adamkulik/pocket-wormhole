@@ -4,7 +4,8 @@ import org.jdom2.Element
 
 /**
  * One finished run, for the profile's stats: what vanilla's stats screen
- * (and its ae_prof.sav) counts. Crew hired isn't tracked yet, so it's 0.
+ * (and its ae_prof.sav) counts. Crew hired includes the starting crew, as
+ * in vanilla.
  */
 class RunRecord(
     val shipName: String,

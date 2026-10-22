@@ -141,6 +141,9 @@ public class InGameState extends MainGame.GameState {
     private int scoreScrapCollected;
     private int scoreBeaconsVisited;
     private int scoreShipsDefeated;
+    // Crew who joined the player this run, starting crew included, for
+    // the profile's stats (vanilla's 'crew hired' records count them too).
+    private int scoreCrewHired;
 
     /**
      * The encounter tail bytes from a vanilla save this run was imported
@@ -770,6 +773,7 @@ public class InGameState extends MainGame.GameState {
             for (int i = 0; i < spec.getAmount(); i++) {
                 LivingCrewInfo info = LivingCrewInfo.generateRandom(race, this);
                 player.addCrewMember(info, true, false);
+                scoreCrewHired++;
             }
         }
 
@@ -1939,6 +1943,7 @@ public class InGameState extends MainGame.GameState {
         root.setAttribute("scoreScrap", Integer.toString(scoreScrapCollected));
         root.setAttribute("scoreBeacons", Integer.toString(scoreBeaconsVisited));
         root.setAttribute("scoreShips", Integer.toString(scoreShipsDefeated));
+        root.setAttribute("scoreCrewHired", Integer.toString(scoreCrewHired));
 
         ObjectRefs refs = new ObjectRefs();
         Sector sector = currentBeacon.getSector();
@@ -2040,6 +2045,9 @@ public class InGameState extends MainGame.GameState {
         String scoreShips = root.getAttributeValue("scoreShips");
         if (scoreShips != null)
             scoreShipsDefeated = Integer.parseInt(scoreShips);
+        String crewHired = root.getAttributeValue("scoreCrewHired");
+        if (crewHired != null)
+            scoreCrewHired = Integer.parseInt(crewHired);
 
         // If the player ship has a custom layout, load that.
         Element customLayout = root.getChild("customLayout");
@@ -2321,7 +2329,7 @@ public class InGameState extends MainGame.GameState {
             mainGame.getProfile().recordRun(new RunRecord(
                     shipName, player.getName(), getFinalScore(),
                     currentBeacon.getSector().getSectorNumber() + 1, victory, difficulty,
-                    enableAdvancedEdition, scoreShipsDefeated, scoreBeaconsVisited, scoreScrapCollected, 0
+                    enableAdvancedEdition, scoreShipsDefeated, scoreBeaconsVisited, scoreScrapCollected, scoreCrewHired
             ));
         }
 
@@ -2715,6 +2723,11 @@ public class InGameState extends MainGame.GameState {
         return (int) (base * multiplier);
     }
 
+    /** Count a crewmember who joined the player (bought in a store). */
+    public void countCrewHired() {
+        scoreCrewHired++;
+    }
+
     public int getScoreScrapCollected() {
         return scoreScrapCollected;
     }
@@ -2788,6 +2801,7 @@ public class InGameState extends MainGame.GameState {
 
         for (LivingCrewInfo info : resources.getCrew()) {
             player.addCrewMember(info, false, false);
+            scoreCrewHired++;
         }
 
         for (RemoveCrewEval removed : resources.getLostCrew()) {

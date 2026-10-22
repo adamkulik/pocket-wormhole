@@ -465,6 +465,7 @@ class StoreWindow(val game: InGameState, val ship: Ship, val store: StoreData, p
                 override fun buy() {
                     store.crew[index] = null
                     ship.addCrewMember(crew!!, false)
+                    game.countCrewHired()
                     updateButtons()
                 }
 
