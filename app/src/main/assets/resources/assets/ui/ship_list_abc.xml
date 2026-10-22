@@ -68,8 +68,8 @@
         <widget type="hbox" pTop="188" pLeft="0" pRight="0">
             <widget type="free" xStretch="1"/>
 
-            <widget type="button" pTop="0">
-                <widget type="label" colour="text-dark" font="HL2" scale="2" text="ship_hiderooms_button"
+            <widget type="button" id="hiderooms" pTop="0">
+                <widget type="label" id="hiderooms_label" colour="text-dark" font="HL2" scale="2" text="ship_hiderooms_button"
                         pLeft="10" pRight="10" pTop="6" pBottom="6"/>
             </widget>
 
