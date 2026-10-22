@@ -7,6 +7,8 @@ import xyz.znix.xftl.rendering.Image
 class CrewHuman(blueprint: CrewBlueprint, animations: Animations, room: Room, mode: SlotType) :
     LivingCrew(blueprint, animations, room, mode) {
 
+    override fun actionsPerLevel(skill: Skill): Int = skill.humanActionsPerLevel
+
     override fun drawImage(x0: Float, y0: Float, x1: Float, y1: Float, baseFrame: Image, alpha: Float) {
         // For humans, enemies always draw without colouring.
         // IDK if they're also always male in vanilla, since that's likely

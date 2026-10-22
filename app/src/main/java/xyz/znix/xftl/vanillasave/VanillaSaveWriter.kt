@@ -534,10 +534,10 @@ object VanillaSaveWriter {
 
         // Skills: xftl keeps 0..2 progress (1 = one colour change); vanilla
         // stores the number of performed actions, which is progress divided
-        // by amountPerAction.
+        // by the crewmember's progress per action.
         for (skill in Skill.entries) {
             val progress = member.info.skills[skill] ?: 0f
-            w.int((progress / skill.amountPerAction).roundToInt())
+            w.int((progress / member.skillAmountPerAction(skill)).roundToInt())
         }
 
         // Humans have a visual gender (colour < base colour count = male);
