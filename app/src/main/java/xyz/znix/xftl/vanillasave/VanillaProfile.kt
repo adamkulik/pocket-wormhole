@@ -5,9 +5,7 @@ package xyz.znix.xftl.vanillasave
  * achievements, which ships are unlocked, and the stats screen's scores and
  * records. The layout follows FTL Profile Editor's ProfileParser (Vhati).
  *
- * Only the parts the engine has an equivalent for are decoded; the stats
- * block (top scores, per-ship bests, records) is kept as raw bytes so that
- * importing a profile and exporting it again doesn't lose anything.
+ * Everything is decoded, and written back exactly as read.
  */
 class VanillaProfile {
     /**
@@ -26,7 +24,61 @@ class VanillaProfile {
     val unlockedA = BooleanArray(SHIPS.size)
     val unlockedC = BooleanArray(SHIPS.size)
 
-    var stats: ByteArray = EMPTY_STATS
+    /** One run's entry in the top scores or the best-per-ship list. */
+    class Score(
+        val shipName: String, val shipId: String, val score: Int, val sector: Int,
+        val victory: Boolean, val difficulty: Int, val advancedEdition: Boolean
+    )
+
+    /** A crew record: the value, and who set it. */
+    class CrewRecord(val value: Int, val name: String, val race: String, val male: Boolean)
+
+    /** The stats screen. */
+    class Stats {
+        val topScores = ArrayList<Score>()
+        val shipBest = ArrayList<Score>()
+
+        /**
+         * Most and total ships defeated, beacons explored, scrap collected
+         * and crew hired (most in one run, then the total), then games
+         * played and victories.
+         */
+        val records = IntArray(10)
+
+        /** Most repairs, combat kills, piloted evasions, jumps survived, skill masteries. */
+        val crewRecords = Array(5) { CrewRecord(0, "", "", false) }
+
+        fun write(w: VanillaSaveByteWriter) {
+            for (list in listOf(topScores, shipBest)) {
+                w.int(list.size)
+                for (score in list) {
+                    w.string(score.shipName); w.string(score.shipId)
+                    w.int(score.score); w.int(score.sector)
+                    w.int(if (score.victory) 1 else 0); w.int(score.difficulty)
+                    w.bool(score.advancedEdition)
+                }
+            }
+            for (value in records) w.int(value)
+            for (rec in crewRecords) {
+                w.int(rec.value); w.string(rec.name); w.string(rec.race); w.bool(rec.male)
+            }
+        }
+
+        companion object {
+            const val MOST_SHIPS_DEFEATED = 0
+            const val TOTAL_SHIPS_DEFEATED = 1
+            const val MOST_BEACONS_EXPLORED = 2
+            const val TOTAL_BEACONS_EXPLORED = 3
+            const val MOST_SCRAP_COLLECTED = 4
+            const val TOTAL_SCRAP_COLLECTED = 5
+            const val MOST_CREW_HIRED = 6
+            const val TOTAL_CREW_HIRED = 7
+            const val TOTAL_GAMES_PLAYED = 8
+            const val TOTAL_VICTORIES = 9
+        }
+    }
+
+    var stats = Stats()
 
     fun write(): ByteArray {
         val w = VanillaSaveByteWriter()
@@ -43,7 +95,7 @@ class VanillaProfile {
             w.bool(unlockedA[i])
             w.bool(unlockedC[i])
         }
-        w.raw(stats)
+        stats.write(w)
         return w.toByteArray()
     }
 
@@ -61,17 +113,6 @@ class VanillaProfile {
         )
 
         fun isVictory(id: String) = id.endsWith("_VICTORY")
-
-        /** An empty stats block: no scores, all records zero. */
-        val EMPTY_STATS: ByteArray = VanillaSaveByteWriter().run {
-            int(0) // top scores
-            int(0) // best score per ship
-            repeat(10) { int(0) } // ships defeated, beacons, scrap, crew hired, games, victories
-            repeat(5) { // crew records: value, name, race, male
-                int(0); string(""); string(""); bool(false)
-            }
-            toByteArray()
-        }
 
         fun parse(bytes: ByteArray): VanillaProfile {
             try {
@@ -110,20 +151,18 @@ class VanillaProfile {
                 p.unlockedC[i] = r.bool()
             }
 
-            // Walk the stats block to check it's all there, then keep it as-is.
-            val statsStart = r.pos
-            repeat(2) { // top scores, then the best score per ship
+            for (list in listOf(p.stats.topScores, p.stats.shipBest)) {
                 val scores = r.int()
                 require(scores in 0..10000) { "bad score count $scores" }
                 repeat(scores) {
-                    r.string(); r.string() // ship name, ship id
-                    repeat(4) { r.int() } // score, sector, victory, difficulty
-                    r.bool() // Advanced Edition
+                    list += Score(
+                        shipName = r.string(), shipId = r.string(), score = r.int(), sector = r.int(),
+                        victory = r.int() == 1, difficulty = r.int(), advancedEdition = r.bool()
+                    )
                 }
             }
-            repeat(10) { r.int() }
-            repeat(5) { r.int(); r.string(); r.string(); r.bool() }
-            p.stats = bytes.copyOfRange(statsStart, r.pos)
+            for (i in p.stats.records.indices) p.stats.records[i] = r.int()
+            for (i in p.stats.crewRecords.indices) p.stats.crewRecords[i] = CrewRecord(r.int(), r.string(), r.string(), r.bool())
             return p
         }
     }

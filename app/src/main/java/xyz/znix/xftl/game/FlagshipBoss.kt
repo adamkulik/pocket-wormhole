@@ -263,7 +263,7 @@ class FlagshipBoss private constructor(val sector: Sector, val game: InGameState
             // credits (vanilla's thank-you blurb and the backer roll) run
             // straight after the explosion, followed by the victory screen.
             // The run is over at this point, so the port deletes its save.
-            game.markRunEnded()
+            game.markRunEnded(true)
             game.shipUI.showVictoryCredits()
         } else {
             stage++

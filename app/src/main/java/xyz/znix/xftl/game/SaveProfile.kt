@@ -81,6 +81,24 @@ class SaveProfile private constructor() {
             markDirty()
         }
 
+    /** Every finished run, oldest first, for the stats. */
+    val runs = ArrayList<RunRecord>()
+
+    /**
+     * How many of [runs] have already been added to an exported vanilla
+     * profile's stats, so exporting again doesn't count them twice.
+     */
+    var runsExported: Int = 0
+        set(value) {
+            field = value
+            markDirty()
+        }
+
+    fun recordRun(run: RunRecord) {
+        runs += run
+        markDirty()
+    }
+
     /**
      * Set to true if this profile needs saving.
      */
@@ -207,6 +225,11 @@ class SaveProfile private constructor() {
         if (!advancedEdition)
             root.addContent(Element("advancedEditionOff"))
 
+        val runsElem = Element("runs").setAttribute("exported", runsExported.toString())
+        for (run in runs)
+            runsElem.addContent(run.toXML())
+        root.addContent(runsElem)
+
         vanillaProfile?.let {
             root.addContent(Element("vanillaProfile").setText(java.util.Base64.getEncoder().encodeToString(it)))
         }
@@ -261,6 +284,10 @@ class SaveProfile private constructor() {
 
         firstRunTipShown = root.getChild("firstRunTipShown") != null
         advancedEdition = root.getChild("advancedEditionOff") == null
+        root.getChild("runs")?.let { runsElem ->
+            runs += runsElem.getChildren("run").mapNotNull { RunRecord.fromXML(it) }
+            runsExported = (runsElem.getAttributeValue("exported")?.toIntOrNull() ?: 0).coerceIn(0, runs.size)
+        }
         root.getChildTextTrim("vanillaProfile")?.let {
             vanillaProfile = try { java.util.Base64.getDecoder().decode(it) } catch (e: IllegalArgumentException) { null }
         }

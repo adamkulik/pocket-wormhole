@@ -2308,11 +2308,22 @@ public class InGameState extends MainGame.GameState {
      * continued. Notifies the main game so it can clean up after itself
      * (on Android, deleting the run save).
      */
-    public void markRunEnded() {
+    public void markRunEnded(boolean victory) {
         if (runEnded)
             return;
 
         runEnded = true;
+
+        // Count it in the profile's stats (vanilla's stats screen).
+        if (mainGame != null && player != null) {
+            GameText title = player.getType().getShipTitle();
+            String shipName = title != null ? getTranslator().get(title) : player.getName();
+            mainGame.getProfile().recordRun(new RunRecord(
+                    shipName, player.getName(), getFinalScore(),
+                    currentBeacon.getSector().getSectorNumber() + 1, victory, difficulty,
+                    enableAdvancedEdition, scoreShipsDefeated, scoreBeaconsVisited, scoreScrapCollected, 0
+            ));
+        }
 
         if (mainGame != null) {
             mainGame.onRunEnded();

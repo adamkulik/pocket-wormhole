@@ -64,6 +64,9 @@ class ProfilePanel(
         for (line in listOf(
             "Ships unlocked: $ships of ${lockable.size} (the Kestrel, Engi and Lanius cruisers are always available)",
             "Achievements: $achieved of ${achievements.achievements.size}",
+            "Runs played here: ${profile.runs.size}, ${profile.runs.count { it.victory }} won" +
+                    (profile.runs.maxOfOrNull { it.score }?.let { ", best score $it" } ?: "") +
+                    " (${profile.runs.size - profile.runsExported} not exported to FTL yet)",
         )) {
             for (wrapped in textFont.wrapString(line, W - 40)) {
                 textFont.drawString(X + 20f, y.f, wrapped, Constants.SECTOR_CUTOUT_TEXT)
@@ -124,7 +127,7 @@ class ProfilePanel(
                         val result = VanillaProfileSync.import(profile, bytes, achievements, families)
                         setStatus(
                             "Imported: ${result.newAchievements} new achievements, ${result.newShips} new ships. " +
-                                    "FTL's scores and records are kept for exporting back.", false
+                                    "FTL's scores and records are kept, and runs played here are added to them on export.", false
                         )
                     } catch (e: VanillaProfile.InvalidProfileException) {
                         setStatus(e.message ?: "Not an FTL profile.", true)
@@ -165,8 +168,8 @@ class ProfilePanel(
         private const val Y = (720 - H) / 2
 
         private const val EXPLANATION =
-            "Move your progress between FTL on a computer and this game, both ways: unlocked ships and " +
-                    "achievements. IMPORT FROM FTL adds what's in FTL's profile to this one; nothing here is " +
+            "Move your progress between FTL on a computer and this game, both ways: unlocked ships, " +
+                    "achievements and the stats screen's scores and records. IMPORT FROM FTL adds what's in FTL's profile to this one; nothing here is " +
                     "lost. EXPORT FOR FTL saves an ae_prof.sav with everything from both. FTL keeps it in " +
                     "Documents\\My Games\\FasterThanLight on Windows, ~/.local/share/FasterThanLight on Linux " +
                     "and ~/Library/Application Support/FasterThanLight on a Mac."
