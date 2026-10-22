@@ -40,10 +40,11 @@ class PauseWindow(val game: InGameState, val close: () -> Unit) : Window() {
         // expose the save directory directly (Android's SAF); on desktop the
         // continue.sav sits next to the other saves anyway.
         val transfer = xyz.znix.xftl.sys.PlatformSpecific.INSTANCE.saveTransfer
-        // Exports work anywhere: importing one rebuilds the same sector from
-        // its layout seed (see GameMap.generateSector). Vanilla lays sectors
-        // out differently, so for FTL itself a sector start is still best.
-        val exportVisible = transfer != null
+        // Vanilla-format exports are only meaningful at a sector boundary:
+        // the importing engine regenerates the beacon layout, so only the
+        // sector's entry beacon is a stable landing point. Hide the button
+        // everywhere else (the long explanation label did not fit).
+        val exportVisible = transfer != null && atSectorStart()
         widgetTree.byId["export_save"]?.isVisible = exportVisible
         widgetTree.byId["export_label"]?.isVisible = exportVisible
         widgetTree.byId["import_save"]?.isVisible = transfer != null
@@ -162,9 +163,17 @@ class PauseWindow(val game: InGameState, val close: () -> Unit) : Window() {
         close()
     }
 
+    // Vanilla-format exports are only meaningful at a sector boundary: the
+    // importing engine regenerates the beacon layout, so only the sector's
+    // entry beacon is a stable landing point (the loader snaps to the same
+    // beacon on import, and the writer pins its export order around it).
+    private fun atSectorStart() =
+        game.currentBeacon === game.currentBeacon.sector.startBeacon
+
     // Button handlers
     private fun exportSaveClicked() {
         val transfer = xyz.znix.xftl.sys.PlatformSpecific.INSTANCE.saveTransfer ?: return
+        if (!atSectorStart()) return
         // Save now, so the export is the game as it is - not the last
         // autosave, from before e.g. shopping at this beacon.
         game.mainGame.writeRunSave()
