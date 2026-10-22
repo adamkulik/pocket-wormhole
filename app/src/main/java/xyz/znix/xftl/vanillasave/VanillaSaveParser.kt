@@ -26,6 +26,7 @@ class VanillaSaveData {
     var scoreShipsDefeated: Int = 0
     var scoreBeaconsVisited: Int = 0
     var scoreScrapCollected: Int = 0
+    var scoreCrewHired: Int = 0
 
     // Seeds / fleet
     var sectorTreeSeed: Int = 0
@@ -180,11 +181,12 @@ object VanillaSaveParser {
             else -> Difficulty.HARD
         }
         // Score counters, written here by vanilla's FUN_00442460:
-        // ships defeated, beacons visited, scrap collected, unused.
+        // ships defeated, beacons visited, scrap collected, crew hired
+        // (starting crew included).
         out.scoreShipsDefeated = r.int()
         out.scoreBeaconsVisited = r.int()
         out.scoreScrapCollected = r.int()
-        r.int()
+        out.scoreCrewHired = r.int()
         out.shipName = r.string()
         out.blueprintName = r.string()
         out.sectorNumber = r.int() - 1

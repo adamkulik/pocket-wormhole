@@ -282,12 +282,14 @@ class MainActivity : Activity() {
      * EXPORT SAVE / IMPORT SAVE buttons).
      */
     private val saveTransfer = object : xyz.znix.xftl.sys.PlatformSpecific.SaveTransfer {
-        override fun exportSave(bytes: ByteArray) {
+        override fun exportSave(bytes: ByteArray) = exportFile(bytes, "continue.sav")
+
+        override fun exportFile(bytes: ByteArray, fileName: String) {
             pendingExportBytes = bytes
             val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
                 addCategory(Intent.CATEGORY_OPENABLE)
                 type = "application/octet-stream"
-                putExtra(Intent.EXTRA_TITLE, "continue.sav")
+                putExtra(Intent.EXTRA_TITLE, fileName)
             }
             runOnUiThread { startActivityForResult(intent, REQUEST_EXPORT_SAVE) }
         }

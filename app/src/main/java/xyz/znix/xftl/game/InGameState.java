@@ -141,6 +141,9 @@ public class InGameState extends MainGame.GameState {
     private int scoreScrapCollected;
     private int scoreBeaconsVisited;
     private int scoreShipsDefeated;
+    // Crew who joined the player this run, starting crew included, for
+    // the profile's stats (vanilla's 'crew hired' records count them too).
+    private int scoreCrewHired;
 
     /**
      * The encounter tail bytes from a vanilla save this run was imported
@@ -308,6 +311,7 @@ public class InGameState extends MainGame.GameState {
         scoreShipsDefeated = data.getScoreShipsDefeated();
         scoreBeaconsVisited = data.getScoreBeaconsVisited();
         scoreScrapCollected = data.getScoreScrapCollected();
+        scoreCrewHired = data.getScoreCrewHired();
 
         vanillaTail = data.getTail();
         isCurrentlyLoadingSave = true;
@@ -770,6 +774,7 @@ public class InGameState extends MainGame.GameState {
             for (int i = 0; i < spec.getAmount(); i++) {
                 LivingCrewInfo info = LivingCrewInfo.generateRandom(race, this);
                 player.addCrewMember(info, true, false);
+                scoreCrewHired++;
             }
         }
 
@@ -1939,6 +1944,7 @@ public class InGameState extends MainGame.GameState {
         root.setAttribute("scoreScrap", Integer.toString(scoreScrapCollected));
         root.setAttribute("scoreBeacons", Integer.toString(scoreBeaconsVisited));
         root.setAttribute("scoreShips", Integer.toString(scoreShipsDefeated));
+        root.setAttribute("scoreCrewHired", Integer.toString(scoreCrewHired));
 
         ObjectRefs refs = new ObjectRefs();
         Sector sector = currentBeacon.getSector();
@@ -2040,6 +2046,9 @@ public class InGameState extends MainGame.GameState {
         String scoreShips = root.getAttributeValue("scoreShips");
         if (scoreShips != null)
             scoreShipsDefeated = Integer.parseInt(scoreShips);
+        String crewHired = root.getAttributeValue("scoreCrewHired");
+        if (crewHired != null)
+            scoreCrewHired = Integer.parseInt(crewHired);
 
         // If the player ship has a custom layout, load that.
         Element customLayout = root.getChild("customLayout");
@@ -2308,11 +2317,22 @@ public class InGameState extends MainGame.GameState {
      * continued. Notifies the main game so it can clean up after itself
      * (on Android, deleting the run save).
      */
-    public void markRunEnded() {
+    public void markRunEnded(boolean victory) {
         if (runEnded)
             return;
 
         runEnded = true;
+
+        // Count it in the profile's stats (vanilla's stats screen).
+        if (mainGame != null && player != null) {
+            GameText title = player.getType().getShipTitle();
+            String shipName = title != null ? getTranslator().get(title) : player.getName();
+            mainGame.getProfile().recordRun(new RunRecord(
+                    shipName, player.getName(), getFinalScore(),
+                    currentBeacon.getSector().getSectorNumber() + 1, victory, difficulty,
+                    enableAdvancedEdition, scoreShipsDefeated, scoreBeaconsVisited, scoreScrapCollected, scoreCrewHired
+            ));
+        }
 
         if (mainGame != null) {
             mainGame.onRunEnded();
@@ -2704,6 +2724,15 @@ public class InGameState extends MainGame.GameState {
         return (int) (base * multiplier);
     }
 
+    /** Count a crewmember who joined the player (bought in a store). */
+    public void countCrewHired() {
+        scoreCrewHired++;
+    }
+
+    public int getScoreCrewHired() {
+        return scoreCrewHired;
+    }
+
     public int getScoreScrapCollected() {
         return scoreScrapCollected;
     }
@@ -2777,6 +2806,7 @@ public class InGameState extends MainGame.GameState {
 
         for (LivingCrewInfo info : resources.getCrew()) {
             player.addCrewMember(info, false, false);
+            scoreCrewHired++;
         }
 
         for (RemoveCrewEval removed : resources.getLostCrew()) {

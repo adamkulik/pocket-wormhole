@@ -54,12 +54,12 @@ object VanillaSaveWriter {
         w.bool(game.isAdvancedEdition)
         w.int(game.difficulty.saveFormatValue)
         // The session score counters, in vanilla's order: ships defeated,
-        // beacons visited, scrap collected, then an unscored statistic we
-        // don't model (FTLGame.exe FUN_00442460 writes these here).
+        // beacons visited, scrap collected, crew hired (starting crew
+        // included; FTLGame.exe FUN_00442460 writes these here).
         w.int(game.scoreShipsDefeated)
         w.int(game.scoreBeaconsVisited)
         w.int(game.scoreScrapCollected)
-        w.int(0)
+        w.int(game.scoreCrewHired)
         val displayText = shipDisplayText(player)
         w.string(if (displayText != null) game.translator[displayText] else player.name)
         w.string(player.name)
