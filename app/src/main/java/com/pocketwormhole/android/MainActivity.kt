@@ -344,7 +344,7 @@ class MainActivity : Activity() {
         }
     }
 
-    private var importModCallback: ((String?, ByteArray?) -> Unit)? = null
+    private var importModCallback: ((String?, java.nio.file.Path?) -> Unit)? = null
 
     /**
      * Mod installation via the Storage Access Framework, offered to the
@@ -352,7 +352,7 @@ class MainActivity : Activity() {
      * the mods folder is in the app's private storage, out of the user's reach.
      */
     private val modImport = object : PlatformSpecific.ModImport {
-        override fun pickMod(onResult: (String?, ByteArray?) -> Unit) {
+        override fun pickMod(onResult: (String?, java.nio.file.Path?) -> Unit) {
             importModCallback = onResult
             val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
                 addCategory(Intent.CATEGORY_OPENABLE)
@@ -389,14 +389,20 @@ class MainActivity : Activity() {
             } catch (e: Exception) {
                 null
             } ?: uri.lastPathSegment ?: "mod.ftl"
-            val bytes = try {
-                contentResolver.openInputStream(uri)?.use { it.readBytes() }
+            // Copy it to a file rather than into memory: big mods
+            // (Multiverse's assets are ~700MB) don't fit in the heap.
+            val copy = try {
+                val tmp = java.io.File(cacheDir, "mod-import.tmp")
+                contentResolver.openInputStream(uri)?.use { input ->
+                    tmp.outputStream().use { input.copyTo(it, 1 shl 16) }
+                    tmp.toPath()
+                }
             } catch (e: Exception) {
                 android.util.Log.e(TAG, "Mod import read failed", e)
                 null
             }
             // Hand the file to the game thread.
-            surfaceView?.queueEvent { callback(name, bytes) } ?: callback(name, bytes)
+            surfaceView?.queueEvent { callback(name, copy) } ?: callback(name, copy)
         }
     }
 

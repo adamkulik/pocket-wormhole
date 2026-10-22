@@ -237,13 +237,13 @@ class ModsPanel(
         val import = modImport ?: return
         confirmDelete = null
         setStatus("Pick a mod file...", false)
-        import.pickMod { name, bytes ->
+        import.pickMod { name, file ->
             pending += {
-                if (name == null || bytes == null) {
+                if (name == null || file == null) {
                     status = null
                 } else {
                     try {
-                        val saved = ModManager.install(name, bytes)
+                        val saved = ModManager.install(name, file)
                         changed = true
                         setStatus("Installed $saved.", false)
                     } catch (e: ModManager.InvalidModException) {

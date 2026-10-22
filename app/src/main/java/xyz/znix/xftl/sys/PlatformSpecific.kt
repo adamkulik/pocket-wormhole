@@ -68,9 +68,11 @@ sealed interface PlatformSpecific {
 
     interface ModImport {
         /** Ask the user to pick a mod file; [onResult] receives its file
-         * name and bytes, or nulls if the user cancelled. May be invoked
-         * on any thread. */
-        fun pickMod(onResult: (String?, ByteArray?) -> Unit)
+         * name and a temporary copy of it (moved into place by
+         * [xyz.znix.xftl.modding.ModManager.install]), or nulls if the user
+         * cancelled. Mods can be hundreds of MB, so they're never held in
+         * memory. May be invoked on any thread. */
+        fun pickMod(onResult: (String?, java.nio.file.Path?) -> Unit)
 
         /** Restart the game, so mod changes take effect. */
         fun restartGame()

@@ -6,6 +6,7 @@ import java.io.ByteArrayInputStream
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.StandardCopyOption
 import java.util.zip.ZipFile
 import java.util.zip.ZipInputStream
 
@@ -98,7 +99,19 @@ object ModManager {
      * order. Returns the name it was saved under.
      */
     fun install(fileName: String, bytes: ByteArray): String {
-        validate(bytes)
+        val tmp = Files.createTempFile("mod", ".tmp")
+        Files.write(tmp, bytes)
+        return install(fileName, tmp)
+    }
+
+    /** As above, moving [file] (a temporary copy) into the mods folder. */
+    fun install(fileName: String, file: Path): String {
+        try {
+            validate(file)
+        } catch (e: Exception) {
+            Files.deleteIfExists(file)
+            throw e
+        }
 
         // Only keep the file's name: no paths, and nothing that would
         // confuse order.txt.
@@ -108,7 +121,13 @@ object ModManager {
             name = "${name.ifEmpty { "mod" }}.ftl"
 
         Files.createDirectories(modDir)
-        Files.write(modDir.resolve(name), bytes)
+        try {
+            Files.move(file, modDir.resolve(name), StandardCopyOption.REPLACE_EXISTING)
+        } catch (e: java.io.IOException) {
+            // A different filesystem: copy instead
+            Files.copy(file, modDir.resolve(name), StandardCopyOption.REPLACE_EXISTING)
+            Files.deleteIfExists(file)
+        }
 
         save(list().filter { it.name != name } + Entry(name, true))
         return name
@@ -137,10 +156,10 @@ object ModManager {
      * Check this is a zip with something a Slipstream mod would contain,
      * so picking the wrong file doesn't break the game on the next start.
      */
-    private fun validate(bytes: ByteArray) {
+    private fun validate(file: Path) {
         var anyEntries = false
         try {
-            ZipInputStream(ByteArrayInputStream(bytes)).use { zip ->
+            ZipInputStream(Files.newInputStream(file).buffered()).use { zip ->
                 while (true) {
                     val entry = zip.nextEntry ?: break
                     anyEntries = true
