@@ -311,6 +311,7 @@ public class InGameState extends MainGame.GameState {
         scoreShipsDefeated = data.getScoreShipsDefeated();
         scoreBeaconsVisited = data.getScoreBeaconsVisited();
         scoreScrapCollected = data.getScoreScrapCollected();
+        scoreCrewHired = data.getScoreCrewHired();
 
         vanillaTail = data.getTail();
         isCurrentlyLoadingSave = true;
@@ -2726,6 +2727,10 @@ public class InGameState extends MainGame.GameState {
     /** Count a crewmember who joined the player (bought in a store). */
     public void countCrewHired() {
         scoreCrewHired++;
+    }
+
+    public int getScoreCrewHired() {
+        return scoreCrewHired;
     }
 
     public int getScoreScrapCollected() {
