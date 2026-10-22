@@ -265,6 +265,17 @@ class Ship(
     val powerAvailable: Int get() = powerAvailableTypes.values.sum()
 
     /**
+     * The total power this ship's reactors and batteries can supply, after
+     * environmental effects such as an ion storm.
+     *
+     * Unlike [powerAvailable] this does not go down as systems use power, so
+     * it's the right value for deciding how much power there is to share out
+     * between systems.
+     */
+    var powerSupply: Int = 0
+        private set
+
+    /**
      * The amount of power that's unusable due to events or the environment (in
      * a plasma storm).
      */
@@ -1270,6 +1281,7 @@ class Ship(
         // Remember how much power is unavailable, as it's shown in the UI.
         val postEnvPower = powerAvailableTypes.values.sum()
         blockedReactorPower = max(0, preEnvPower - postEnvPower)
+        powerSupply = postEnvPower
 
         // First make the systems use the power they're already using
         for (system in systems) {
