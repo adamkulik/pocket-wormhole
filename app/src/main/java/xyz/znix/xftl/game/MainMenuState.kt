@@ -109,7 +109,7 @@ class MainMenuState(private val main: MainGame, private val datafile: Datafile) 
         g.colour = if (hovering) MODS_HOVER_FILL else MODS_FILL
         Buttons.drawRounded(g, MODS_X + 2, MODS_Y + 2, MODS_W - 4, MODS_H - 4, 3)
         val colour = if (hovering) Constants.UI_BUTTON_HOVER else Constants.SECTOR_CUTOUT_TEXT
-        modsButtonFont.drawStringCentred(MODS_X.f, MODS_Y + MODS_H / 2f + 7f, MODS_W.f, modsButtonLabel, colour)
+        modsButtonFont.drawStringCentred(MODS_X.f, MODS_Y + MODS_H / 2f + 7f, MODS_W.f, modsButtonLabel(), colour)
     }
 
     private fun isOverModsButton(x: Int, y: Int): Boolean =
@@ -118,13 +118,18 @@ class MainMenuState(private val main: MainGame, private val datafile: Datafile) 
     private val modsButtonFont by lazy { buttonFont() }
 
     // Counted once: the mods only change from the panel, which needs a restart.
-    private val modsButtonLabel by lazy {
-        val enabled = try {
+    private val enabledModFiles by lazy {
+        try {
             ModManager.list().count { it.enabled }
         } catch (e: Exception) {
             0
         }
-        if (enabled == 0) "MODS" else "MODS ($enabled)"
+    }
+
+    /** The mod files turned on, plus the built-in game speed button if it is. */
+    private fun modsButtonLabel(): String {
+        val enabled = enabledModFiles + (if (main.profile.gameSpeedButton) 1 else 0)
+        return if (enabled == 0) "MODS" else "MODS ($enabled)"
     }
 
     private fun getFont(name: String): SILFontLoader =
