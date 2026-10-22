@@ -93,7 +93,7 @@ class SaveProfile private constructor() {
 
         // If we've already unlocked the achievement on a harder difficulty,
         // don't overwrite it with the easier unlock.
-        if (current != null && current.difficulty.ordinal <= difficulty.ordinal) {
+        if (current != null && current.difficulty.ordinal >= difficulty.ordinal) {
             return
         }
 
@@ -119,7 +119,7 @@ class SaveProfile private constructor() {
 
         // If we've already unlocked the achievement on a harder difficulty,
         // don't overwrite it with the easier unlock.
-        if (current != null && current.difficulty.ordinal <= difficulty.ordinal) {
+        if (current != null && current.difficulty.ordinal >= difficulty.ordinal) {
             return
         }
 
