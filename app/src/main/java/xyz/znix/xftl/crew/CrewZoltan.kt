@@ -9,7 +9,7 @@ import xyz.znix.xftl.systems.MainSystem
 class CrewZoltan(blueprint: CrewBlueprint, animations: Animations, room: Room, mode: SlotType) :
     LivingCrew(blueprint, animations, room, mode) {
 
-    override val maxHealth: Float get() = 70f
+    override val raceMaxHealth: Float get() = 70f
 
     override fun draw(g: Graphics) {
         // The explosion animation is in it's own image, so we have to draw

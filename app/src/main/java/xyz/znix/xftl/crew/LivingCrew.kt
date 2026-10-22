@@ -26,7 +26,24 @@ abstract class LivingCrew(blueprint: CrewBlueprint, anims: Animations, room: Roo
 
     override val repairSpeed: Float get() = 1f + REPAIR_SKILL_BONUS[getSkillLevel(Skill.REPAIRS).ordinal] / 100f
 
-    override val attackDamageMult: Float get() = 1f + COMBAT_SKILL_BONUS[getSkillLevel(Skill.COMBAT).ordinal] / 100f
+    override val attackDamageMult: Float
+        get() = (1f + COMBAT_SKILL_BONUS[getSkillLevel(Skill.COMBAT).ordinal] / 100f) *
+                (1f + MIND_CONTROL_DAMAGE_BONUS.getOrElse(mindControlLevel) { 0f })
+
+    /** This race's health, before any boost. */
+    protected open val raceMaxHealth: Float get() = 100f
+
+    /**
+     * Mind control at level 2 and 3 makes the controlled crewmember tougher
+     * and stronger (wiki, Mind Control: "+15 Health, +25% combat damage
+     * boost" at level 2, "+30 Health, +100% combat damage boost" at level 3),
+     * following the controlling system's current power.
+     */
+    private val mindControlLevel: Int get() = mindControlledBy?.powerSupplied ?: 0
+    private val healthBoost: Float get() = MIND_CONTROL_HEALTH_BONUS.getOrElse(mindControlLevel) { 0f }
+    private var appliedHealthBoost = 0f
+
+    final override val maxHealth: Float get() = raceMaxHealth + healthBoost
 
     open val isMindControlResistant: Boolean get() = false
 
@@ -144,6 +161,16 @@ abstract class LivingCrew(blueprint: CrewBlueprint, anims: Animations, room: Roo
             mindControlAnimation = null
         } else {
             mindControlAnimation?.update(dt)
+        }
+
+        // The mind control health boost comes with the control (and with
+        // more power on it), and goes again when it ends or loses power.
+        val boost = healthBoost
+        if (boost != appliedHealthBoost) {
+            if (boost > appliedHealthBoost)
+                health += boost - appliedHealthBoost
+            appliedHealthBoost = boost
+            health = health.coerceAtMost(maxHealth)
         }
 
         super.update(dt)
@@ -325,6 +352,10 @@ abstract class LivingCrew(blueprint: CrewBlueprint, anims: Animations, room: Roo
     companion object {
         val REPAIR_SKILL_BONUS = listOf(0, 10, 20)
         val COMBAT_SKILL_BONUS = listOf(0, 10, 20)
+
+        // By the controlling Mind Control system's power (0-3).
+        private val MIND_CONTROL_HEALTH_BONUS = listOf(0f, 0f, 15f, 30f)
+        private val MIND_CONTROL_DAMAGE_BONUS = listOf(0f, 0f, 0.25f, 1f)
 
         /**
          * How long (in seconds) the experience indicator stays visible
