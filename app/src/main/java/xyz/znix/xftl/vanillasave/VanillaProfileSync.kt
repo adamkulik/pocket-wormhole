@@ -57,7 +57,7 @@ object VanillaProfileSync {
             // offers every layout of an unlocked ship.
             val quest = imported.achievements.firstOrNull { it.id == "${baseShip}_QUEST" }
             if (imported.unlockedA[slot] || imported.unlockedC[slot] || quest != null) {
-                if (!family.isUnlocked(profile))
+                if (!family.isReallyUnlocked(profile))
                     newShips++
                 profile.unlockShip(family, difficulty(quest?.difficulty ?: 1))
             }
@@ -92,7 +92,7 @@ object VanillaProfileSync {
         // achievements in vanilla) keep vanilla's own setting.
         for (family in families.families) {
             val slot = VanillaProfile.SHIPS.indexOf(family.ships.firstOrNull())
-            if (slot != -1 && family.unlockId != null && family.isUnlocked(profile))
+            if (slot != -1 && family.unlockId != null && family.isReallyUnlocked(profile))
                 out.unlockedA[slot] = true
         }
 

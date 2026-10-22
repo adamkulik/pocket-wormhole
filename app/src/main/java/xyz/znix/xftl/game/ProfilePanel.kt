@@ -84,11 +84,12 @@ class ProfilePanel(
 
     private fun drawProfile(g: Graphics, mouseX: Int, mouseY: Int) {
         val lockable = families.families.filter { it.unlockId != null }
-        val ships = lockable.count { it.isUnlocked(profile) }
+        val ships = lockable.count { it.isReallyUnlocked(profile) }
         val achieved = achievements.achievements.values.count { profile.getAchievement(it) != null }
         var y = Y + 80
         for (line in listOf(
-            "Ships unlocked: $ships of ${lockable.size} (the Kestrel, Engi and Lanius cruisers are always available)",
+            "Ships unlocked: $ships of ${lockable.size} (the Kestrel, Engi and Lanius cruisers are always available)" +
+                    (if (profile.allShipsUnlocked) " - UNLOCK ALL is on, so all are playable" else ""),
             "Achievements: $achieved of ${achievements.achievements.size}",
             "Runs played here: ${profile.runs.size}, ${profile.runs.count { it.victory }} won" +
                     (profile.runs.maxOfOrNull { it.score }?.let { ", best score $it" } ?: "") +
@@ -122,7 +123,7 @@ class ProfilePanel(
             button(g, mouseX, mouseY, buttonX + 228, bottomY, 220, 32, "EXPORT FOR FTL") { exportProfile() }
             buttonX += 456
         }
-        button(g, mouseX, mouseY, buttonX, bottomY, 160, 32, "UNLOCK ALL") { unlockAllShips() }
+        button(g, mouseX, mouseY, buttonX, bottomY, 160, 32, if (profile.allShipsUnlocked) "RELOCK" else "UNLOCK ALL") { toggleAllShips() }
     }
 
     /** Every achievement, earned ones lit with the difficulty they were earned on. */
@@ -255,18 +256,17 @@ class ProfilePanel(
     }
 
     /**
-     * Unlock every ship (all layouts) without importing, e.g. for testing.
+     * Make every ship (all layouts) playable without importing, e.g. for
+     * testing, or undo that. Nothing is recorded as unlocked, so RELOCK
+     * leaves the ships really unlocked and exports skip the others.
      * Achievements are left to be earned.
      */
-    private fun unlockAllShips() {
-        var count = 0
-        for (family in families.families) {
-            if (family.unlockId == null || family.isUnlocked(profile))
-                continue
-            profile.unlockShip(family, Difficulty.EASY)
-            count++
-        }
-        setStatus(if (count == 0) "Every ship is already unlocked." else "Unlocked $count ships. Achievements are still to be earned.", false)
+    private fun toggleAllShips() {
+        profile.allShipsUnlocked = !profile.allShipsUnlocked
+        setStatus(
+            if (profile.allShipsUnlocked) "Every ship is playable. RELOCK undoes it; achievements are still to be earned."
+            else "Back to the ships you've unlocked.", false
+        )
     }
 
     private fun setStatus(text: String, error: Boolean) {

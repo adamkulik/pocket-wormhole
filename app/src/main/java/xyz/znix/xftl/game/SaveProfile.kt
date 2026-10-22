@@ -71,6 +71,17 @@ class SaveProfile private constructor() {
         }
 
     /**
+     * Every ship is playable (UNLOCK ALL in the STATS panel), without
+     * recording them as unlocked: turning it off again leaves only the
+     * ships really unlocked, and exports don't include the others.
+     */
+    var allShipsUnlocked = false
+        set(value) {
+            field = value
+            markDirty()
+        }
+
+    /**
      * The last vanilla profile (ae_prof.sav) imported, with what the engine
      * doesn't track - ship victories, the stats screen's scores and records
      * - so exporting gives it back. See VanillaProfileSync.
@@ -224,6 +235,8 @@ class SaveProfile private constructor() {
 
         if (!advancedEdition)
             root.addContent(Element("advancedEditionOff"))
+        if (allShipsUnlocked)
+            root.addContent(Element("allShipsUnlocked"))
 
         val runsElem = Element("runs").setAttribute("exported", runsExported.toString())
         for (run in runs)
@@ -284,6 +297,7 @@ class SaveProfile private constructor() {
 
         firstRunTipShown = root.getChild("firstRunTipShown") != null
         advancedEdition = root.getChild("advancedEditionOff") == null
+        allShipsUnlocked = root.getChild("allShipsUnlocked") != null
         root.getChild("runs")?.let { runsElem ->
             runs += runsElem.getChildren("run").mapNotNull { RunRecord.fromXML(it) }
             runsExported = (runsElem.getAttributeValue("exported")?.toIntOrNull() ?: 0).coerceIn(0, runs.size)
