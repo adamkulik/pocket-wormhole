@@ -34,6 +34,16 @@ object VanillaSaveApplier {
             }
 
             if (vb.storePresent && vb.store != null) {
+                // When our sector differs from the save's (vanilla's own
+                // saves), the store can land on a beacon with a hazard, e.g.
+                // a sun, where it couldn't be opened. Make it a store beacon,
+                // which has none, like vanilla's.
+                if (!beacon.event.isStore) {
+                    runCatching { game.eventManager["STORE"].resolve() }.getOrNull()?.let {
+                        beacon.event = it
+                        beacon.clearEnvironment()
+                    }
+                }
                 beacon.hasStore = true
                 beacon.setStoreData(buildStore(vb.store!!, game))
             }
