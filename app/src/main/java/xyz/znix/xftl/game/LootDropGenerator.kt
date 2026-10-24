@@ -22,8 +22,8 @@ object LootDropGenerator {
      * Generate a scrap reward for a given tier. Note that [sector] starts at zero for the first sector.
      */
     fun generateScrap(rand: Random, tier: RewardTier, sector: Int): Int {
-        // Same reward system as FTL
-        // Note: it seems that when calculating the scrap rewards, add one sector for easy mode and -1 for hard
+        // Same reward system as FTL. The caller shifts the sector by one for
+        // easy (+1) and hard (-1) - see Events.
         val range = SCRAP_DROP_MULTS[tier.resolve(rand)]
         val multiplier = range.start + rand.nextFloat() * (range.endInclusive - range.start)
         val base = 15 + sector * 6
