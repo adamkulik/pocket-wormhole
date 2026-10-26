@@ -21,6 +21,12 @@ class ShipEditor(val state: SelectShipState, val ship: EditableShip) {
 
     // These are set by the state
     var editorWidth: Int = 100
+
+    /**
+     * Don't draw the rooms and doors (the hangar's HIDE ROOMS mode). Only
+     * used while the ship isn't being edited.
+     */
+    var hideRooms: Boolean = false
     var editorHeight: Int = 100
 
     // This is just here because it's useful.
@@ -89,7 +95,10 @@ class ShipEditor(val state: SelectShipState, val ship: EditableShip) {
         weaponPanel.baseX = systemPalette.x - weaponPanel.width - 10
         dronePanel.baseX = weaponPanel.baseX - dronePanel.width - 10
 
+        val roomSystems = objects.mapNotNullTo(HashSet()) { (it as? RoomObject)?.systemObject }
         for (obj in objects) {
+            if (hideRooms && (obj is RoomObject || obj is DoorObject || obj in roomSystems))
+                continue
             obj.draw(g)
         }
 

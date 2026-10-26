@@ -99,6 +99,12 @@ class SelectShipState(private val datafile: Datafile, private val main: MainGame
     private val shipList: ShipList
     private var shipListVisible = false
 
+    /**
+     * Vanilla's HIDE ROOMS / SHOW ROOMS toggle: with the rooms hidden only
+     * the ship's hull (and weapons) are drawn.
+     */
+    private var roomsHidden = false
+
     val font = getFont("c&c")
     val fontHL2 = getFont("HL2")
 
@@ -149,7 +155,8 @@ class SelectShipState(private val datafile: Datafile, private val main: MainGame
 
         shipSelector.addButtonListener("list") { shipListVisible = true }
 
-        // TODO hide/show rooms button
+        shipSelector.addButtonListener("hiderooms") { toggleRoomsHidden() }
+
         // TODO the arrow navigation buttons
 
         shipList = ShipList(this) {
@@ -202,9 +209,14 @@ class SelectShipState(private val datafile: Datafile, private val main: MainGame
         shipOffset.x = Math.round(HANGAR_SHIP_CENTRE_X - currentBlueprint.hullOffset.x - hullImg.width / 2f)
         shipOffset.y = Math.round(HANGAR_SHIP_CENTRE_Y - currentBlueprint.hullOffset.y - hullImg.height / 2f)
         g.translate(shipOffset.x.f, shipOffset.y.f)
-        current.draw(g, this, false)
+        // The editor needs the rooms to edit them.
+        if (roomsHidden && !isShipEdited)
+            current.drawHull(g, this)
+        else
+            current.draw(g, this, false)
         editor.editorWidth = container.width - shipOffset.x
         editor.editorHeight = container.height - shipOffset.y
+        editor.hideRooms = roomsHidden && !isShipEdited
         editor.draw(g)
         g.popTransform()
 
@@ -376,6 +388,17 @@ class SelectShipState(private val datafile: Datafile, private val main: MainGame
         updateTypeButton("type_a", 0)
         updateTypeButton("type_b", 1)
         updateTypeButton("type_c", 2)
+    }
+
+    private fun toggleRoomsHidden() {
+        roomsHidden = !roomsHidden
+
+        val label = shipSelector.byId["hiderooms_label"] as Label
+        label.text = when (roomsHidden) {
+            true -> translator.translations["ship_showrooms_button"] ?: "SHOW ROOMS"
+            false -> translator["ship_hiderooms_button"]
+        }
+        shipSelector.updateLayout()
     }
 
     /**
