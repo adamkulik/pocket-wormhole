@@ -58,7 +58,13 @@ class Ship(
 
     // Helper methods, providing quick access to important stuff from the blueprint
     val name: String get() = type.name
-    val maxHealth: Int get() = type.maxHealth
+    val maxHealth: Int get() = type.maxHealth + hullBonus
+
+    /**
+     * Extra hull points on top of the blueprint's - generated enemies get
+     * more hull the further into the game they are, see ShipGenerator.
+     */
+    var hullBonus: Int = 0
     val isPlayerShip: Boolean get() = type.isPlayerShip
     val isUsingBossUI: Boolean get() = boss?.useBossShipUI ?: false
     val isAutoScout: Boolean get() = type.isAutoScout
@@ -2163,6 +2169,7 @@ class Ship(
         SaveUtil.addAttrFloat(elem, "ftlProgress", ftlChargeProgress)
         SaveUtil.addAttrInt(elem, "reactorPower", purchasedReactorPower)
         SaveUtil.addAttrInt(elem, "health", health)
+        SaveUtil.addTagInt(elem, "hullBonus", hullBonus, 0)
 
         SaveUtil.addTagInt(elem, "escapeHealth", escapeHealth, 0)
         SaveUtil.addTagInt(elem, "surrenderHealth", surrenderHealth, 0)
@@ -2349,6 +2356,7 @@ class Ship(
 
         ftlChargeProgress = SaveUtil.getAttrFloat(rootElem, "ftlProgress")
         purchasedReactorPower = SaveUtil.getAttrInt(rootElem, "reactorPower")
+        hullBonus = SaveUtil.getOptionalTagInt(rootElem, "hullBonus") ?: 0
         health = SaveUtil.getAttrInt(rootElem, "health")
 
         escapeHealth = SaveUtil.getOptionalTagInt(rootElem, "escapeHealth") ?: 0

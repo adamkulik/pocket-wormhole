@@ -41,6 +41,14 @@ class ShipGenerator(val df: Datafile, val bp: BlueprintManager) {
         ship.generationSeed = effectiveSeed
         ship.loadDefaultContents()
 
+        // Enemies get one more hull point per sector (sector is zero-indexed
+        // here), plus one on hard - so a 10HP Rebel Fighter has 15HP in
+        // sector 6 on easy or normal, and 16HP on hard. See the Calculated
+        // FTL guide (Enemy ship generation - How hull points are determined);
+        // this also matches vanilla on normal in sector 5 (blueprint+4).
+        ship.hullBonus = sector + if (difficulty == Difficulty.HARD) 1 else 0
+        ship.health = ship.maxHealth
+
         ship.escapeHealth = spec.escapeHealth?.pick(rand) ?: 0
         ship.surrenderHealth = spec.surrenderHealth?.pick(rand) ?: 0
 
