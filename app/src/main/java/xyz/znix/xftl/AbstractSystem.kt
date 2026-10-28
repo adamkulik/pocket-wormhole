@@ -222,8 +222,10 @@ abstract class AbstractSystem(val blueprint: SystemBlueprint) {
 
     open fun dealDamage(damage: Int, ionDamage: Int) {
         // Add the specified amount of damage, but avoid having more damage than we have power (which
-        // would come to a negative amount of available power)
-        damagedEnergyLevels = (damagedEnergyLevels + damage).coerceAtMost(energyLevels)
+        // would come to a negative amount of available power). Damage can also be negative (the repair
+        // bomb has a system damage of -8), and that mustn't repair past undamaged: negative damaged
+        // levels would give the system more power than it has bars.
+        damagedEnergyLevels = (damagedEnergyLevels + damage).coerceIn(0, energyLevels)
 
         // Apply ion damage. If we're not already ion-locked, use
         // the current power (don't mind the ugly hack to get it).
