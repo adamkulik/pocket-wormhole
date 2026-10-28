@@ -34,6 +34,16 @@ object VanillaSaveApplier {
             }
 
             if (vb.storePresent && vb.store != null) {
+                // When our sector differs from the save's (vanilla's own
+                // saves), the store can land on a beacon with a hazard, e.g.
+                // a sun, where it couldn't be opened. Make it a store beacon,
+                // which has none, like vanilla's.
+                if (!beacon.event.isStore) {
+                    runCatching { game.eventManager["STORE"].resolve() }.getOrNull()?.let {
+                        beacon.event = it
+                        beacon.clearEnvironment()
+                    }
+                }
                 beacon.hasStore = true
                 beacon.setStoreData(buildStore(vb.store!!, game))
             }
@@ -67,6 +77,18 @@ object VanillaSaveApplier {
         result.availableResources.droneParts = store.droneParts
 
         for (shelf in store.shelves) {
+            // The store window only shows the sections listed here.
+            val section = when (shelf.type) {
+                VanillaSaveFormat.SHELF_SYSTEM -> xyz.znix.xftl.game.StoreData.Section.SYSTEMS
+                VanillaSaveFormat.SHELF_WEAPON -> xyz.znix.xftl.game.StoreData.Section.WEAPONS
+                VanillaSaveFormat.SHELF_DRONE -> xyz.znix.xftl.game.StoreData.Section.DRONES
+                VanillaSaveFormat.SHELF_AUGMENT -> xyz.znix.xftl.game.StoreData.Section.AUGMENTS
+                VanillaSaveFormat.SHELF_CREW -> xyz.znix.xftl.game.StoreData.Section.CREW
+                else -> null
+            }
+            if (section != null && section !in result.sections)
+                result.sections += section
+
             for (item in shelf.items) {
                 // xftl models a store section as a list with nulls for
                 // sold-out slots; vanilla marks them avail=0 with the name
