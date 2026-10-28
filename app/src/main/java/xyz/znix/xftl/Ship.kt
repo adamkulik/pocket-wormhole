@@ -2008,7 +2008,9 @@ class Ship(
             // dodged while cloaked (GitHub issue #172; FTL wiki, Crew skills:
             // "Skill is also not gained when your ship is cloaked"). This
             // covers every miss roll - projectiles, bombs and asteroids.
-            if (!isCloakActive) {
+            // Nor out of combat: asteroids dodged after the fight is over
+            // don't train anyone (wiki, Crew skills).
+            if (!isCloakActive && sys.getEnemyOf(this) != null) {
                 piloting?.addSkillPoint(Skill.PILOTING)
                 engines?.addSkillPoint(Skill.ENGINES)
             }

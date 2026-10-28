@@ -256,7 +256,11 @@ abstract class LivingCrew(blueprint: CrewBlueprint, anims: Animations, room: Roo
 
     override fun onKilledCrew(enemy: AbstractCrew) {
         super.onKilledCrew(enemy)
-        addSkillPoint(Skill.COMBAT)
+
+        // Destroying an onboard drone (an anti-personnel or boarding drone,
+        // which fight like crew) gives no experience (wiki, Crew skills).
+        if (enemy is LivingCrew)
+            addSkillPoint(Skill.COMBAT)
     }
 
     override fun onSabotagedSystem(system: AbstractSystem) {
