@@ -311,4 +311,9 @@ class LazyShipBlueprint(
     val shipClass: GameText? = elem.getGameTextChild("class")
     val shipTitle: GameText? = elem.getGameTextChild("name")
     val unlockText: GameText? = elem.getGameTextChild("unlock")
+
+    // The sectors (zero-indexed) an enemy ship with this blueprint can be
+    // generated in, eg the Rock assault ship only from sector 6 on.
+    val minSector: Int? = elem.getChildTextTrim("minSector")?.toIntOrNull()
+    val maxSector: Int? = elem.getChildTextTrim("maxSector")?.toIntOrNull()
 }

@@ -34,7 +34,7 @@ class ShipGenerator(val df: Datafile, val bp: BlueprintManager) {
             println("Generating ship from spec '${spec.name}' with seed $seedStr")
         }
 
-        val shipBlueprint = (spec.autoBlueprint.resolve(rand) as LazyShipBlueprint).real
+        val shipBlueprint = pickBlueprint(spec, effectiveSector.coerceAtLeast(0), rand).real
         val elem = shipBlueprint.loadElem()
 
         val ship = Ship(shipBlueprint, sys, null, spec, null)
@@ -434,6 +434,20 @@ class ShipGenerator(val df: Datafile, val bp: BlueprintManager) {
         }
 
         return ship
+    }
+
+    /**
+     * Pick the ship's blueprint from the spec's list, out of the ones whose
+     * minSector/maxSector allow the (zero-indexed, a sector behind on easy)
+     * sector, or out of all of them if none do - as vanilla does. Duplicate
+     * entries in the list keep their weight.
+     */
+    private fun pickBlueprint(spec: EnemyShipSpec, sector: Int, rand: Random): LazyShipBlueprint {
+        val all = spec.autoBlueprint.list().map { it as LazyShipBlueprint }
+        val allowed = all.filter {
+            (it.minSector ?: 0) <= sector && sector <= (it.maxSector ?: Int.MAX_VALUE)
+        }
+        return allowed.ifEmpty { all }.random(rand)
     }
 
     /**
