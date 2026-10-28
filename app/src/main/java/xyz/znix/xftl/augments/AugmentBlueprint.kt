@@ -76,6 +76,30 @@ open class AugmentBlueprint(elem: Element) : Blueprint(elem) {
     }
 }
 
+/**
+ * Fire Suppression: puts out every fire aboard at once, each at the speed
+ * of a Crystal crewmember fighting it (wiki, Augmentations: "Puts out all
+ * fires at once, at the same speed as a Crystal crew"). Same rate as
+ * AbstractCrew's fire-fighting, with Crystal's fire-fighting speed.
+ */
+class AugFireSuppression(elem: Element) : AugmentBlueprint(elem) {
+    override fun update(ship: Ship, dt: Float, totalValue: Float) {
+        super.update(ship, dt, totalValue)
+
+        for (room in ship.rooms) {
+            for (fire in room.fires) {
+                if (fire != null)
+                    fire.health -= 1.2f * 0.08f * CRYSTAL_FIRE_FIGHTING_SPEED * dt
+            }
+        }
+    }
+
+    companion object {
+        const val NAME = "FIRE_EXTINGUISHERS"
+        private const val CRYSTAL_FIRE_FIGHTING_SPEED = 0.83f
+    }
+}
+
 class AugEngiMedbots(elem: Element) : AugmentBlueprint(elem) {
     override fun update(ship: Ship, dt: Float, totalValue: Float) {
         super.update(ship, dt, totalValue)
