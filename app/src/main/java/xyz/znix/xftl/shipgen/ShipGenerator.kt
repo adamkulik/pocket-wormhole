@@ -117,7 +117,8 @@ class ShipGenerator(val df: Datafile, val bp: BlueprintManager) {
         // Pick the power for each category:
         var offensivePower = (effectiveSector + 1).coerceAtLeast(1)
         var defensivePower = (effectiveSector + 2).coerceAtLeast(1)
-        var generalPower = ((effectiveSector + 1) / 2).coerceAtLeast(1)
+        // 1/1/1/2/2/2/3/3 in sectors 1-8 on normal (see the Reddit post's table)
+        var generalPower = (effectiveSector / 3 + 1).coerceAtLeast(1)
 
         fun subtractPower(category: SystemCategory, power: Int) = when (category) {
             SystemCategory.OFFENSIVE -> offensivePower -= power
@@ -128,8 +129,10 @@ class ShipGenerator(val df: Datafile, val bp: BlueprintManager) {
         if (difficulty == Difficulty.HARD)
             generalPower++
 
-        // Place the optional systems
-        val optionalSystemChance = (sector * 10 + when (difficulty) {
+        // Place the optional systems: 20% plus 10% per sector on normal, 10%
+        // more on hard and 10% less on easy - 20% less with easy's sector
+        // delay, but never below 10%.
+        val optionalSystemChance = (effectiveSector * 10 + when (difficulty) {
             Difficulty.EASY -> 10
             Difficulty.NORMAL -> 20
             Difficulty.HARD -> 30
@@ -147,16 +150,18 @@ class ShipGenerator(val df: Datafile, val bp: BlueprintManager) {
             // Install the system
             system.room.setSystem(system)
 
-            // Add a power cost for adding this system.
+            // Add a power cost for adding this system: weapons, drones and
+            // the teleporter take one bar from the offensive budget, anything
+            // else (artillery included) two from the general one, one on hard.
             // Don't check the current power here, it's allowed to go negative.
             val systemInstance = system.room.system!!
-            val category = getSystemCategory(systemInstance)
-            val basePowerUse = when {
-                category == SystemCategory.OFFENSIVE && systemInstance !is Artillery -> 1
-                difficulty == Difficulty.HARD -> 1
-                else -> 2
+            when {
+                systemInstance is Weapons || systemInstance is Drones || systemInstance is Teleporter ->
+                    subtractPower(SystemCategory.OFFENSIVE, 1)
+
+                difficulty == Difficulty.HARD -> subtractPower(SystemCategory.GENERAL, 1)
+                else -> subtractPower(SystemCategory.GENERAL, 2)
             }
-            subtractPower(category, basePowerUse)
         }
 
         // Make sure each system has at least one power
@@ -291,9 +296,9 @@ class ShipGenerator(val df: Datafile, val bp: BlueprintManager) {
                 if (it.power > remainingPower)
                     return@filter false
 
-                // We can't use all the remaining power, except for
-                // with a one-power weapon.
-                if (it.power == remainingPower && it.power != 1)
+                // A single weapon can't use all the system's power, except
+                // for a one-power weapon.
+                if (it.power >= weaponSystem.energyLevels && it.power != 1)
                     return@filter false
 
                 // Don't start with one-power weapons
@@ -301,7 +306,7 @@ class ShipGenerator(val df: Datafile, val bp: BlueprintManager) {
                     return@filter false
 
                 // This weapon must use >25% of the remaining power
-                if (it.power < remainingPower / 4f)
+                if (it.power <= remainingPower / 4f)
                     return@filter false
 
                 // Pick weapons such that we can:
@@ -469,7 +474,7 @@ class ShipGenerator(val df: Datafile, val bp: BlueprintManager) {
             difficulty == Difficulty.EASY -> 1
 
             // Normal/hard is 1, rising to 2 on sector 3 (id=2 when zero-indexed)
-            effectiveSector < 3 - 1 -> 2
+            effectiveSector < 3 - 1 -> 1
             else -> 2
         }
 
