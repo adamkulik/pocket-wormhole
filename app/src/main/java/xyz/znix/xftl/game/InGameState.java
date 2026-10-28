@@ -1413,6 +1413,19 @@ public class InGameState extends MainGame.GameState {
             // beacon's event is about to spawn its ship or hazard, and vanilla - whose loop
             // is frozen while the event dialogue is up - never charges through that moment.
             player.setFtlChargeProgress(1);
+
+            // Out of danger, vanilla makes the cloak, mind control, backup
+            // battery and crew teleporter available again straight away
+            // (wiki: Backup Battery - "If you are not IN DANGER and Backup
+            // Battery runs out, it becomes instantly available again ...
+            // just like Cloaking or Mind Control"; Crew Teleporter - "When
+            // your ship is not in danger, the cooldown is reset instantly").
+            for (AbstractSystem system : player.getSystems()) {
+                if (system instanceof Cloaking || system instanceof MindControl
+                        || system instanceof BackupBattery || system instanceof Teleporter) {
+                    system.clearCooldown();
+                }
+            }
         }
     }
 

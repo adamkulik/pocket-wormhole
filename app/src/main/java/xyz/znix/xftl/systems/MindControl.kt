@@ -52,6 +52,13 @@ class MindControl(blueprint: SystemBlueprint) : MainSystem(blueprint) {
             }
         }
 
+    override fun onJump() {
+        super.onJump()
+
+        // "Mind Control's cooldown is immediately reset by an FTL jump" (wiki).
+        clearCooldown()
+    }
+
     override fun update(dt: Float) {
         super.update(dt)
 
