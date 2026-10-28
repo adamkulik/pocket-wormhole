@@ -45,6 +45,9 @@ open class AugmentBlueprint(elem: Element) : Blueprint(elem) {
         const val SYSTEM_CASING: String = "SYSTEM_CASING"
         const val CRYSTAL_SHARDS: String = "CRYSTAL_SHARDS"
         const val DRONE_SPEED: String = "DRONE_SPEED"
+
+        // Drone Recovery Arm: see AbstractExternalDrone.removeRecovered.
+        const val DRONE_RECOVERY: String = "DRONE_RECOVERY"
         const val SCRAP_COLLECTOR: String = "SCRAP_COLLECTOR"
         const val ION_ARMOR: String = "ION_ARMOR"
         const val FTL_BOOSTER: String = "FTL_BOOSTER"
