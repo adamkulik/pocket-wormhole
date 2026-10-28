@@ -1662,6 +1662,16 @@ public class InGameState extends MainGame.GameState {
         return playerFlyIn > 0 || playerJumpOut > 0 || enemyJumpOut > 0;
     }
 
+    /**
+     * Pass a turn without jumping, with the last stand's WAIT button: the
+     * fleet (and the flagship) moves on, and if the flagship comes to this
+     * beacon the fight starts.
+     */
+    public void waitAtCurrentBeacon() {
+        advanceFleet();
+        trySpawnBoss();
+    }
+
     private void trySpawnBoss() {
         BossManager boss = currentBeacon.getSector().getBosses().stream()
                 .filter(thisBoss -> thisBoss.getBeacon() == currentBeacon)
