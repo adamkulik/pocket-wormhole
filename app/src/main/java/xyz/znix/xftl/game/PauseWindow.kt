@@ -174,15 +174,12 @@ class PauseWindow(val game: InGameState, val close: () -> Unit) : Window() {
     private fun exportSaveClicked() {
         val transfer = xyz.znix.xftl.sys.PlatformSpecific.INSTANCE.saveTransfer ?: return
         if (!atSectorStart()) return
+        // Save now, so the export is the game as it is - not the last
+        // autosave, from before e.g. shopping at this beacon.
+        game.mainGame.writeRunSave()
         val path = game.mainGame.getVanillaSavePath()
-        val bytes = if (java.nio.file.Files.exists(path)) {
-            java.nio.file.Files.readAllBytes(path)
-        } else {
-            // No vanilla save yet - write one from the current state.
-            game.mainGame.writeRunSave()
-            java.nio.file.Files.readAllBytes(path)
-        }
-        transfer.exportSave(bytes)
+        if (!java.nio.file.Files.exists(path)) return
+        transfer.exportSave(java.nio.file.Files.readAllBytes(path))
     }
 
     private fun importSaveClicked() {
