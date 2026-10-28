@@ -201,6 +201,15 @@ class Shields(blueprint: SystemBlueprint) : MainSystem(blueprint) {
             targetPower = powerSelected + forcedPower
     }
 
+    // A starved shield keeps whole bubbles: a lone reactor bar would run
+    // nothing, so it goes back to the reactor (unless a Zoltan bar or an odd
+    // system level makes it part of the top bubble, like the - click).
+    override fun roundDownStarvedSelection(supplied: Int): Int {
+        if ((supplied + forcedPower).mod(2) == 0 || supplied + forcedPower >= reactorRoom() + forcedPower)
+            return supplied
+        return (supplied - 1).coerceAtLeast(0)
+    }
+
     override fun getPowerBarSpacing(powerLevel: Int): Int {
         // Group the power bars into pairs
         if (powerLevel.mod(2) == 1) {

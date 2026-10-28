@@ -56,12 +56,11 @@ abstract class MainSystem(blueprint: SystemBlueprint) : AbstractSystem(blueprint
 
     /**
      * The power this system is actually running at: the sum of everything in
-     * [selectedPowerSources]. This is at most [powerSelected] - the two differ
-     * when the ship's power supply can't keep up, e.g. in an ion storm, where
-     * the demand keeps the player's selection (so it restores automatically
-     * when the storm passes) while only the supplied power functions
-     * (GitHub issue #95; wiki: Environmental Hazards - "Power will be removed
-     * automatically from systems").
+     * [selectedPowerSources]. This is at most [powerSelected]. When the ship's
+     * power supply can't keep up, e.g. in an ion storm, [consumePowerSecond]
+     * drops the selection to what's supplied, like vanilla (GitHub issue #95;
+     * wiki: Environmental Hazards - "Power will be removed automatically from
+     * systems"); weapons and drones turn items off instead.
      *
      * All gameplay behaviour must read THIS, not [powerSelected] - that's the
      * demand, used for button state, power-bar highlights and re-powering.
@@ -451,11 +450,53 @@ abstract class MainSystem(blueprint: SystemBlueprint) : AbstractSystem(blueprint
             require(toDeduct >= 0)
         }
 
+        // The ship couldn't supply the whole selection (an ion storm cutting
+        // the reactor, the backup battery running out): like vanilla, the
+        // system loses those bars for good. Nothing gives them back when a
+        // bar is freed elsewhere or the storm passes - timed in vanilla
+        // 1.6.14 with a patched ion-storm beacon: the bars freed by taking
+        // power off another system stay in the reactor, and the system cut
+        // by the storm is still off after jumping out of it.
+        if (totalRemaining > 0 && dropsPowerWhenStarved) {
+            val supplied = powerSelected.coerceIn(0, roomForSelection) - totalRemaining
+            val selection = roundDownStarvedSelection(supplied)
+            releaseGlobalPower(powerAvailable, supplied - selection)
+            powerSelected = selection
+            targetPower = selection + forcedPower
+        }
+
         updateCachedSelectedPower()
 
         // Alert the subclass if anything has changed.
         if (selectedPowerSources != previousPowerSources) {
             powerStateChanged()
+        }
+    }
+
+    /**
+     * Whether [consumePowerSecond] takes the bars it couldn't supply off the
+     * selection. Weapons and drones don't: their power manager already turns
+     * the last items off and lowers the selection to match.
+     */
+    protected open val dropsPowerWhenStarved: Boolean get() = true
+
+    /**
+     * The selection a starved system keeps out of the [supplied] reactor
+     * bars: all of them, except where a bar on its own does nothing.
+     */
+    protected open fun roundDownStarvedSelection(supplied: Int): Int = supplied
+
+    /** Gives [amount] global bars back, lowest priority sources first. */
+    private fun releaseGlobalPower(powerAvailable: HashMap<EnergySource, Int>, amount: Int) {
+        var remaining = amount
+        for (type in EnergySource.GLOBAL_TYPES.reversed()) {
+            if (remaining <= 0)
+                break
+            val held = selectedPowerSources[type] ?: continue
+            val give = min(held, remaining)
+            selectedPowerSources[type] = held - give
+            powerAvailable[type] = (powerAvailable[type] ?: 0) + give
+            remaining -= give
         }
     }
 
