@@ -18,6 +18,7 @@ import xyz.znix.xftl.ui.Label
 import xyz.znix.xftl.ui.WidgetContainer
 import kotlin.math.atan2
 import kotlin.math.max
+import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlin.random.Random
@@ -127,6 +128,7 @@ class JumpWindow(val game: InGameState, showSectorMap: () -> Unit, val jump: (Be
     private val mapBase = Point(0, 0)
 
     private val sector = game.currentBeacon.sector
+    private val lastStandHelpFont = game.getFont("JustinFont10")
 
     private val flashTimerBase = System.nanoTime()
 
@@ -455,6 +457,33 @@ class JumpWindow(val game: InGameState, showSectorMap: () -> Unit, val jump: (Be
     }
 
     /**
+     * Vanilla's last stand help box (text id pc_boss) left of the beacon map:
+     * the flagship destroys the base after three turns there, how to read its
+     * jump line, and that repair stations repair for free. Vanilla draws it at
+     * 8,235 on the screen, 322px wide, next to its map; it's narrowed to fit
+     * when the map is scaled up for touch and reaches further left.
+     */
+    private fun drawLastStandHelp(g: Graphics) {
+        // This draws in the window's (possibly scaled) coordinates
+        val topLeft = scaleWindowPoint(8, 235)
+        val x = topLeft.x
+        val y = topLeft.y
+        val width = min(322, position.x - GLOW - 8 - x)
+        if (width < 150)
+            return
+
+        // The text's paragraphs are separated by \n (escaped in the XML)
+        val lines = game.translator["pc_boss"].split("\\n", "\n").flatMap {
+            if (it.isBlank()) listOf("") else lastStandHelpFont.wrapString(it, width - 22)
+        }
+        val height = 22 + (lines.size - 1) * 17 + 18
+        game.windowRenderer.render(x, y, width, height)
+        for ((i, line) in lines.withIndex()) {
+            lastStandHelpFont.drawString(x + 11f, y + 24f + i * 17, line, Colour.white)
+        }
+    }
+
+    /**
      * Draw vanilla's "Turns until the base is destroyed" panel (text id
      * boss_jumps) when the flagship has reached the federation base. The
      * box art and the 4 - baseTurns countdown are pinned from the 1.6.14
@@ -594,6 +623,9 @@ class JumpWindow(val game: InGameState, showSectorMap: () -> Unit, val jump: (Be
         })
 
         drawBaseCountdown(g)
+
+        if (sector.isLastStand)
+            drawLastStandHelp(g)
 
         // Draw the top-left map label tab
         val tab = game.translator["map_title"]
