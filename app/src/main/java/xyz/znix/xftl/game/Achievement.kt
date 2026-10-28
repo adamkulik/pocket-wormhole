@@ -21,7 +21,8 @@ class Achievement(elem: Element) {
             val doc = df.parseXML(df["data/achievements.xml"])
             check(doc.rootElement.name == "FTL")
 
-            achievements = HashMap()
+            // In achievements.xml's order, for the profile's list.
+            achievements = LinkedHashMap()
 
             for (elem in doc.rootElement.getChildren("achievement")) {
                 val ach = Achievement(elem)
