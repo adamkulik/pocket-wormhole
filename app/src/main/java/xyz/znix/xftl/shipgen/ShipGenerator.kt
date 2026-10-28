@@ -266,6 +266,12 @@ class ShipGenerator(val df: Datafile, val bp: BlueprintManager) {
             }
         }
 
+        // Vanilla enemies always have exactly enough reactor power to power
+        // all their systems (FTL wiki, Ship: "Enemy power"). Counting it up
+        // as we went missed the bars the blueprint and the optional systems
+        // start with, leaving them a bar or two short.
+        ship.purchasedReactorPower = ship.systems.filterIsInstance<MainSystem>().sumOf { it.energyLevels }
+
         // Spawn the weapons in. Again, see the linked Reddit post near
         // the top of the function, as it explains what this is doing.
         val weaponList = parseWeaponsList(elem)
