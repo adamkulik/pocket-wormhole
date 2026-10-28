@@ -153,16 +153,13 @@ class SelectShipState(private val datafile: Datafile, private val main: MainGame
         shipSelector.addButtonListener("type_b") { selectShipVariant(1) }
         shipSelector.addButtonListener("type_c") { selectShipVariant(2) }
 
-        // The arrows either side of LIST step through the ships, like
-        // vanilla - skipping the ones that aren't unlocked yet.
-        (shipSelector.byId["prev"] as ImageButton).clickListener = { stepShip(-1) }
-        (shipSelector.byId["next"] as ImageButton).clickListener = { stepShip(1) }
-
         shipSelector.addButtonListener("list") { shipListVisible = true }
 
         shipSelector.addButtonListener("hiderooms") { toggleRoomsHidden() }
 
-        // TODO the arrow navigation buttons
+        // The arrows either side of LIST step through the ships, like vanilla.
+        (shipSelector.byId["prev"] as ImageButton).clickListener = { stepShip(-1) }
+        (shipSelector.byId["next"] as ImageButton).clickListener = { stepShip(1) }
 
         shipList = ShipList(this) {
             shipListVisible = false
@@ -445,27 +442,63 @@ class SelectShipState(private val datafile: Datafile, private val main: MainGame
     }
 
     /**
-     * Select the next ([direction] = 1) or previous (-1) unlocked ship, in
-     * the order of the ship list: each family's A variant, then any ships
-     * not in a family. Wraps around at either end.
+     * Select the next ([direction] = 1) or previous (-1) ship, in the order of
+     * the ship list: each family's A variant, then any ships not in a family.
+     * Ships that aren't unlocked, or that the current Advanced Edition setting
+     * can't use, are skipped, like vanilla. Wraps around at either end.
+     *
+     * The current layout (A/B/C) carries over to the ship that gets picked,
+     * when it has that variant - vanilla's ShipBuilder::CycleShipNext /
+     * CycleShipPrevious keep the layout index while cycling ships.
      */
     private fun stepShip(direction: Int) {
-        val nonFamilyShips = ships.filter { !shipFamilies.byShipId.containsKey(it.name) }
-        val aVariants = shipFamilies.families.mapNotNull { family -> ships.firstOrNull { it.name == family.ships[0] } }
-        val order = (aVariants + nonFamilyShips).filter { isShipUnlocked(it.name) }
-        if (order.isEmpty())
+        // Switching ships re-creates the ship editor, so the arrows are
+        // ignored while a ship is being edited in the hangar.
+        if (isShipEdited)
             return
 
-        // The current ship's position, by family for B/C variants.
-        val currentName = current.baseBlueprint
-        val familyA = shipFamilies.byShipId[currentName]?.ships?.get(0)
-        val index = order.indexOfFirst { it.name == currentName || it.name == familyA }
+        val nonFamilyShips = ships.filter { !shipFamilies.byShipId.containsKey(it.name) }
+        val aVariants = shipFamilies.families.mapNotNull { family -> ships.firstOrNull { it.name == family.ships[0] } }
+        val rows = aVariants + nonFamilyShips
+        if (rows.isEmpty())
+            return
 
-        val next = when (index) {
-            -1 -> order.first()
-            else -> order[(index + direction).mod(order.size)]
+        // The current ship's row - the family's A variant row, for a B/C ship -
+        // plus the layout index to carry over.
+        val currentName = current.baseBlueprint
+        val currentFamily = shipFamilies.byShipId[currentName]
+        val layoutIndex = currentFamily?.ships?.indexOf(currentName) ?: 0
+        val currentIndex = rows.indexOfFirst { it.name == currentName || it.name == currentFamily?.ships?.getOrNull(0) }
+
+        // If the current ship isn't a row of the list, the first step lands on
+        // the first row going forward, the last row going back.
+        var index = if (currentIndex == -1) -1 else currentIndex
+
+        var steps = 0
+        while (steps < rows.size) {
+            steps++
+            index = (index + direction).mod(rows.size)
+
+            val target = shipForRow(rows[index], layoutIndex) ?: continue
+
+            if (target.name != currentName)
+                selectShip(target)
+            return
         }
-        selectShip(next.real)
+    }
+
+    /**
+     * The blueprint of the ship list [row]'s [layoutIndex] variant (A/B/C), or
+     * null when that variant doesn't exist or can't be picked with the current
+     * unlock / Advanced Edition state.
+     */
+    private fun shipForRow(row: LazyShipBlueprint, layoutIndex: Int): ShipBlueprint? {
+        val family = shipFamilies.byShipId[row.name]
+        val shipId = family?.ships?.getOrNull(layoutIndex) ?: row.name
+        if (!isShipSelectable(shipId))
+            return null
+
+        return ships.firstOrNull { it.name == shipId }?.real
     }
 
     /**
