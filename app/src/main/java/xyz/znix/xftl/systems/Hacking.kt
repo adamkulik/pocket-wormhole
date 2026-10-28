@@ -3,6 +3,7 @@ package xyz.znix.xftl.systems
 import org.jdom2.Element
 import xyz.znix.xftl.*
 import xyz.znix.xftl.Constants.ROOM_SIZE
+import xyz.znix.xftl.augments.AugmentBlueprint
 import xyz.znix.xftl.game.*
 import xyz.znix.xftl.layout.Room
 import xyz.znix.xftl.math.ConstPoint
@@ -137,6 +138,15 @@ class Hacking(blueprint: SystemBlueprint) : MainSystem(blueprint) {
             // If the system is damaged, that caps the amount hacking time.
             // TODO this was copied from cloaking, check if it's the same here
             timeRemaining = min(timeRemaining!!, duration)
+
+            // Hacking Stun: everyone in the hacked room during the pulse is
+            // stunned for the rest of it - both ships' crew and drones, and
+            // anyone who walks in meanwhile (wiki, Augmentations).
+            val room = projectile?.target
+            if (room != null && timeRemaining!! > 0 && ship.hasAugment(AugmentBlueprint.HACKING_STUN)) {
+                for (crew in room.crew)
+                    crew.stun(timeRemaining!!)
+            }
 
             // We have to check for powerSelected here, since the above
             // won't work if the system is fully broken since duration is
