@@ -141,6 +141,7 @@ class JumpWindow(val game: InGameState, showSectorMap: () -> Unit, val jump: (Be
     val cancelButton: Button
     val nextSectorButton: Button
     val noFuelButtons: List<Button>
+    val lastStandWaitButtons: List<Button>
 
     val background = game.getImg("img/map/zone_1.png")
 
@@ -182,6 +183,10 @@ class JumpWindow(val game: InGameState, showSectorMap: () -> Unit, val jump: (Be
 
     private val outOfFuel: Boolean get() = game.player.fuelCount == 0
 
+    // In the last stand vanilla always has a WAIT button: the out-of-fuel
+    // one, or with fuel one of its own (GitHub issue #85).
+    private val lastStandWait: Boolean get() = sector.isLastStand && !outOfFuel
+
     init {
         // The buttons are fiddly to set up, as they move depending on
         // the length of the text inside them.
@@ -218,6 +223,10 @@ class JumpWindow(val game: InGameState, showSectorMap: () -> Unit, val jump: (Be
         // Hacky, the rendering code is also what populates the buttons
         noFuelButtons = ArrayList()
         drawNoFuelUI(noFuelButtons)
+        lastStandWaitButtons = ArrayList()
+        drawLastStandWaitUI(lastStandWaitButtons)
+        if (lastStandWait)
+            buttons += lastStandWaitButtons
         if (outOfFuel)
             buttons += noFuelButtons
 
@@ -674,6 +683,14 @@ class JumpWindow(val game: InGameState, showSectorMap: () -> Unit, val jump: (Be
             }
         }
 
+        if (lastStandWait) {
+            drawLastStandWaitUI(null)
+
+            for (button in lastStandWaitButtons) {
+                button.draw(g)
+            }
+        }
+
         // The leave-crew confirm box (issue #98), on top of everything.
         if (leaveCrewConfirm)
             drawLeaveCrewConfirm(g)
@@ -786,6 +803,65 @@ class JumpWindow(val game: InGameState, showSectorMap: () -> Unit, val jump: (Be
                 }
             }
         }
+    }
+
+    /**
+     * The last stand's WAIT button and vanilla's final_sector_wait text ("Wait
+     * in your current location."), in the out-of-fuel panel's frame without
+     * the distress beacon toggle. Like [drawNoFuelUI], this both draws and
+     * creates the button.
+     */
+    private fun drawLastStandWaitUI(buttons: MutableList<Button>?) {
+        val rightX = position.x + size.x
+        val frameY = position.y + size.y - 57
+
+        val labelText = game.translator["final_sector_wait"]
+        val labelAreaWidth = 7 + distressBeaconFont.getWidth(labelText) + 8
+        val labelAreaX = rightX - 12 - labelAreaWidth
+
+        val waitText = game.translator["button_wait"]
+        val waitButtonWidth = font.getWidth(waitText) + 4 * 2
+        val waitButtonX = labelAreaX - 5 - 4 - waitButtonWidth
+
+        val leftX = waitButtonX - 4 - 5
+
+        if (buttons == null) {
+            val imgY = frameY - 10
+            val imgH = waitDistressFrame.height
+            waitDistressFrame.drawSection(leftX - 10, imgY, 22, imgH)
+            waitDistressFrame.drawSection(waitButtonX + 3, imgY, 1, imgH, 22, 0, waitButtonWidth - 6)
+            waitDistressFrame.drawSection(labelAreaX - 12, imgY, 22, imgH, 27)
+            waitDistressFrame.drawSection(labelAreaX + 10, imgY, 1, imgH, 49, 0, rightX - 15 - (labelAreaX + 10))
+            waitDistressFrame.drawSection(rightX - 15, imgY, 15, imgH, 62)
+
+            distressBeaconFont.drawStringCentredVertical(
+                labelAreaX, frameY + 33,
+                labelAreaWidth,
+                18,
+                labelText,
+                Constants.SECTOR_CUTOUT_TEXT
+            )
+        } else {
+            buttons += Buttons.BasicButton(
+                game,
+                ConstPoint(waitButtonX, frameY + 9), ConstPoint(waitButtonWidth, 36),
+                waitText, 4, font, 27
+            ) {
+                waitLastStand()
+            }
+        }
+    }
+
+    /**
+     * Pass a turn at the current beacon in the last stand: no fuel and no
+     * event, but the flagship moves on - and fights us if it comes here.
+     */
+    private fun waitLastStand() {
+        if (game.isJumpAnimationPlaying())
+            return
+
+        jump(game.currentBeacon)
+        game.waitAtCurrentBeacon()
     }
 
     override fun updateUI(x: Int, y: Int) {
