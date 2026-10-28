@@ -409,6 +409,25 @@ public class InGameState extends MainGame.GameState {
      * values and reloads it through the regular deserialiser.
      */
     private Ship applyVanillaShip(VanillaSaveData data, VanillaSaveData.ShipData vs) {
+        // Install the systems bought since the start (e.g. a teleporter from
+        // a store) into their slots on the fresh ship, so they're in the XML
+        // patched below - otherwise only the starting systems survive.
+        for (Map.Entry<String, String> entry : VanillaSaveFormat.INSTANCE.systemSlotEntries()) {
+            VanillaSaveData.VanillaSystem vsSys = vs.getSystems().get(entry.getKey());
+            if (vsSys == null || vsSys.getCapacity() <= 0) continue;
+            String xftlName = entry.getValue();
+            if (player.getSystems().stream().anyMatch(sys -> sys.getBlueprint().getName().equals(xftlName))) continue;
+            installSystemSlot:
+            for (Room room : player.getRooms()) {
+                for (SystemInstallConfiguration slot : room.getSystemSlots()) {
+                    if (slot.getSystem().getName().equals(xftlName)) {
+                        room.setSystem(slot);
+                        break installSystemSlot;
+                    }
+                }
+            }
+        }
+
         Element xml = new Element("playerShip");
         ObjectRefs refs = new ObjectRefs();
         refs.register(player, "player");
