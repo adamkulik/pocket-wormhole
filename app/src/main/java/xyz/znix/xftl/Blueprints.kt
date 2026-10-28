@@ -196,6 +196,7 @@ class BlueprintManager {
             // is implemented by the jump map; the stasis pod is an event
             // quest prop. Neither has a passive effect to implement.
             AugmentBlueprint.ADVANCED_FTL_NAVIGATION -> AugmentBlueprint(elem)
+            AugmentBlueprint.DISTRACTION_BUOYS -> AugmentBlueprint(elem)
             AugmentBlueprint.STASIS_POD -> AugmentBlueprint(elem)
 
             // The Lifeform Scanner's mechanic (sensing enemy crew through

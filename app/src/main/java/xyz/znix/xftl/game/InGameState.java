@@ -1517,6 +1517,17 @@ public class InGameState extends MainGame.GameState {
 
             // Switch to the new sector's music
             loadSectorMusic(sectorType);
+
+            // Distraction Buoys: "Leaves a false signal at sector start to
+            // delay Rebels 1 jump" - no pursuit on the sector's first jump.
+            // Not in the last stand (wiki, Augmentations), whose fleet
+            // works differently, nor when just reloading a save (the
+            // modifier is saved).
+            Sector sector = currentBeacon.getSector();
+            if (player != null && !isCurrentlyLoadingSave && !sector.isLastStand()
+                    && player.hasAugment(AugmentBlueprint.DISTRACTION_BUOYS)) {
+                sector.setFleetAdvanceModifier(sector.getFleetAdvanceModifier() - 1);
+            }
         }
 
         this.currentBeacon = currentBeacon;
