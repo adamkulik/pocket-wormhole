@@ -531,16 +531,32 @@ public class InGameState extends MainGame.GameState {
         xml.removeChildren("rooms");
         Element roomsElem = new Element("rooms");
         HashMap<Integer, Element> breachRooms = new HashMap<>();
+        // A vanilla breach is (x, y, health): the square in the ship's grid,
+        // layout offset included, and health out of 100 (the same as the
+        // writer, see VanillaSaveWriter).
         for (Triple<Integer, Integer, Integer> breach : vs.getBreaches()) {
-            Element roomElem = breachRooms.computeIfAbsent(breach.getFirst(), k -> {
+            int x = breach.getFirst() - player.getOffset().getX();
+            int y = breach.getSecond() - player.getOffset().getY();
+            Room room = null;
+            for (Room r : player.getRooms()) {
+                if (x >= r.getX() && x < r.getX() + r.getWidth() && y >= r.getY() && y < r.getY() + r.getHeight()) {
+                    room = r;
+                    break;
+                }
+            }
+            if (room == null)
+                continue; // Outside the ship: vanilla drops these too
+            int slot = (x - room.getX()) + (y - room.getY()) * room.getWidth();
+
+            Element roomElem = breachRooms.computeIfAbsent(room.getId(), k -> {
                 Element elem = new Element("room");
                 elem.setAttribute("id", k.toString());
                 roomsElem.addContent(elem);
                 return elem;
             });
             Element breachElem = new Element("breach");
-            breachElem.setAttribute("slot", breach.getSecond().toString());
-            breachElem.setAttribute("health", Float.toString(breach.getThird() / 10f));
+            breachElem.setAttribute("slot", Integer.toString(slot));
+            breachElem.setAttribute("health", Float.toString(breach.getThird() / 100f));
             roomElem.addContent(breachElem);
         }
         xml.addContent(roomsElem);
