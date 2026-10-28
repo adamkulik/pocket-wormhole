@@ -153,6 +153,11 @@ class SelectShipState(private val datafile: Datafile, private val main: MainGame
         shipSelector.addButtonListener("type_b") { selectShipVariant(1) }
         shipSelector.addButtonListener("type_c") { selectShipVariant(2) }
 
+        // The arrows either side of LIST step through the ships, like
+        // vanilla - skipping the ones that aren't unlocked yet.
+        (shipSelector.byId["prev"] as ImageButton).clickListener = { stepShip(-1) }
+        (shipSelector.byId["next"] as ImageButton).clickListener = { stepShip(1) }
+
         shipSelector.addButtonListener("list") { shipListVisible = true }
 
         shipSelector.addButtonListener("hiderooms") { toggleRoomsHidden() }
@@ -437,6 +442,30 @@ class SelectShipState(private val datafile: Datafile, private val main: MainGame
 
     fun isFamilyUnlocked(family: ShipFamily): Boolean {
         return family.isUnlocked(main.profile)
+    }
+
+    /**
+     * Select the next ([direction] = 1) or previous (-1) unlocked ship, in
+     * the order of the ship list: each family's A variant, then any ships
+     * not in a family. Wraps around at either end.
+     */
+    private fun stepShip(direction: Int) {
+        val nonFamilyShips = ships.filter { !shipFamilies.byShipId.containsKey(it.name) }
+        val aVariants = shipFamilies.families.mapNotNull { family -> ships.firstOrNull { it.name == family.ships[0] } }
+        val order = (aVariants + nonFamilyShips).filter { isShipUnlocked(it.name) }
+        if (order.isEmpty())
+            return
+
+        // The current ship's position, by family for B/C variants.
+        val currentName = current.baseBlueprint
+        val familyA = shipFamilies.byShipId[currentName]?.ships?.get(0)
+        val index = order.indexOfFirst { it.name == currentName || it.name == familyA }
+
+        val next = when (index) {
+            -1 -> order.first()
+            else -> order[(index + direction).mod(order.size)]
+        }
+        selectShip(next.real)
     }
 
     /**
