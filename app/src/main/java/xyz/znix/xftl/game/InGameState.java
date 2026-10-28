@@ -545,6 +545,8 @@ public class InGameState extends MainGame.GameState {
         }
         xml.addContent(roomsElem);
 
+        // Replace the fresh state's levels: the loader reads the first.
+        xml.removeChildren("oxygenLevels");
         Element oxygenElem = new Element("oxygenLevels");
         StringBuilder oxygen = new StringBuilder();
         for (int i = 0; i < player.getRooms().size(); i++) {
