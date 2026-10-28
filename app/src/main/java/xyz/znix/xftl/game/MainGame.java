@@ -173,6 +173,9 @@ public class MainGame implements Game {
                 return new kotlin.Pair<>(tiles, bp.getDoors().size());
             });
             setCurrentState(new InGameState(this, getGameContent(data.getAdvanced()), data));
+            // Save the imported run as a regular one straight away, as the
+            // vanilla save is moved aside below.
+            writeRunSave();
             // Consumed: rename to a backup so it can't shadow newer saves.
             try {
                 Files.move(path, path.resolveSibling("continue-imported.sav"),
@@ -228,6 +231,8 @@ public class MainGame implements Game {
         deleteRunSave();
         InGameState inGameState = new InGameState(this, getGameContent(advancedEdition), shipName, difficulty, customised);
         setCurrentState(inGameState);
+        // Saved right away: otherwise there's no save until the first jump.
+        writeRunSave();
     }
 
     public void restartGame() {
@@ -320,6 +325,9 @@ public class MainGame implements Game {
         boolean advancedEdition = Boolean.parseBoolean(savedGame.getRootElement().getAttributeValue("enableAE"));
         InGameState inGameState = new InGameState(this, getGameContent(advancedEdition), savedGame);
         setCurrentState(inGameState);
+        // The save was consumed to load it: write it back straight away, or
+        // closing the app before the next jump or event loses the run.
+        writeRunSave();
     }
 
     @Override
