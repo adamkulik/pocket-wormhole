@@ -41,6 +41,13 @@ class ShipGenerator(val df: Datafile, val bp: BlueprintManager) {
         ship.generationSeed = effectiveSeed
         ship.loadDefaultContents()
 
+        // Enemies get one more hull point per sector, one fewer on easy
+        // (like everything else here, easy is a sector behind). Measured in
+        // vanilla with a 9HP REBEL_FAT: 9/11/13/16 in sectors 1/3/5/8 on both
+        // normal and hard, 8/10/12/15 on easy.
+        ship.hullBonus = effectiveSector
+        ship.health = ship.maxHealth
+
         ship.escapeHealth = spec.escapeHealth?.pick(rand) ?: 0
         ship.surrenderHealth = spec.surrenderHealth?.pick(rand) ?: 0
 
