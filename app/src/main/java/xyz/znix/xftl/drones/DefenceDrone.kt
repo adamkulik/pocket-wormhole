@@ -2,6 +2,7 @@ package xyz.znix.xftl.drones
 
 import org.jdom2.Element
 import xyz.znix.xftl.Ship
+import xyz.znix.xftl.augments.AugmentBlueprint
 import xyz.znix.xftl.environment.AsteroidProjectile
 import xyz.znix.xftl.f
 import xyz.znix.xftl.game.InGameState
@@ -119,6 +120,13 @@ class DefenceDrone(type: DroneBlueprint) : AbstractExternalDrone(type, false) {
         }
 
         cooldown = max(0f, cooldown - dt)
+
+        // Defense Scrambler: the other ship's augment stops defense and
+        // anti-combat drones acquiring anything to shoot at (wiki,
+        // Augmentations: "Prevents enemy defense drones from targeting
+        // anything").
+        if (ownerShip.sys.getEnemyOf(ownerShip)?.hasAugment(AugmentBlueprint.DEFENSE_SCRAMBLER) == true)
+            return
 
         var bestTarget: InterceptResult? = if (shootsAtDrones) {
             // Hacking and boarding drones are projectiles while they fly
