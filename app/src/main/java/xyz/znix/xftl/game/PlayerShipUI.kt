@@ -525,8 +525,11 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
         if (PlatformSpecific.INSTANCE.isTouchUi) {
             startX = 531 + 40
             val hasStore = game.currentBeacon?.hasStore == true
-            val widths = if (hasStore) 74 + 60 + 88 + 41 else 74 + 60 + 41
-            val gaps = if (hasStore) 27 + 17 + 17 else 27 + 17
+            // The speed button, if it's turned on, adds 17 + its width.
+            val speedWidth = if (showSpeedButton) GAME_SPEED_BUTTON_WIDTH else 0
+            val speedGap = if (showSpeedButton) 17 else 0
+            val widths = (if (hasStore) 74 + 60 + 88 + 41 else 74 + 60 + 41) + speedWidth
+            val gaps = (if (hasStore) 27 + 17 + 17 else 27 + 17) + speedGap
             val rightBound = if (game.enemy != null) 905 else Int.MAX_VALUE
             buttonScale = min(
                 1.25f,
@@ -568,10 +571,74 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
             showPauseWindow()
         }
         settings.renderScale = buttonScale
+        nextPos += ConstPoint(step(41, 17), 0)
 
         buttons += jump
         buttons += ship
         buttons += settings
+
+        if (showSpeedButton) {
+            val speed = GameSpeedButton(nextPos + ConstPoint(0, 7))
+            speed.renderScale = buttonScale
+            buttons += speed
+        }
+    }
+
+    /** The speed button is opt-in, from the main menu's MODS panel. */
+    private val showSpeedButton: Boolean get() = game.mainGame.profile.gameSpeedButton
+
+    /**
+     * The game speed toggle, right of the options wrench: tap to cycle
+     * 1x, 2x, 4x, 8x, 16x. Vanilla FTL has no speed control (the ftlspeed mod
+     * adds one), so it's drawn like the box labels rather than imitating
+     * a vanilla button.
+     */
+    private inner class GameSpeedButton(pos: ConstPoint) : Button(game, pos, ConstPoint(GAME_SPEED_BUTTON_WIDTH, 34)) {
+        private val tooltip = object : StandardTooltip(game) {
+            override fun getText(): String {
+                val speed = game.mainGame.gameSpeed
+                val max = game.mainGame.profile.gameSpeedMax
+                val actual = if (isLimited) "\nThis device manages about ${game.effectiveGameSpeed.roundToInt()}x." else ""
+                return "Game speed: ${speed}x$actual\nTap to cycle up to ${max}x (change the limit in MODS on the main menu).\n" +
+                        "Long-press (or right-click) to go straight back to 1x.\n\n" +
+                        "Not in vanilla FTL - everything runs faster together, so the game plays the same. " +
+                        "If the device can't keep up it runs as fast as it can, shown by red text."
+            }
+        }
+
+        override fun draw(g: Graphics) {
+            val speed = game.mainGame.gameSpeed
+            val fast = speed > 1
+
+            g.colour = if (hovered) UI_BUTTON_HOVER else UI_TEXT_COLOUR_1
+            Buttons.drawRounded(g, pos.x, pos.y, size.x, size.y, 4)
+            g.colour = if (fast) UI_BUTTON_HOVER else SPEED_BUTTON_FILL
+            Buttons.drawRounded(g, pos.x + 2, pos.y + 2, size.x - 4, size.y - 4, 3)
+
+            val text = "${speed}x"
+            val textColour = when {
+                isLimited -> SYS_ENERGY_BROKEN
+                fast -> JUMP_DISABLED_TEXT
+                else -> SECTOR_CUTOUT_TEXT
+            }
+            font.drawString(pos.x + (size.x - font.getWidth(text)) / 2f, pos.y + 24f, text, textColour)
+
+            if (hovered)
+                g.tooltip = tooltip
+        }
+
+        override fun click(button: Int) {
+            // A long-press is a right click on touch: a quick way back to
+            // normal speed without cycling through the rest.
+            if (button == Input.MOUSE_RIGHT_BUTTON)
+                game.mainGame.resetGameSpeed()
+            else
+                game.mainGame.cycleGameSpeed()
+        }
+
+        // Well below the selected speed: the device can't keep up.
+        private val isLimited: Boolean
+            get() = game.mainGame.gameSpeed > 1 && game.effectiveGameSpeed < game.mainGame.gameSpeed * 0.8f
     }
 
     /**
@@ -3267,6 +3334,9 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
     }
 
     companion object {
+        private const val GAME_SPEED_BUTTON_WIDTH = 52
+        private val SPEED_BUTTON_FILL = Colour(32, 46, 51, 230)
+
         /**
          * How much selected crew are enlarged by in the touch UI's
          * room-selection mode (see [crewEnlargeScale]).

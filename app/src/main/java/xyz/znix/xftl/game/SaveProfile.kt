@@ -58,6 +58,24 @@ class SaveProfile private constructor() {
         private set
 
     /**
+     * Whether the game speed button is shown. It's not a vanilla feature,
+     * and some players count speeding up as cheating, so it's off unless
+     * turned on in the main menu's MODS panel.
+     */
+    var gameSpeedButton = false
+        set(value) {
+            field = value
+            markDirty()
+        }
+
+    /** The fastest the game speed button goes, picked in the MODS panel. */
+    var gameSpeedMax = 8
+        set(value) {
+            field = value
+            markDirty()
+        }
+
+    /**
      * The hangar's ADVANCED EDITION ON/OFF toggle, remembered between runs
      * like vanilla. New runs use it; saved runs keep whatever they started
      * with.
@@ -193,6 +211,10 @@ class SaveProfile private constructor() {
         if (firstRunTipShown)
             root.addContent(Element("firstRunTipShown"))
 
+        if (gameSpeedButton)
+            root.addContent(Element("gameSpeedButton"))
+        root.addContent(Element("gameSpeedMax").setAttribute("value", gameSpeedMax.toString()))
+
         if (!advancedEdition)
             root.addContent(Element("advancedEditionOff"))
 
@@ -245,6 +267,8 @@ class SaveProfile private constructor() {
         }
 
         firstRunTipShown = root.getChild("firstRunTipShown") != null
+        gameSpeedButton = root.getChild("gameSpeedButton") != null
+        root.getChild("gameSpeedMax")?.getAttributeValue("value")?.toIntOrNull()?.let { gameSpeedMax = it }
         advancedEdition = root.getChild("advancedEditionOff") == null
     }
 
