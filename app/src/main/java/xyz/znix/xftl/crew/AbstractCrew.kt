@@ -472,16 +472,22 @@ abstract class AbstractCrew(
             if (destination.ship != room.ship) {
                 // Step 1
 
-                // Clear out any movement, as the pathfinding system
-                // is understandably unhappy about walking between ships.
-                nextTargetPos = null
-                pathingTarget = null
-
                 // Before we swap modes, we have to remove ourselves
                 // from the current ship - otherwise when we swap modes, we may
                 // conflict with the other crew (both standing on the same cell)
                 // and thus force someone to move.
                 removeFromShip()
+
+                // Clear out any movement, as the pathfinding system
+                // is understandably unhappy about walking between ships.
+                // This must come after removeFromShip: setting pathingTarget
+                // recalculates the old ship's reserved slots, and if we were
+                // still in its crew list a slot conflict would path us to a
+                // room on the ship we're leaving. That target (and the
+                // nextTargetPos derived from it) then came along to the new
+                // ship, walking us off the edge of its rooms.
+                nextTargetPos = null
+                pathingTarget = null
 
                 // Move to the other ship
                 destination.ship.crew.add(this)
