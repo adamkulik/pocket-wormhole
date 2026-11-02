@@ -616,7 +616,10 @@ abstract class AbstractCrew(
                 this.nextTargetPos = null
 
                 if (doorAttackPos == pixelPosition && doorToAttack!!.isLockedFor(this)) {
-                    // Switch to attacking the door
+                    // Switch to attacking the door. Clear any punch left over
+                    // from a fist-fight first: setting the action picks the
+                    // animation, and only up/down punch animations exist.
+                    isPunching = false
                     currentAction = Action.ATTACKING_DOOR
                 } else {
                     // Calculate the next movement
