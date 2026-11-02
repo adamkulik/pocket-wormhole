@@ -393,7 +393,15 @@ class Event(
         // Add the standard type/tier rewards - these are the standard results and most commonly used
         // eg destroying a ship usually gives STANDARD/MEDIUM rewards.
         if (autoRewards != null) {
-            val sector = game.currentBeacon.sector.sectorNumber + 1
+            // Vanilla's scrap rewards are a sector ahead on easy and a sector
+            // behind on hard (never before the first sector) - timed in
+            // vanilla FTL 1.6.14 at sectors 1, 3, 5 and 8 on each difficulty.
+            val difficultyShift = when (game.difficulty) {
+                Difficulty.EASY -> 1
+                Difficulty.NORMAL -> 0
+                Difficulty.HARD -> -1
+            }
+            val sector = (game.currentBeacon.sector.sectorNumber + difficultyShift).coerceAtLeast(0)
             val rewards = LootDropGenerator.generateRewards(game, rand, autoRewards.second, autoRewards.first, sector)
             resourcesGained += rewards
         }
