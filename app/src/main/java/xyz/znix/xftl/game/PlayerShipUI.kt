@@ -2556,7 +2556,7 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
             if (sectorInfo == null)
                 return@SectorMapWindow
 
-            val sector = game.gameMap.generateSector(sectorInfo, game)
+            val sector = game.gameMap.generateSector(sectorInfo, game, null, game.delayedQuests.toList())
 
             // Jump via the proper jump path (GitHub issue #63): the jump-out
             // animation plays, then arrival at the new sector's start beacon

@@ -92,6 +92,15 @@ class JumpWindow(val game: InGameState, showSectorMap: () -> Unit, val jump: (Be
     private val nebulaClouds: List<NebulaCloud> by lazy { buildNebulaClouds() }
 
     private fun buildNebulaClouds(): List<NebulaCloud> {
+        // Vanilla's own images where the layout placed them, matched by size
+        if (sector.nebulaImages.isNotEmpty()) {
+            val all = nebulaSmallPuffs + nebulaLargePuffs
+            return sector.nebulaImages.mapNotNull { r ->
+                val image = all.firstOrNull { it.width == r[2] && it.height == r[3] } ?: return@mapNotNull null
+                NebulaCloud(image, r[0].toFloat(), r[1].toFloat())
+            }
+        }
+
         val nebulaBeacons = sector.beacons.filter { it.environmentType.isNebula }
         if (nebulaBeacons.isEmpty())
             return emptyList()

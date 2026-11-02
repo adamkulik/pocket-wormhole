@@ -284,9 +284,10 @@ class GameMap private constructor(df: Datafile, private val eventManager: EventM
 
     /**
      * Generate a sector, laid out the way vanilla does it from [layoutSeed] (a
-     * vanilla save's, or a new random one).
+     * vanilla save's, or a new random one). [quests] are the ones delayed
+     * from the last sector: vanilla places them last, on beacons of its choice.
      */
-    fun generateSector(sectorInfo: SectorInfo, game: InGameState, layoutSeed: Int? = null): Sector {
+    fun generateSector(sectorInfo: SectorInfo, game: InGameState, layoutSeed: Int? = null, quests: List<Event> = emptyList()): Sector {
         val seed = layoutSeed
             ?: firstLayoutSeed?.takeIf { sectorInfo.columnNumber == 0 }
             ?: Random.nextInt()
@@ -300,7 +301,8 @@ class GameMap private constructor(df: Datafile, private val eventManager: EventM
         val typeName = if (sectorInfo.columnNumber == 0) "STANDARD_SPACE" else sectorInfo.type.name
         val layout = VanillaSectorLayout(
             vanillaEvents, seed, typeName, sectorInfo.columnNumber,
-            game.difficulty == Difficulty.HARD, aeEnabled
+            game.difficulty == Difficulty.HARD, aeEnabled,
+            quests.map { it.deserialisationId }
         )
         val events = layout.beacons.map { b ->
             when {
@@ -311,6 +313,12 @@ class GameMap private constructor(df: Datafile, private val eventManager: EventM
         val sector = Sector(sectorInfo, layout, seed, events)
         layout.flagship?.let { f ->
             sector.bosses.add(FlagshipBoss(sector, game, sector.beacons[layout.beacons.indexOf(f)]))
+        }
+        for ((i, b) in layout.questBeacons) {
+            val beacon = sector.beacons[layout.beacons.indexOf(b)]
+            beacon.hasQuest = true
+            beacon.event = quests[i]
+            sector.placedQuests += quests[i]
         }
         return sector
     }

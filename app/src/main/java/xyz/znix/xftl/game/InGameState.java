@@ -1536,9 +1536,11 @@ public class InGameState extends MainGame.GameState {
             SectorType sectorType = currentBeacon.getSector().getType();
             lootPool = new LootPool(blueprintManager, sectorType);
 
-            // Add any quests we didn't have time for last time
+            // Add any quests we didn't have time for last time (the ones
+            // the sector's layout hasn't placed already, like vanilla)
             for (Event quest : delayedQuests) {
-                currentBeacon.getSector().addQuest(currentBeacon, quest, true);
+                if (!currentBeacon.getSector().getPlacedQuests().contains(quest))
+                    currentBeacon.getSector().addQuest(currentBeacon, quest, true);
             }
             delayedQuests.clear();
 

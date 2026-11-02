@@ -28,12 +28,16 @@ class VanillaSectorLayout(
 
     /** Advanced Edition content on (the flagship's beacon event). */
     ae: Boolean,
+
+    /** The quests delayed from the last sector, by event name, placed last. */
+    quests: List<String> = emptyList(),
 ) {
     class Beacon(val cell: Int, val x: Int, val y: Int) {
         val links = ArrayList<Beacon>()
         var event: VanillaEventWalker.Made? = null
         var isExit = false
         var nebula = false
+        var hasQuest = false
     }
 
     /** The beacons, in vanilla's order (the order vanilla saves list them in). */
@@ -48,6 +52,9 @@ class VanillaSectorLayout(
     /** Where the rebel fleet starts: vanilla's fleetOffset and fleetFudge. */
     val fleetX: Int
     val fleetY: Int
+
+    /** The beacon each of the delayed quests (by index) went to. */
+    val questBeacons = HashMap<Int, Beacon>()
 
     /** Where vanilla draws its nebula images: x, y, width, height. */
     val nebulaRects = ArrayList<IntArray>()
@@ -183,6 +190,32 @@ class VanillaSectorLayout(
             fleetX = -959
             fleetY = fleetFudge
         }
+
+        // The rock homeworld's crystal beacon counts as a quest beacon
+        for (b in beacons) if (b.event?.name == "ROCK_CRYSTAL_BEACON") b.hasQuest = true
+
+        // At the end of GenerateMap, the quests the last sector had no room
+        // for: StarMap::AddQuest, without the rebel fleet check
+        quests.forEachIndexed { i, name -> addQuest(name, level)?.let { questBeacons[i] = it } }
+    }
+
+    /**
+     * StarMap::AddQuest: the quest's event is made first, then one draw picks
+     * a beacon (in vanilla's order) that isn't the start, the exit, in a
+     * nebula, a quest already, a store or a distress beacon.
+     */
+    private fun addQuest(name: String, level: Int): Beacon? {
+        val made = walker.get(name, level, rng) ?: return null
+        val suitable = beacons.filter { b ->
+            if (b === start || b.isExit || b.nebula || b.hasQuest) return@filter false
+            val e = b.event?.let { walker.element(it) }
+            e == null || (e.getChild("store") == null && e.getChild("distressBeacon") == null)
+        }
+        if (suitable.isEmpty()) return null
+        val b = suitable[Integer.remainderUnsigned(rng.next(), suitable.size)]
+        b.hasQuest = true
+        b.event = made
+        return b
     }
 
     private fun hops(from: Beacon, to: Beacon): Int {

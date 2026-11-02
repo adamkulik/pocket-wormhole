@@ -143,6 +143,12 @@ class VanillaEventWalker(df: Datafile, private val ae: Boolean) {
      */
     class Made(val name: String?, val list: String?, val index: Int)
 
+    /** The XML of an event [get] made, to check what kind of event it is. */
+    fun element(made: Made): Element? {
+        made.name?.let { return events[it] }
+        return lists[made.list ?: return null]?.getOrNull(made.index) as? Element
+    }
+
     /**
      * EventGenerator::GetBaseEvent with no seed: retries until an event is
      * made. Null if there's no such event (or it's a unique one already made).
