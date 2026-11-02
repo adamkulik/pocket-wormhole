@@ -239,8 +239,8 @@ class Sector {
             b.bindSector(this, neighbours)
         }
 
-        startBeacon = tmpStartBeacon ?: error("Failed to place a starting beacon!")
-        finishBeacon = tmpFinishBeacon ?: error("Failed to place a finish beacon!")
+        startBeacon = tmpStartBeacon ?: throw LayoutFailedException("Failed to place a starting beacon!")
+        finishBeacon = tmpFinishBeacon ?: throw LayoutFailedException("Failed to place a finish beacon!")
 
         dangerZoneCentre = Point(-959, rand.nextInt(50, 300))
 
@@ -523,3 +523,11 @@ class Sector {
         const val DANGER_ZONE_ADVANCE = 64
     }
 }
+
+/**
+ * The random layout left no beacon in the start column (or in the exit
+ * columns): every cell there was skipped or left unused. This happens to
+ * roughly one sector in 3000 - [GameMap.generateSector] just rolls the
+ * layout again.
+ */
+class LayoutFailedException(message: String) : IllegalStateException(message)

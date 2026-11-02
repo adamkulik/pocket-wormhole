@@ -258,7 +258,13 @@ class GameMap private constructor(df: Datafile, private val eventManager: EventM
         var attemptCount = 0
         var sector: Sector
         while (true) {
-            sector = Sector(sectorInfo, eventPool, specialEvents, game.difficulty)
+            sector = try {
+                Sector(sectorInfo, eventPool, specialEvents, game.difficulty)
+            } catch (e: LayoutFailedException) {
+                // No start or finish beacon: roll the layout again, like
+                // a sector without a path to the exit.
+                continue
+            }
 
             val path = sector.findShortestPath(sector.startBeacon, sector.finishBeacon)
 
