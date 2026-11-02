@@ -172,8 +172,11 @@ class ASBProjectile(target: Room, val isReal: Boolean) : AbstractWeaponProjectil
         val impact = ship.sys.animations[EXPLOSION_ANIMS.random(Random)]
         ship.playCentredAnimation(impact, target.pixelCentre)
 
-        // PDS_SHOT's hitShipSounds (hitHull1).
-        type.hitShipSounds?.get()?.play()
+        // PDS_SHOT's hitShipSounds (hitHull1). Looked up directly: TYPE is
+        // a fake blueprint that never goes through finishSetup, so a sound
+        // list on it would never be loaded - and reading it threw on every
+        // hull hit, wedging the game's update loop.
+        ship.sys.sounds.getSampleOrWarn("hitHull1")?.play()
     }
 
     override fun renderPreTranslated(g: Graphics) {
@@ -240,10 +243,6 @@ class ASBProjectile(target: Room, val isReal: Boolean) : AbstractWeaponProjectil
             addElem(elem, "damage", "3")
             addElem(elem, "breachChance", "10")
             addElem(elem, "sp", "5")
-            // PDS_SHOT's hitShipSounds, played by our hitHull override.
-            elem.addContent(Element("hitShipSounds").apply {
-                addContent(Element("sound").apply { text = "hitHull1" })
-            })
 
             TYPE = MissileBlueprint(elem)
         }
