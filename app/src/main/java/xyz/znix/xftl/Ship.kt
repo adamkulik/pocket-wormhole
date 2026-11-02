@@ -2542,6 +2542,9 @@ class Ship(
                     // Fires don't have an animation set in the XML,
                     // so we have to grab the proper animation here.
                     FireInstance.SMOKE_ANIMATION.name -> FireInstance.SMOKE_ANIMATION
+                    // Likewise the Anti-Ship Battery's firing smoke; a save
+                    // made while it played otherwise couldn't be loaded.
+                    ASBController.FIRE_SMOKE_ANIM.name -> ASBController.FIRE_SMOKE_ANIM
 
                     else -> game.animations[name]
                 }

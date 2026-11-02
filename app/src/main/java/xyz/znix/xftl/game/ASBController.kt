@@ -279,7 +279,7 @@ class ASBController(private val game: InGameState) {
         // The exe spawns this strip directly by path (img/effects/
         // fire_smoke.png, 7 frames of 34x34, 1.0 s) - it has no
         // animations.xml entry.
-        private val FIRE_SMOKE_ANIM = AnimationSpec(
+        val FIRE_SMOKE_ANIM = AnimationSpec(
             Animations.SpriteSheetSpec("img/effects/fire_smoke.png", 34, 34, 238, 34),
             "asb_fire_smoke", 0, 0, 7, 1.0f
         )
