@@ -305,7 +305,13 @@ abstract class LivingCrew(blueprint: CrewBlueprint, anims: Animations, room: Roo
     override fun saveToXML(elem: Element, refs: ObjectRefs) {
         super.saveToXML(elem, refs)
 
-        SaveUtil.addAttrRef(elem, "ownerShip", refs, ownerShip)
+        // An intruder can outlive its ship: boarders still aboard when the
+        // enemy jumps away (or that the player jumps away from) stay on the
+        // player's ship. Their ship isn't saved any more, so they're saved
+        // without an owner - just like the intruders events spawn in, which is
+        // how they behave from then on anyway. Saving the reference threw,
+        // failing every save until they died.
+        SaveUtil.addAttrRef(elem, "ownerShip", refs, ownerShip?.takeIf { refs.contains(it) })
         info.saveToXML(elem, false)
 
         savedPosition?.let { SaveUtil.addPoint(elem, "savedPos", it) }
