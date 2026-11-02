@@ -1,6 +1,10 @@
 package xyz.znix.xftl.game
 
+import xyz.znix.xftl.Constants
 import xyz.znix.xftl.Datafile
+import xyz.znix.xftl.SILFontLoader
+import xyz.znix.xftl.modding.ModManager
+import xyz.znix.xftl.rendering.Colour
 import xyz.znix.xftl.f
 import xyz.znix.xftl.rendering.Graphics
 import xyz.znix.xftl.rendering.Image
@@ -35,6 +39,8 @@ class MainMenuState(private val main: MainGame, private val datafile: Datafile) 
     private var mouseY = 0
 
     private var musicStarted = false
+
+    private var modsPanel: ModsPanel? = null
 
     init {
         var y = firstButtonY
@@ -77,6 +83,8 @@ class MainMenuState(private val main: MainGame, private val datafile: Datafile) 
             it.updateLoopedSounds(false)
             it.updateMusic(delta)
         }
+
+        modsPanel?.update()
     }
 
     override fun render(container: GameContainer, g: Graphics) {
@@ -86,11 +94,60 @@ class MainMenuState(private val main: MainGame, private val datafile: Datafile) 
         for (button in buttons) {
             button.draw(g, mouseX, mouseY)
         }
+
+        drawModsButton(g)
+        modsPanel?.draw(g, mouseX, mouseY)
     }
+
+    // Vanilla has no mods button: this is a small one in the bottom-left
+    // corner, opening the mod list (Android's mods folder is otherwise out
+    // of the user's reach).
+    private fun drawModsButton(g: Graphics) {
+        val hovering = modsPanel == null && isOverModsButton(mouseX, mouseY)
+        g.colour = Constants.SECTOR_CUTOUT_TEXT
+        Buttons.drawRounded(g, MODS_X, MODS_Y, MODS_W, MODS_H, 4)
+        g.colour = if (hovering) MODS_HOVER_FILL else MODS_FILL
+        Buttons.drawRounded(g, MODS_X + 2, MODS_Y + 2, MODS_W - 4, MODS_H - 4, 3)
+        val colour = if (hovering) Constants.UI_BUTTON_HOVER else Constants.SECTOR_CUTOUT_TEXT
+        modsButtonFont.drawStringCentred(MODS_X.f, MODS_Y + MODS_H / 2f + 7f, MODS_W.f, modsButtonLabel, colour)
+    }
+
+    private fun isOverModsButton(x: Int, y: Int): Boolean =
+        x in MODS_X until MODS_X + MODS_W && y in MODS_Y until MODS_Y + MODS_H
+
+    private val modsButtonFont by lazy { buttonFont() }
+
+    // Counted once: the mods only change from the panel, which needs a restart.
+    private val modsButtonLabel by lazy {
+        val enabled = try {
+            ModManager.list().count { it.enabled }
+        } catch (e: Exception) {
+            0
+        }
+        if (enabled == 0) "MODS" else "MODS ($enabled)"
+    }
+
+    private fun getFont(name: String): SILFontLoader =
+        SILFontLoader(resourceContext, datafile, datafile["fonts/$name.font"])
+
+    private fun buttonFont(): SILFontLoader = getFont("HL2").apply { scale = 2f }
 
     override fun mouseClicked(button: Int, x: Int, y: Int, clickCount: Int) {
         if (button != Input.MOUSE_LEFT_BUTTON)
             return
+
+        // The mod list is modal.
+        modsPanel?.let {
+            it.mouseClicked(x, y)
+            return
+        }
+
+        if (isOverModsButton(x, y)) {
+            modsPanel = ModsPanel(getFont("JustinFont12Bold"), getFont("JustinFont10"), buttonFont()) {
+                modsPanel = null
+            }
+            return
+        }
 
         for (b in buttons) {
             if (b.contains(x, y) && b.action != null) {
@@ -137,6 +194,13 @@ class MainMenuState(private val main: MainGame, private val datafile: Datafile) 
     }
 
     companion object {
+        private const val MODS_X = 24
+        private const val MODS_Y = 660
+        private const val MODS_W = 140
+        private const val MODS_H = 36
+        private val MODS_FILL = Colour(32, 46, 51, 230)
+        private val MODS_HOVER_FILL = Colour(55, 78, 86, 240)
+
         private const val LOGO_X = 805
         private const val LOGO_Y = 62
     }
