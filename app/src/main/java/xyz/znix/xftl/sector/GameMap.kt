@@ -286,15 +286,22 @@ class GameMap private constructor(df: Datafile, private val eventManager: EventM
 
         // Set up the flagship, if required.
         if (sector.isLastStand) {
+            // The flagship goes on one of the two right-most columns, and
+            // must have a path to the base. A layout where none of those
+            // beacons do used to spin here forever, freezing the jump into
+            // the last stand - roll a new layout instead.
+            val candidates = sector.beacons.filter {
+                it.gridPos.x >= 4 && sector.findShortestPath(it, sector.finishBeacon) != null
+            }
+            if (candidates.isEmpty())
+                return generateSector(sectorInfo, game)
+
             attemptCount = 0
             while (true) {
                 attemptCount++
 
-                // The flagship goes on one of the two right-most columns.
-                val flagshipBeacon = sector.beacons.filter { it.gridPos.x >= 4 }.random()
-
-                // Make sure we have a path to the base!
-                val path = sector.findShortestPath(flagshipBeacon, sector.finishBeacon) ?: continue
+                val flagshipBeacon = candidates.random()
+                val path = sector.findShortestPath(flagshipBeacon, sector.finishBeacon)!!
 
                 // Try and pick a flagship position that gives the player
                 // enough time to get there!
