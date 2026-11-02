@@ -127,8 +127,12 @@ class BombBlueprint(xml: Element) : AbstractWeaponBlueprint(xml) {
 
             SaveUtil.addTagFloat(elem, "firingAnimationTimer", firingAnimationTimer, 0f)
             SaveUtil.addTagBoolIfTrue(elem, "hasFired", hasFired)
-            if (target != null) {
-                SaveUtil.addRoomRef(elem, "target", refs, target!!)
+            // The target can be on a ship that's gone (the enemy jumped
+            // away, or we did): it isn't saved then, and saving the room
+            // reference threw, failing the whole save.
+            val target = target
+            if (target != null && refs.contains(target.ship)) {
+                SaveUtil.addRoomRef(elem, "target", refs, target)
             }
         }
 
