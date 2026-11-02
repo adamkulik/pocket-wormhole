@@ -830,8 +830,32 @@ public class InGameState extends MainGame.GameState {
 
         // The game stays frozen while an arrival or jump-out animation
         // plays (issue #4).
-        if (!isPaused() && !isJumpAnimationPlaying())
+        // Speeding the game up runs extra normal-length steps rather than
+        // one long one, so everything (combat, fires, oxygen, crew) plays
+        // out exactly as at normal speed, just sooner. Stop early if a step
+        // pauses the game, eg by opening an event window. If a slow device
+        // can't fit all the steps into a frame, skip the rest rather than
+        // dropping the frame rate: the game then runs as fast as it can.
+        int steps = mainGame.getGameSpeed();
+        long stepsStart = System.nanoTime();
+        int stepsDone = 0;
+        boolean outOfTime = false;
+        for (int i = 0; i < steps && !isPaused() && !isJumpAnimationPlaying(); i++) {
+            if (i > 0 && System.nanoTime() - stepsStart > SPEED_STEP_BUDGET_NS) {
+                outOfTime = true;
+                break;
+            }
             updateGameState(delta);
+            stepsDone++;
+        }
+
+        // Track the speed the device actually manages, for the speed button.
+        // Frames cut short by a pause don't say anything about that.
+        if (steps == 1) {
+            effectiveGameSpeed = 1f;
+        } else if (stepsDone == steps || outOfTime) {
+            effectiveGameSpeed += (stepsDone - effectiveGameSpeed) * 0.05f;
+        }
 
         // Tick the jump-out animations (issue #4). When the player's
         // jump-out finishes, the beacon actually changes and the arrival
@@ -1465,6 +1489,19 @@ public class InGameState extends MainGame.GameState {
         crewLostInJump.clear();
     }
     private static final float JUMP_OUT_TIME = 1.2f;
+
+    /** How long the sped-up game updates may take per frame (see update). */
+    private static final long SPEED_STEP_BUDGET_NS = 25_000_000L;
+
+    // The average number of game steps per frame recently achieved at the
+    // selected game speed. Lower than the selected speed on a device too
+    // slow for it.
+    private float effectiveGameSpeed = 1f;
+
+    public float getEffectiveGameSpeed() {
+        return effectiveGameSpeed;
+    }
+
     private static final float JUMP_OUT_SCALE_END = 0.35f;
 
     // Same animation for an enemy ship jumping away mid-combat.

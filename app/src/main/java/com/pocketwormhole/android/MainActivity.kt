@@ -10,6 +10,7 @@ import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.egl.EGLDisplay
 import android.opengl.GLSurfaceView
 import android.os.Bundle
+import android.provider.OpenableColumns
 import android.view.View
 import android.view.WindowManager
 import android.widget.FrameLayout
@@ -119,6 +120,10 @@ class MainActivity : Activity() {
             handleSaveTransferResult(requestCode, resultCode, data)
             return
         }
+        if (requestCode == REQUEST_IMPORT_MOD) {
+            handleModImportResult(resultCode, data)
+            return
+        }
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode != PICK_FTL_DAT) return
         awaitingPicker = false
@@ -178,6 +183,7 @@ class MainActivity : Activity() {
         val view = GameSurfaceView(this, container, input)
         surfaceView = view
         xyz.znix.xftl.sys.AndroidPlatform.saveTransfer = saveTransfer
+        xyz.znix.xftl.sys.AndroidPlatform.modImport = modImport
         root.addView(view, FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT,
             FrameLayout.LayoutParams.MATCH_PARENT
@@ -338,11 +344,68 @@ class MainActivity : Activity() {
         }
     }
 
+    private var importModCallback: ((String?, ByteArray?) -> Unit)? = null
+
+    /**
+     * Mod installation via the Storage Access Framework, offered to the
+     * engine through AndroidPlatform.modImport (the main menu's MODS panel):
+     * the mods folder is in the app's private storage, out of the user's reach.
+     */
+    private val modImport = object : PlatformSpecific.ModImport {
+        override fun pickMod(onResult: (String?, ByteArray?) -> Unit) {
+            importModCallback = onResult
+            val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                addCategory(Intent.CATEGORY_OPENABLE)
+                type = "*/*"
+            }
+            runOnUiThread { startActivityForResult(intent, REQUEST_IMPORT_MOD) }
+        }
+
+        override fun restartGame() {
+            runOnUiThread {
+                val launch = packageManager.getLaunchIntentForPackage(packageName)
+                if (launch?.component != null)
+                    startActivity(Intent.makeRestartActivityTask(launch.component))
+                // Mods are applied while loading the datafile, so start a
+                // fresh process rather than just a fresh activity.
+                Runtime.getRuntime().exit(0)
+            }
+        }
+    }
+
+    private fun handleModImportResult(resultCode: Int, data: Intent?) {
+        val callback = importModCallback ?: return
+        importModCallback = null
+        val uri = data?.data
+        if (resultCode != RESULT_OK || uri == null) {
+            surfaceView?.queueEvent { callback(null, null) } ?: callback(null, null)
+            return
+        }
+        thread {
+            val name = try {
+                contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use {
+                    if (it.moveToFirst()) it.getString(0) else null
+                }
+            } catch (e: Exception) {
+                null
+            } ?: uri.lastPathSegment ?: "mod.ftl"
+            val bytes = try {
+                contentResolver.openInputStream(uri)?.use { it.readBytes() }
+            } catch (e: Exception) {
+                android.util.Log.e(TAG, "Mod import read failed", e)
+                null
+            }
+            // Hand the file to the game thread.
+            surfaceView?.queueEvent { callback(name, bytes) } ?: callback(name, bytes)
+        }
+    }
+
     companion object {
         private const val TAG = "XFTL"
         private const val PICK_FTL_DAT = 4242
         private const val REQUEST_EXPORT_SAVE = 4243
         private const val REQUEST_IMPORT_SAVE = 4244
+        private const val REQUEST_IMPORT_MOD = 4245
     }
 }
 
