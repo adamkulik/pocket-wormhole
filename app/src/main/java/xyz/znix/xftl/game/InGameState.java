@@ -1537,12 +1537,19 @@ public class InGameState extends MainGame.GameState {
             lootPool = new LootPool(blueprintManager, sectorType);
 
             // Add any quests we didn't have time for last time (the ones
-            // the sector's layout hasn't placed already, like vanilla)
+            // the sector's layout hasn't placed already, like vanilla). Like
+            // vanilla, the ones that still don't fit (eg a sector that's all
+            // nebula) wait for the next sector, up to sector 7.
+            Sector newSector = currentBeacon.getSector();
+            ArrayList<Event> stillDelayed = new ArrayList<>();
             for (Event quest : delayedQuests) {
-                if (!currentBeacon.getSector().getPlacedQuests().contains(quest))
-                    currentBeacon.getSector().addQuest(currentBeacon, quest, true);
+                if (newSector.getPlacedQuests().contains(quest))
+                    continue;
+                if (!newSector.addQuest(currentBeacon, quest, true) && newSector.getSectorNumber() < 6)
+                    stillDelayed.add(quest);
             }
             delayedQuests.clear();
+            delayedQuests.addAll(stillDelayed);
 
             // Switch to the new sector's music
             loadSectorMusic(sectorType);
