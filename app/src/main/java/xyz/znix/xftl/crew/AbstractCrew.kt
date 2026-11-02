@@ -1699,10 +1699,18 @@ abstract class AbstractCrew(
         // Combat stuff
         if (currentAction.isAttackAction) {
             val combat = Element("combat")
-            SaveUtil.addAttrFloat(combat, "attackTimer", attackTimer)
+
+            // The target can already be gone from the game - eg a boarding
+            // drone whose ship has left - and saving the reference would
+            // throw, failing the whole save. Leave both it and the attack
+            // timer out instead: on load the crewmember picks a new target,
+            // exactly as when one walks out of the room.
+            val target = enemyToAttack?.takeIf { refs.contains(it) }
+            if (target != null || enemyToAttack == null)
+                SaveUtil.addAttrFloat(combat, "attackTimer", attackTimer)
             SaveUtil.addAttrFloat(combat, "attackDuration", attackDuration)
             SaveUtil.addAttrFloat(combat, "damageTimer", damageTime)
-            SaveUtil.addAttrRef(combat, "enemy", refs, enemyToAttack)
+            SaveUtil.addAttrRef(combat, "enemy", refs, target)
             SaveUtil.addAttrBool(combat, "isPunching", isPunching)
             SaveUtil.addAttrBool(combat, "sharesHostileCell", sharesHostileCell)
             // isPunching and sharesHostileCell are only used for animations
