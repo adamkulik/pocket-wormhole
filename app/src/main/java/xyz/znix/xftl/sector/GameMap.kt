@@ -287,6 +287,7 @@ class GameMap private constructor(df: Datafile, private val eventManager: EventM
      * vanilla save's, or a new random one). [quests] are the ones delayed
      * from the last sector: vanilla places them last, on beacons of its choice.
      */
+    @JvmOverloads
     fun generateSector(sectorInfo: SectorInfo, game: InGameState, layoutSeed: Int? = null, quests: List<Event> = emptyList()): Sector {
         val seed = layoutSeed
             ?: firstLayoutSeed?.takeIf { sectorInfo.columnNumber == 0 }
