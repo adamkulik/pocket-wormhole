@@ -368,8 +368,17 @@ class FriendlyCrewAI(private val ship: Ship) {
 
         val teleporter = ship.teleporter ?: return
 
-        val enemy = ship.sys.getEnemyOf(ship) ?: return
-        val boarders = enemy.crew.filterIsInstance<LivingCrew>().filter { it.mode == AbstractCrew.SlotType.INTRUDER }
+        // Once the fight is over - the player accepted our surrender - we're
+        // no longer anyone's enemy, but a ship with a teleporter still takes
+        // its boarders home, all of them, like vanilla does (a neutral ship
+        // with a teleporter recalls boarders: wiki, Boarding - Defending
+        // against boarders; GitHub issue #234).
+        val hostileEnemy = ship.sys.getEnemyOf(ship)
+        val enemy = hostileEnemy ?: ship.sys.player.takeIf { ship == ship.sys.enemy } ?: return
+        val forceRecv = teleportForceRecv || hostileEnemy == null
+        val boarders = enemy.crew.filterIsInstance<LivingCrew>().filter {
+            it.mode == AbstractCrew.SlotType.INTRUDER && (hostileEnemy != null || it.ownerShip == ship)
+        }
 
         val minHealthFraction = when (ship.type.boardingStrategy) {
             BoardingStrategy.INVASION -> -1f // Never teleport back
@@ -379,7 +388,7 @@ class FriendlyCrewAI(private val ship: Ship) {
         for (crew in boarders) {
             val healthFraction = crew.health / crew.maxHealth
 
-            if (healthFraction > minHealthFraction && !teleportForceRecv)
+            if (healthFraction > minHealthFraction && !forceRecv)
                 continue
 
             // Teleport the crew from this room
