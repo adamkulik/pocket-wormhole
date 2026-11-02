@@ -196,6 +196,8 @@ class JumpWindow(val game: InGameState, showSectorMap: () -> Unit, val jump: (Be
             3, font, 24,
             ::cancelClicked
         )
+        // CANCEL just closes the map: no tap-to-arm confirmation needed.
+        cancelButton.skipTapToArm = true
         buttons += cancelButton
 
         // Next sector button
