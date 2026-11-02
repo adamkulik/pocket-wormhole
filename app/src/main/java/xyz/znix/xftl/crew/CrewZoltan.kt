@@ -27,8 +27,8 @@ class CrewZoltan(blueprint: CrewBlueprint, animations: Animations, room: Room, m
         )
     }
 
-    override fun onStartedDying() {
-        super.onStartedDying()
+    override fun onStartedDying(playSound: Boolean) {
+        super.onStartedDying(playSound)
 
         // Vanilla only damages the crew hostile to the exploding Zoltan, in the
         // room where it dies: "Zoltan explode on death, causing damage to nearby

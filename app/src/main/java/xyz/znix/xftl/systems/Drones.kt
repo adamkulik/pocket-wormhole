@@ -117,7 +117,7 @@ class Drones(blueprint: SystemBlueprint) : MainSystem(blueprint) {
         if (power) {
             // If this drone attacks hostile ships but there isn't
             // one present, we can't turn it on.
-            val hostileShip = ship.sys.enemy
+            val hostileShip = ship.sys.getEnemyOf(ship)
             if (info.type.type.needsHostileShip && hostileShip == null) {
                 return
             }

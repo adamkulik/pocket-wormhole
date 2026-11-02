@@ -472,16 +472,22 @@ abstract class AbstractCrew(
             if (destination.ship != room.ship) {
                 // Step 1
 
-                // Clear out any movement, as the pathfinding system
-                // is understandably unhappy about walking between ships.
-                nextTargetPos = null
-                pathingTarget = null
-
                 // Before we swap modes, we have to remove ourselves
                 // from the current ship - otherwise when we swap modes, we may
                 // conflict with the other crew (both standing on the same cell)
                 // and thus force someone to move.
                 removeFromShip()
+
+                // Clear out any movement, as the pathfinding system
+                // is understandably unhappy about walking between ships.
+                // This must come after removeFromShip: setting pathingTarget
+                // recalculates the old ship's reserved slots, and if we were
+                // still in its crew list a slot conflict would path us to a
+                // room on the ship we're leaving. That target (and the
+                // nextTargetPos derived from it) then came along to the new
+                // ship, walking us off the edge of its rooms.
+                nextTargetPos = null
+                pathingTarget = null
 
                 // Move to the other ship
                 destination.ship.crew.add(this)
@@ -616,7 +622,10 @@ abstract class AbstractCrew(
                 this.nextTargetPos = null
 
                 if (doorAttackPos == pixelPosition && doorToAttack!!.isLockedFor(this)) {
-                    // Switch to attacking the door
+                    // Switch to attacking the door. Clear any punch left over
+                    // from a fist-fight first: setting the action picks the
+                    // animation, and only up/down punch animations exist.
+                    isPunching = false
                     currentAction = Action.ATTACKING_DOOR
                 } else {
                     // Calculate the next movement
@@ -1497,7 +1506,14 @@ abstract class AbstractCrew(
         room.ship.sys.updatePlayerCrew()
     }
 
-    open fun onStartedDying() {
+    /**
+     * [playSound] is false for crew going down with their destroyed ship:
+     * vanilla only plays the hull explosion then, not a scream per crew.
+     */
+    open fun onStartedDying(playSound: Boolean = true) {
+        if (!playSound)
+            return
+
         // Death sounds: engi, mantis, rock, zoltan and crystal crew have
         // race-specific ones (the engiDeath wiring is user-confirmed by
         // ear against vanilla); every other race (human, slug, ghost,
@@ -1699,10 +1715,18 @@ abstract class AbstractCrew(
         // Combat stuff
         if (currentAction.isAttackAction) {
             val combat = Element("combat")
-            SaveUtil.addAttrFloat(combat, "attackTimer", attackTimer)
+
+            // The target can already be gone from the game - eg a boarding
+            // drone whose ship has left - and saving the reference would
+            // throw, failing the whole save. Leave both it and the attack
+            // timer out instead: on load the crewmember picks a new target,
+            // exactly as when one walks out of the room.
+            val target = enemyToAttack?.takeIf { refs.contains(it) }
+            if (target != null || enemyToAttack == null)
+                SaveUtil.addAttrFloat(combat, "attackTimer", attackTimer)
             SaveUtil.addAttrFloat(combat, "attackDuration", attackDuration)
             SaveUtil.addAttrFloat(combat, "damageTimer", damageTime)
-            SaveUtil.addAttrRef(combat, "enemy", refs, enemyToAttack)
+            SaveUtil.addAttrRef(combat, "enemy", refs, target)
             SaveUtil.addAttrBool(combat, "isPunching", isPunching)
             SaveUtil.addAttrBool(combat, "sharesHostileCell", sharesHostileCell)
             // isPunching and sharesHostileCell are only used for animations

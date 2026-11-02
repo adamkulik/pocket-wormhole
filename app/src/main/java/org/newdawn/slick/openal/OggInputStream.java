@@ -104,6 +104,14 @@ public class OggInputStream extends InputStream implements AudioInputStream {
     boolean inited = false;
 
     /**
+     * True once a whole logical bitstream has been decoded. Anything after
+     * that which isn't another Ogg stream is trailing junk - vanilla's
+     * bp_SFX_FemaleDeath1/2.ogg carry a few KB of it - and just ends the
+     * file, rather than being an error that throws the decoded sound away.
+     */
+    private boolean decodedAStream = false;
+
+    /**
      * The index into the byte array we currently read from
      */
     private int readIndex;
@@ -212,6 +220,12 @@ public class OggInputStream extends InputStream implements AudioInputStream {
             // have we simply run out of data?  If so, we're done.
             if (bytes < 4096)
                 return false;
+
+            // Trailing data after a complete stream: we're done too.
+            if (decodedAStream) {
+                endOfStream = true;
+                return false;
+            }
 
             // error case.  Must not be Vorbis data
             Log.error("Input does not appear to be an Ogg bitstream.");
@@ -475,6 +489,7 @@ public class OggInputStream extends InputStream implements AudioInputStream {
 
             // clean up this logical bitstream; before exit we see if we're
             // followed by another [chained]
+            decodedAStream = true;
             streamState.clear();
 
             // ogg_page and ogg_packet structs always point to storage in
@@ -496,7 +511,11 @@ public class OggInputStream extends InputStream implements AudioInputStream {
     public int read() throws IOException {
         if (readIndex >= pcmBuffer.position()) {
             pcmBuffer.clear();
-            readPCM();
+            // Once the stream has ended (and the framer has been cleared)
+            // there's nothing more to decode - decoding again would read
+            // through the cleared jogg state and crash.
+            if (!endOfStream)
+                readPCM();
             readIndex = 0;
         }
         if (readIndex >= pcmBuffer.position()) {
