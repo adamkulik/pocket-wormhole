@@ -266,10 +266,14 @@ class DialogueWindow private constructor(val game: InGameState, val playerShip: 
             val prefix = "${i + 1}. "
             var text = prefix + option.choiceText
 
+            drawOptionFrame(g, i, colour)
+
             // Handle the 'continue' option, since it fails if
             // we try to read its resources.
             if (option.isContinue) {
                 drawText(textY, text, colour, rebuildBBs)
+                if (rebuildBBs)
+                    widenOptionArea(i, null)
                 continue
             }
 
@@ -327,7 +331,11 @@ class DialogueWindow private constructor(val game: InGameState, val playerShip: 
                     boxPos = ConstPoint(maxBoxX, centreY)
                 }
 
-                drawResourceBox(g, option.choiceResources, boxPos, boxSize, colour)
+                // On touch the rewards sit inside the option's own frame
+                // (see drawOptionFrame), as on iOS, without a box of their own
+                drawResourceBox(g, option.choiceResources, boxPos, boxSize, colour, !PlatformSpecific.INSTANCE.isTouchUi)
+                if (rebuildBBs)
+                    widenOptionArea(i, Rectangle(boxPos.x.f, boxPos.y.f, boxSize.x.f, boxSize.y.f))
 
                 // Leave a 10px gap below the resource box. The box is
                 // drawn over the option's vertical span (its top is the
@@ -342,6 +350,8 @@ class DialogueWindow private constructor(val game: InGameState, val playerShip: 
                 textY += TEXT_OPTION_TOP_OFFSET
                 textY = drawText(textY, text, colour, rebuildBBs)
                 textY += TEXT_OPTION_BOTTOM_MARGIN
+                if (rebuildBBs)
+                    widenOptionArea(i, null)
             }
         }
     }
@@ -392,7 +402,55 @@ class DialogueWindow private constructor(val game: InGameState, val playerShip: 
         }
 
         val text = "1. " + game.translator["continue"]
+        drawOptionFrame(g, 0, colour)
         drawText(textY, text, colour, rebuildBBs)
+        if (rebuildBBs)
+            widenOptionArea(0, null)
+    }
+
+    /**
+     * Touch: the iOS port draws each choice as a framed button. The frame
+     * is the option's tap area (see [widenOptionArea]), so it's only there
+     * from the second frame the event is shown on.
+     */
+    private fun drawOptionFrame(g: Graphics, index: Int, colour: Colour) {
+        if (!PlatformSpecific.INSTANCE.isTouchUi)
+            return
+        val bb = optionBoundingBoxes.getOrNull(index) ?: return
+
+        g.colour = OPTION_FRAME_FILL
+        g.fillRect(bb.x, bb.y, bb.width, bb.height)
+
+        g.colour = colour
+        g.drawRect(bb.x, bb.y, bb.width - 1, bb.height - 1)
+        g.drawRect(bb.x + 1, bb.y + 1, bb.width - 3, bb.height - 3)
+    }
+
+    /**
+     * Touch: grow an option's tap area (the text's bounding box) to cover
+     * its reward box too, plus some padding, making it the framed button
+     * [drawOptionFrame] draws.
+     */
+    private fun widenOptionArea(index: Int, resourceBox: Rectangle?) {
+        if (!PlatformSpecific.INSTANCE.isTouchUi)
+            return
+        val bb = optionBoundingBoxes.getOrNull(index) ?: return
+
+        var minX = bb.x
+        var minY = bb.y
+        var maxX = bb.x + bb.width
+        var maxY = bb.y + bb.height
+        if (resourceBox != null) {
+            minX = min(minX, resourceBox.x)
+            minY = min(minY, resourceBox.y)
+            maxX = max(maxX, resourceBox.x + resourceBox.width)
+            maxY = max(maxY, resourceBox.y + resourceBox.height)
+        }
+
+        optionBoundingBoxes[index] = Rectangle(
+            minX - OPTION_FRAME_PAD_X, minY - OPTION_FRAME_PAD_Y,
+            maxX - minX + 2 * OPTION_FRAME_PAD_X, maxY - minY + 2 * OPTION_FRAME_PAD_Y
+        )
     }
 
     private fun findResourceBoxSize(resourceSet: ResourceSet): IPoint {
@@ -496,15 +554,20 @@ class DialogueWindow private constructor(val game: InGameState, val playerShip: 
         return ConstPoint(width, height)
     }
 
-    private fun drawResourceBox(g: Graphics, resourceSet: ResourceSet, pos: IPoint, size: IPoint, textColour: Colour) {
+    private fun drawResourceBox(
+        g: Graphics, resourceSet: ResourceSet, pos: IPoint, size: IPoint, textColour: Colour,
+        boxed: Boolean = true
+    ) {
         var y = pos.y
 
-        g.colour = Constants.REWARDS_BACKGROUND
-        g.fillRect(pos.x.f, y.f, size.x.f, size.y.f)
+        if (boxed) {
+            g.colour = Constants.REWARDS_BACKGROUND
+            g.fillRect(pos.x.f, y.f, size.x.f, size.y.f)
 
-        g.colour = textColour
-        g.drawRect(pos.x.f, y.f, size.x - 1f, size.y - 1f)
-        g.drawRect(pos.x.f + 1, y + 1f, size.x - 3f, size.y - 3f)
+            g.colour = textColour
+            g.drawRect(pos.x.f, y.f, size.x - 1f, size.y - 1f)
+            g.drawRect(pos.x.f + 1, y + 1f, size.x - 3f, size.y - 3f)
+        }
 
         var resourceX = pos.x + RESOURCE_LEFT_START
 
@@ -1168,5 +1231,10 @@ class DialogueWindow private constructor(val game: InGameState, val playerShip: 
         private const val RESOURCE_LEFT_START = 5
         private const val RESOURCE_ICON_SPACING = 30
         private const val RESOURCE_RIGHT_SPACING = 9
+
+        // Touch: the padding around a framed option, see drawOptionFrame
+        private const val OPTION_FRAME_PAD_X = 7
+        private const val OPTION_FRAME_PAD_Y = 3
+        private val OPTION_FRAME_FILL = Colour(0f, 0f, 0f, 0.25f)
     }
 }
