@@ -2,11 +2,13 @@ package xyz.znix.xftl.game
 
 import xyz.znix.xftl.Blueprint
 import xyz.znix.xftl.Constants
+import xyz.znix.xftl.GameText
 import xyz.znix.xftl.Ship
 import xyz.znix.xftl.f
 import xyz.znix.xftl.math.ConstPoint
 import xyz.znix.xftl.math.IPoint
 import xyz.znix.xftl.math.Point
+import xyz.znix.xftl.rendering.Colour
 import xyz.znix.xftl.rendering.Graphics
 import xyz.znix.xftl.rendering.HotkeyDelayedTooltip
 import xyz.znix.xftl.sys.Input
@@ -34,8 +36,9 @@ class StoreWindow(val game: InGameState, val ship: Ship, val store: StoreData, p
     override val renderScale = if (PlatformSpecific.INSTANCE.isTouchUi) 1.2f else 1f
 
     // Tap-to-arm: first tap highlights (and shows the item description),
-    // second tap confirms (runtime-gated on isTouchUi). Selling already
-    // happens via mouseReleased (drop), which the gate never sees.
+    // second tap confirms (runtime-gated on isTouchUi). Store items skip
+    // it: a tap only selects them, and they're bought with BUY or sold with
+    // SELL (or dragged), see mouseClick.
     override val tapToArm = true
 
     private val buyImage = game.getImg("img/storeUI/store_buy_main.png")
@@ -131,6 +134,23 @@ class StoreWindow(val game: InGameState, val ship: Ship, val store: StoreData, p
         this::escapePressed
     )
 
+    // Touch: the item whose description a tap opened. Like the iOS port's
+    // store, a BUY button with the price sits right under the description
+    // (moved there each frame, see InfoPanel.drawPriceTab), and only BUY buys it.
+    // Always null on desktop.
+    private var selectedBuyButton: BuyButton? = null
+
+    private val buyNowButton = infoPanel.PriceTabButton(
+        game.translator["button_buy"],
+        { selectedBuyButton?.disabled != false },
+        this::buySelected
+    )
+
+    // The sell tab's counterpart: a tap on an item shows its description
+    // with the sell price and SELL under it (see ShipEquipmentPanel
+    // .selectForSale).
+    private val sellNowButton = infoPanel.PriceTabButton(game.translator["button_sell"], { false }, sellPanel::sellSelected)
+
     var sellTab: Boolean = false
         set(value) {
             field = value
@@ -214,12 +234,35 @@ class StoreWindow(val game: InGameState, val ship: Ship, val store: StoreData, p
             Constants.JUMP_DISABLED_TEXT
         )
 
-        // Draw the info for whatever the player is hovering
-        val hoveredBuyButton = buttons.filterIsInstance<BuyButton>().firstOrNull { it.hovered }
+        // Draw the info for whatever the player is hovering, or on touch
+        // the tapped item (tapping its BUY button moves the pointer off it)
+        val selected = selectedBuyButton?.takeIf { !sellTab }
+        val hoveredBuyButton = buttons.filterIsInstance<BuyButton>().firstOrNull { it.hovered } ?: selected
         hoveredBuyButton?.drawInfoPanel(g)
+
+        if (selected != null)
+            infoPanel.drawPriceTab(g, buyNowButton, selected.price) { hoveredBuyButton?.drawInfoPanel(g) }
 
         sellPanel.drawDrag(g)
     }
+
+    private fun buySelected() {
+        val selected = selectedBuyButton ?: return
+        selected.purchase()
+
+        if (!selected.staysSelected)
+            selectedBuyButton = null
+    }
+
+    // Bought systems, weapons etc. rebuild their buttons as sold out, so
+    // only resources with stock left and FIX 1 on a damaged hull stay
+    // selected after buying (to buy several in a row; FIX ALL greys out).
+    private val BuyButton.staysSelected: Boolean
+        get() = when (this) {
+            is ResourceButton -> numAvailable > 0
+            is RepairButton -> !disabled
+            else -> false
+        }
 
     private fun drawBuy(g: Graphics) {
         buyImage.draw(position)
@@ -327,6 +370,8 @@ class StoreWindow(val game: InGameState, val ship: Ship, val store: StoreData, p
 
         repairButtons += object : RepairButton(ConstPoint(buttonX, buttonBaseY + 15), repairImg, repairPricePos) {
             override val nameKey: String get() = "repair_one_button"
+            override val titleKey: String get() = "repair_one_title"
+            override val descKey: String get() = "repair_one_desc"
             override val price: Int get() = repairPrice
 
             override fun buy() {
@@ -336,6 +381,8 @@ class StoreWindow(val game: InGameState, val ship: Ship, val store: StoreData, p
 
         repairButtons += object : RepairButton(ConstPoint(buttonX, buttonBaseY + 70), repairImg, repairPricePos) {
             override val nameKey: String get() = "repair_all_button"
+            override val titleKey: String get() = "repair_all_title"
+            override val descKey: String get() = "repair_all_desc"
             override val price: Int get() = (ship.maxHealth - ship.health) * repairPrice
 
             override fun buy() {
@@ -690,6 +737,10 @@ class StoreWindow(val game: InGameState, val ship: Ship, val store: StoreData, p
 
         // Draw the information for the currently-hovered blueprint.
         sellPanel.drawInfoPanel(infoPanel)
+
+        // You only get half of what you paid for it, as with the sell box
+        if (sellPanel.showsSellButton)
+            infoPanel.drawPriceTab(g, sellNowButton, (sellPanel.selectedBlueprint!!.cost ?: 0) / 2) { sellPanel.drawInfoPanel(infoPanel) }
     }
 
     override fun escapePressed() {
@@ -706,7 +757,37 @@ class StoreWindow(val game: InGameState, val ship: Ship, val store: StoreData, p
     }
 
     override fun mouseClick(button: Int, x: Int, y: Int) {
-        if (!tapArmGate(button, x, y))
+        if (PlatformSpecific.INSTANCE.isTouchUi && button == Input.MOUSE_LEFT_BUTTON && !sellTab) {
+            val p = scaleWindowPoint(x, y)
+            if (selectedBuyButton != null && buyNowButton.contains(p.x, p.y)) {
+                buySelected()
+                return
+            }
+
+            // Tapping an item only selects it, it's bought with BUY: unlike
+            // the upgrades, the store has no UNDO for a mistaken tap.
+            val target = clickTargetAt(p.x, p.y)
+            selectedBuyButton = (target as? BuyButton)
+                ?.takeIf { !it.empty && !(it is RepairButton && it.disabled) }
+            if (target is BuyButton)
+                return
+        }
+
+        var onSellItem = false
+        if (PlatformSpecific.INSTANCE.isTouchUi && button == Input.MOUSE_LEFT_BUTTON && sellTab) {
+            val p = scaleWindowPoint(x, y)
+            if (sellPanel.showsSellButton && sellNowButton.contains(p.x, p.y)) {
+                sellPanel.sellSelected()
+                return
+            }
+
+            sellPanel.selectForSale(p.x, p.y)
+            onSellItem = sellPanel.buttonAt(p.x, p.y) is Buttons.DragDropBlueprintButton
+        }
+
+        // Items in the sell tab aren't armed: the tap shows the item with
+        // SELL (above), and a press can be dragged to the sell box at once.
+        if (!onSellItem && !tapArmGate(button, x, y))
             return
 
         super.mouseClick(button, x, y)
@@ -732,9 +813,16 @@ class StoreWindow(val game: InGameState, val ship: Ship, val store: StoreData, p
     override fun updateUI(x: Int, y: Int) {
         super.updateUI(x, y)
 
+        if (selectedBuyButton != null) {
+            val p = scaleWindowPoint(x, y)
+            buyNowButton.update(p.x, p.y)
+        }
+
         if (sellTab) {
             val p = scaleWindowPoint(x, y)
             sellPanel.updateUI(p.x, p.y)
+            if (sellPanel.showsSellButton)
+                sellNowButton.update(p.x, p.y)
         }
     }
 
@@ -770,6 +858,9 @@ class StoreWindow(val game: InGameState, val ship: Ship, val store: StoreData, p
                 textColour
             )
         }
+
+        /** Buy this item, as clicking it does. */
+        fun purchase() = click(Input.MOUSE_LEFT_BUTTON)
 
         override fun click(button: Int) {
             if (button != Input.MOUSE_LEFT_BUTTON)
@@ -854,6 +945,8 @@ class StoreWindow(val game: InGameState, val ship: Ship, val store: StoreData, p
         override val empty: Boolean get() = false
 
         abstract val nameKey: String
+        abstract val titleKey: String
+        abstract val descKey: String
 
         override fun draw(g: Graphics) {
             val image = when {
@@ -892,7 +985,10 @@ class StoreWindow(val game: InGameState, val ship: Ship, val store: StoreData, p
         }
 
         override fun drawInfoPanel(g: Graphics) {
-            // No message
+            infoPanel.drawDescriptionBox(
+                GameText.localised(titleKey), GameText.localised(descKey),
+                null, emptyList(), InfoPanel.INFO_HEIGHT_ITEM
+            )
         }
     }
 
@@ -902,6 +998,7 @@ class StoreWindow(val game: InGameState, val ship: Ship, val store: StoreData, p
         const val CANVAS_H: Int = 720
 
         const val GLOW_WIDTH: Int = 7
+
 
         private fun resourceTextureName(resource: Resource): String {
             return when (resource) {

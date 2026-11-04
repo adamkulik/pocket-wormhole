@@ -9,6 +9,7 @@ import xyz.znix.xftl.math.ConstPoint
 import xyz.znix.xftl.math.IPoint
 import xyz.znix.xftl.rendering.Colour
 import xyz.znix.xftl.rendering.Graphics
+import xyz.znix.xftl.sys.Input
 import xyz.znix.xftl.systems.SystemBlueprint
 import xyz.znix.xftl.weapons.*
 import kotlin.math.max
@@ -21,8 +22,18 @@ class InfoPanel(private val game: InGameState) {
     private val titleFont = game.getFont("c&cnew", 2f)
     private val descriptionFont = game.getFont("JustinFont10")
     private val tipFont = game.getFont("JustinFont8")
+    private val priceTabFont = game.getFont("HL2", 3f)
+    private val priceScrapIcon = game.getImg("img/upgradeUI/details_scrap.png")
 
     var position: IPoint = ConstPoint.ZERO
+
+    /** The bottom edge of everything the last draw call put on screen. */
+    var bottom: Int = 0
+        private set
+
+    /** True if [bottom] is the edge of a framed box, rather than loose content. */
+    var bottomIsFrame: Boolean = false
+        private set
 
     fun drawAugment(blueprint: AugmentBlueprint) {
         drawDescriptionBox(blueprint.title, blueprint.desc, null, emptyList(), INFO_HEIGHT_AUGMENT)
@@ -109,6 +120,8 @@ class InfoPanel(private val game: InGameState) {
         // Draw the skills box
         val skillsY = position.y + INFO_HEIGHT_CREW + 24
         game.windowRenderer.render(position.x, skillsY, 323, 242)
+        bottom = skillsY + 242
+        bottomIsFrame = true
 
         val leftIconX = position.x + 9
         val rightIconX = position.x + 164
@@ -176,6 +189,8 @@ class InfoPanel(private val game: InGameState) {
         height: Int
     ) {
         game.windowRenderer.render(position.x, position.y, 333, height)
+        bottom = position.y + height
+        bottomIsFrame = true
 
         var y = position.y + 30
 
@@ -221,6 +236,7 @@ class InfoPanel(private val game: InGameState) {
             val tipHeight = 31 + tipLines.size * 15
 
             game.windowRenderer.render(position.x, tipY, 333, tipHeight)
+            bottom = tipY + tipHeight
 
             var lineY = tipY + 27
             for (line in tipLines) {
@@ -234,6 +250,8 @@ class InfoPanel(private val game: InGameState) {
         val x = position.x
         val y = position.y + 133
         val totalWidth = 333 // Maybe this comes from localisation?
+        bottom = y + 192 + 24 + 8
+        bottomIsFrame = false
 
         val scrapIcon = game.getImg("img/upgradeUI/details_scrap.png")
 
@@ -320,6 +338,65 @@ class InfoPanel(private val game: InGameState) {
         lines += baseStr.replaceArg(chanceStr)
     }
 
+    /**
+     * Touch: draw the price and [button] in a small tab hanging under
+     * whatever this panel just drew (description, weapon tip, crew skills or
+     * system power levels), as on iOS. [redrawInfo] draws the panel again,
+     * so the tab's top is tucked under the box it hangs from. A null price
+     * (nothing left to buy) shows as "--".
+     */
+    fun drawPriceTab(g: Graphics, button: PriceTabButton, price: Int?, redrawInfo: () -> Unit) {
+        val width = PRICE_TAB_PAD + PRICE_CELL_W + 4 + button.size.x + PRICE_TAB_PAD
+        val x = position.x + (333 - width) / 2
+        val attached = bottomIsFrame
+        val contentY = bottom + if (attached) 2 else 8
+        val top = if (attached) bottom - 20 else contentY - PRICE_TAB_PAD
+        game.windowRenderer.render(x, top, width, contentY + PRICE_TAB_CELL_H + PRICE_TAB_PAD - top)
+        if (attached)
+            redrawInfo()
+
+        // The price in its own cell, left of the button
+        val cellX = x + PRICE_TAB_PAD
+        g.colour = PRICE_CELL_COLOUR
+        Buttons.drawRounded(g, cellX, contentY, PRICE_CELL_W, PRICE_TAB_CELL_H, 4)
+        priceScrapIcon.draw(cellX + 8f, contentY + PRICE_TAB_CELL_H / 2f - priceScrapIcon.height / 2f)
+        numberFont.drawString(cellX + 14f + priceScrapIcon.width, contentY + 25f, price?.toString() ?: "--", Colour.white)
+
+        button.windowOffset = ConstPoint(cellX + PRICE_CELL_W + 4, contentY)
+        button.draw(g)
+    }
+
+    /** BUY/SELL/UPGRADE in the price tab: a light button with a dark line inside its edge, as on iOS. */
+    inner class PriceTabButton(
+        private val label: String,
+        private val isDisabled: () -> Boolean,
+        private val cb: () -> Unit
+    ) : Button(game, ConstPoint.ZERO, ConstPoint(max(80, priceTabFont.getWidth(label) + 20), PRICE_TAB_CELL_H)) {
+        override val disabled: Boolean get() = isDisabled()
+
+        override fun draw(g: Graphics) {
+            val fill = when {
+                disabled -> Constants.JUMP_DISABLED
+                hovered -> Constants.UI_BUTTON_HOVER
+                else -> Constants.SECTOR_CUTOUT_TEXT
+            }
+            g.colour = fill
+            Buttons.drawRounded(g, pos.x, pos.y, size.x, size.y, 4)
+            g.colour = Constants.JUMP_DISABLED_TEXT
+            Buttons.drawRounded(g, pos.x + 2, pos.y + 2, size.x - 4, size.y - 4, 3)
+            g.colour = fill
+            Buttons.drawRounded(g, pos.x + 4, pos.y + 4, size.x - 8, size.y - 8, 2)
+
+            val textX = (size.x - priceTabFont.getWidth(label)) / 2f
+            priceTabFont.drawString(pos.x + textX, pos.y + 26f, label, Constants.JUMP_DISABLED_TEXT)
+        }
+
+        override fun click(button: Int) {
+            if (button == Input.MOUSE_LEFT_BUTTON)
+                cb()
+        }
+    }
+
     companion object {
         const val INFO_HEIGHT_SYSTEM = 121
         const val INFO_HEIGHT_AUGMENT = 136
@@ -327,5 +404,15 @@ class InfoPanel(private val game: InGameState) {
         const val INFO_HEIGHT_ITEM = 121
         const val INFO_HEIGHT_DRONE = 162
         const val INFO_HEIGHT_WEAPON = 252
+
+        // The touch price tab, see drawPriceTab
+        const val PRICE_TAB_PAD = 7
+        const val PRICE_TAB_CELL_H = 34
+        const val PRICE_CELL_W = 64
+
+        /** How far an attached price tab reaches below the box it hangs from. */
+        const val PRICE_TAB_HEIGHT = 2 + PRICE_TAB_CELL_H + PRICE_TAB_PAD
+
+        private val PRICE_CELL_COLOUR = Colour(113, 92, 92)
     }
 }

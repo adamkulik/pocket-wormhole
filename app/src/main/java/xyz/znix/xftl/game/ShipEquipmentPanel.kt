@@ -62,6 +62,23 @@ class ShipEquipmentPanel(private val game: InGameState, val ship: Ship) {
     private val cargoButtons = ArrayList<Buttons.DragDropBlueprintButton>()
     private var sellButton: Button? = null // The box for selling and leaving behind items
 
+    /**
+     * Touch, sell UI: the slot tapped to show its item's description and
+     * the store's SELL button, as in the iOS port. Kept as the slot's
+     * position, since the slot buttons are rebuilt whenever the ship
+     * changes.
+     */
+    private var selectedSlotPos: IPoint? = null
+
+    private val selectedSlot: Buttons.DragDropBlueprintButton?
+        get() {
+            val pos = selectedSlotPos ?: return null
+            return (weaponButtons + droneButtons + augmentButtons + cargoButtons).firstOrNull { it.basePos == pos }
+        }
+
+    /** The item [sellSelected] would sell, or null. */
+    val selectedBlueprint: Blueprint? get() = selectedSlot?.blueprint
+
     private var draggingBlueprint: Buttons.DragDropBlueprintButton? = null
         set(value) {
             field = value
@@ -113,6 +130,9 @@ class ShipEquipmentPanel(private val game: InGameState, val ship: Ship) {
             button.draw(g)
         }
     }
+
+    /** True while the store should show SELL for [selectedBlueprint]. */
+    val showsSellButton: Boolean get() = selectedBlueprint != null && draggingBlueprint == null
 
     fun drawDrag(g: Graphics) {
         // Draw the dragged bit of equipment above everything else
@@ -301,7 +321,11 @@ class ShipEquipmentPanel(private val game: InGameState, val ship: Ship) {
 
             sellBoxLocalPos = sellBoxPlacer?.invoke(sellButton!!.size) ?: ConstPoint(-275, 107)
 
-            buttons += sellButton!!
+            // Touch sells with the store's SELL button instead, like the
+            // iOS port, which has no sell box: keep it as the drop target
+            // sellSelected uses, but don't show it or take drops.
+            if (!PlatformSpecific.INSTANCE.isTouchUi)
+                buttons += sellButton!!
         }
 
         for (button in buttons) {
@@ -332,6 +356,22 @@ class ShipEquipmentPanel(private val game: InGameState, val ship: Ship) {
      */
     fun buttonAt(x: Int, y: Int): Button? = buttons.firstOrNull { it.contains(x, y) }
 
+    /** Select the item at a (panel-space) tap for [sellSelected], or clear it. */
+    fun selectForSale(x: Int, y: Int) {
+        val slot = buttonAt(x, y) as? Buttons.DragDropBlueprintButton
+        selectedSlotPos = slot?.takeIf { it.blueprint != null }?.basePos
+    }
+
+    /** Sell the item picked by [selectForSale], as dropping it on the sell box does. */
+    fun sellSelected() {
+        val slot = selectedSlot ?: return
+        val sellBox = sellButton ?: return
+        selectedSlotPos = null
+
+        if (slot.blueprint != null)
+            moveBlueprint(slot, sellBox)
+    }
+
     fun mouseClick(button: Int, x: Int, y: Int) {
         // Copied from Window.
         // Mouse clicking may change the buttons array (eg in the store
@@ -352,11 +392,12 @@ class ShipEquipmentPanel(private val game: InGameState, val ship: Ship) {
         if (draggingBlueprint != null)
             return null
 
+        // On touch, the tapped item stays shown once the finger is on SELL
         val hoveredButton = buttons.firstOrNull { it.hovered }
         if (hoveredButton !is Buttons.DragDropBlueprintButton)
-            return null
+            return selectedBlueprint
 
-        return hoveredButton.blueprint
+        return hoveredButton.blueprint ?: selectedBlueprint
     }
 
     fun drawInfoPanel(infoPanel: InfoPanel) {
@@ -374,6 +415,18 @@ class ShipEquipmentPanel(private val game: InGameState, val ship: Ship) {
         drag.dragPosition = null
         draggingBlueprint = null
 
+        // Find the blueprint the user is trying to drop the item into
+        val hovered = buttons.firstOrNull { it.hovered } ?: return
+
+        // Moving an item elsewhere drops the selection (a tap picks the
+        // item up and puts it back in the same slot, keeping it)
+        if (hovered != drag)
+            selectedSlotPos = null
+
+        moveBlueprint(drag, hovered)
+    }
+
+    private fun moveBlueprint(drag: Buttons.DragDropBlueprintButton, hovered: Button) {
         data class SlotAccess(
             val get: () -> Blueprint?,
             val set: (Blueprint?) -> Unit
@@ -457,9 +510,6 @@ class ShipEquipmentPanel(private val game: InGameState, val ship: Ship) {
 
             return null
         }
-
-        // Find the blueprint the user is trying to drop the item into
-        val hovered = buttons.firstOrNull { it.hovered } ?: return
 
         // Get access to where this blueprint is being dragged to and from
         val src = getAccess(drag) ?: return
