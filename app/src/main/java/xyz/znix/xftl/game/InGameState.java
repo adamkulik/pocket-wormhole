@@ -2300,11 +2300,18 @@ public class InGameState extends MainGame.GameState {
         // crew are selected), the power popup (while power is being
         // manipulated) and the targeting modes (weapon aiming, or the
         // teleporter/hacking/mind-control room pickers) also freeze the
-        // game.
-        return paused || shipUI.isWindowOpen() ||
+        // game - unless the player turned that off in the options.
+        return paused || shipUI.isWindowOpen() || (isTouchAutoPauseOn() && (
                 (shipUI != null && shipUI.getRoomSelectionMode()) ||
                 (shipUI != null && shipUI.getPowerPopupOpen()) ||
-                isTouchTargeting() || shipUI.isAutofireArmed();
+                isTouchTargeting() || shipUI.isAutofireArmed()));
+    }
+
+    /**
+     * The "Touch Command Auto-Pause" option (on by default, as on iOS).
+     */
+    public boolean isTouchAutoPauseOn() {
+        return mainGame == null || mainGame.getProfile().getTouchAutoPause();
     }
 
     /**

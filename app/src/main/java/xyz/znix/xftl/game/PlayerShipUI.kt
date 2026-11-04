@@ -1630,7 +1630,7 @@ class PlayerShipUI(val ship: Ship, private val game: InGameState) {
         // confirmation their pause registered (GitHub issue #173 - pausing
         // during auto-pause to hold a beam's target). Hide only the
         // AUTO-PAUSED banner; the action banners below still show.
-        val showAutoPause = !game.isManuallyPaused()
+        val showAutoPause = !game.isManuallyPaused() && game.isTouchAutoPauseOn
 
         // The power popup sits above the ship UI but under any windows.
         // Manipulating power auto-pauses the game, so show the AUTO-PAUSED
