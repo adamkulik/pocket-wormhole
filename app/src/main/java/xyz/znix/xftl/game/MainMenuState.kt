@@ -12,9 +12,9 @@ import xyz.znix.xftl.sys.ResourceContext
  * The game's title screen, shown when the game opens (issue #2).
  *
  * Vanilla-look layout: the logo in the top-right and a column of menu
- * buttons under it, right-aligned. 'Continue' only appears when there's a
- * saved run to resume; the screens we don't implement yet (tutorial, stats,
- * options, credits) are drawn like vanilla but do nothing.
+ * buttons under it, right-aligned. 'Continue' is greyed out without a
+ * saved run to resume, as are the screens we don't implement yet
+ * (tutorial, stats, options, credits).
  */
 class MainMenuState(private val main: MainGame, private val datafile: Datafile) : MainGame.GameState() {
     private val resourceContext = ResourceContext()
@@ -25,11 +25,11 @@ class MainMenuState(private val main: MainGame, private val datafile: Datafile) 
 
     private val buttons = ArrayList<MenuButton>()
 
-    // All the buttons share a right edge (under the logo), and are stacked
-    // one image-height apart - the images include their own visual padding.
-    private val buttonsRightX = 1216
-    private val firstButtonY = 274
-    private val buttonSpacing = 62
+    // All the buttons share a right edge (under the logo), measured against
+    // vanilla 1.6.14's main menu.
+    private val buttonsRightX = 1200
+    private val firstButtonY = 275
+    private val buttonSpacing = 58
 
     private var mouseX = 0
     private var mouseY = 0
@@ -39,17 +39,15 @@ class MainMenuState(private val main: MainGame, private val datafile: Datafile) 
     init {
         var y = firstButtonY
 
-        // 'Continue' only exists if there's a saved run to go back to.
-        if (main.hasRunSave()) {
-            buttons.add(makeButton("continue", y) { main.continueSavedRun() })
-            y += buttonSpacing
-        }
+        // 'Continue' only works if there's a saved run to go back to.
+        val continueAction: (() -> Unit)? = if (main.hasRunSave()) ({ main.continueSavedRun() }) else null
+        buttons.add(makeButton("continue", y, continueAction))
+        y += buttonSpacing
 
         buttons.add(makeButton("start", y) { main.switchToShipSelect() })
         y += buttonSpacing
 
-        // These screens don't exist yet - draw them like vanilla, but they
-        // don't do anything when clicked.
+        // These screens don't exist yet - they're greyed out.
         for (name in listOf("tutorial", "stats", "options", "credits")) {
             buttons.add(makeButton(name, y))
             y += buttonSpacing
@@ -101,10 +99,11 @@ class MainMenuState(private val main: MainGame, private val datafile: Datafile) 
     }
 
     private fun makeButton(name: String, y: Int, action: (() -> Unit)? = null): MenuButton {
-        // The buttons are right-aligned, like vanilla.
-        val image = getImg("img/main_menus/${name}_off.png")
+        // The buttons are right-aligned, like vanilla. Vanilla draws the
+        // 'on' image normally, 'select2' when hovered, and 'off' greyed out.
+        val image = getImg("img/main_menus/${name}_${if (action != null) "on" else "off"}.png")
         val x = buttonsRightX - image.width
-        val hovered = getImg("img/main_menus/${name}_on.png")
+        val hovered = getImg("img/main_menus/${name}_select2.png")
         return MenuButton(image, hovered, x, y, action)
     }
 
@@ -137,7 +136,8 @@ class MainMenuState(private val main: MainGame, private val datafile: Datafile) 
     }
 
     companion object {
-        private const val LOGO_X = 805
-        private const val LOGO_Y = 62
+        // Exactly over the logo already in main_base2.png, as vanilla draws it
+        private const val LOGO_X = 820
+        private const val LOGO_Y = 60
     }
 }
