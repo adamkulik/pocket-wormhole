@@ -27,7 +27,7 @@
             <widget type="slider" id="music" pLeft="200" pTop="87" pRight="30"/>
         </widget>
 
-        <!-- TODO close button -->
+        <!-- The CLOSE button is added by OptionsWindow -->
     </widget>
 
     <style>
