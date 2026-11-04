@@ -18,7 +18,7 @@ class EditFileControls(val state: SelectShipState) {
     private val font = SILFontLoader(state.fontHL2).apply { scale = 2f }
     private val editText = state.translator["xftl_edit_ship"]
     private val clearEditText = state.translator["xftl_clear_edit_ship"]
-    private val editBtnWidth = 5 + max(font.getWidth(editText), font.getWidth(clearEditText)) + 5
+    val editBtnWidth = 5 + max(font.getWidth(editText), font.getWidth(clearEditText)) + 5
     private val editBtnHeight = 20
 
     private var editBtnHover = false
