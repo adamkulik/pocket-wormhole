@@ -14,7 +14,11 @@ import xyz.znix.xftl.ui.Widget
 import xyz.znix.xftl.ui.WidgetContainer
 
 class PauseWindow(val game: InGameState, val close: () -> Unit) : Window() {
-    private val widgetTree: WidgetContainer = game.uiLoader.load("escape_menu").mainWidget
+    // With the Android save EXPORT/IMPORT buttons, the button column's
+    // frame needs two more slots to hold them.
+    private val widgetTree: WidgetContainer = game.uiLoader.load(
+        if (xyz.znix.xftl.sys.PlatformSpecific.INSTANCE.saveTransfer != null) "escape_menu_transfer" else "escape_menu"
+    ).mainWidget
     private val lockIcon: Image = game.getImg("img/customizeUI/box_lock_on.png")
     private val mousePos = Point(0, 0)
     private val shipFamily: ShipFamily? = game.content.shipFamilies.byShipId[game.player.type.name]
