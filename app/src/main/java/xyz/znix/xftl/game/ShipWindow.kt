@@ -76,6 +76,37 @@ class ShipWindow(val game: InGameState, val ship: Ship, initialTab: Tab, private
     // If true, the drawing code should re-create any buttons it added
     private var updatingButtons = false
 
+    // Touch: like the iOS port, a tap on a system or the reactor selects
+    // it - its description stays up with the price and an UPGRADE button
+    // under it - and only UPGRADE upgrades, so systems can be looked at
+    // without buying anything. Kept as the
+    // system rather than its button, as the buttons are re-created after
+    // every upgrade. Never set on desktop.
+    private var selectedSystem: AbstractSystem? = null
+    private var reactorSelected = false
+    private var reactorButton: Button? = null
+
+    // Placed under the description each frame, see InfoPanel.drawPriceTab
+    private val upgradeNowButton = infoPanel.PriceTabButton(
+        game.translator["button_upgrade"],
+        { selectedUpgradePrice == null },
+        this::upgradeSelected
+    )
+
+    private val hasUpgradeSelection: Boolean get() = selectedSystem != null || reactorSelected
+
+    private val selectedUpgradePrice: Int?
+        get() = if (reactorSelected) reactorUpgradePrice else upgradePriceFor(selectedSystem)
+
+    /** The price of the next reactor bar, or null if it's maxed out. */
+    private val reactorUpgradePrice: Int?
+        get() = when {
+            ship.purchasedReactorPower >= ship.maxReactorPower -> null
+            // Expensive first power on the Cernkov
+            ship.purchasedReactorPower < 5 -> 30
+            else -> (ship.purchasedReactorPower / 5) * 5 + 15
+        }
+
     private val closeButton = Buttons.BasicButton(
         // As an interesting note, in the base game it's one pixel too far right so
         // where it meets up with the side of the ship panel has a small ledge.
@@ -130,6 +161,8 @@ class ShipWindow(val game: InGameState, val ship: Ship, initialTab: Tab, private
         if (tab != Tab.UPGRADES) {
             systemUpgradeUndos.clear()
             reactorUpgradeUndo.clear()
+            selectedSystem = null
+            reactorSelected = false
         }
 
         // Update the button window offsets
@@ -231,11 +264,21 @@ class ShipWindow(val game: InGameState, val ship: Ship, initialTab: Tab, private
         // Draw the system power info.
         // Note the reactor button draws this itself.
         val hoveredButton = buttons.filterIsInstance(UpgradeButton::class.java).firstOrNull { it.hovered }
-        val hoveredSystem = hoveredButton?.system
+        val hoveredSystem = hoveredButton?.system ?: selectedSystem
         if (hoveredSystem != null) {
             val undoablePower = systemUpgradeUndos[hoveredSystem]?.size ?: 0
             infoPanel.drawDescriptionBoxSystem(hoveredSystem)
-            infoPanel.drawSystemPowerBox(g, hoveredSystem.blueprint, hoveredSystem.energyLevels, undoablePower)
+
+            // Touch: the price and UPGRADE hang under the description, as
+            // on iOS, pushing the power levels down
+            var powerBoxShift = 0
+            if (selectedSystem != null) {
+                infoPanel.drawPriceTab(g, upgradeNowButton, selectedUpgradePrice) {
+                    infoPanel.drawDescriptionBoxSystem(hoveredSystem)
+                }
+                powerBoxShift = InfoPanel.PRICE_TAB_HEIGHT
+            }
+            infoPanel.drawSystemPowerBox(g, hoveredSystem.blueprint, hoveredSystem.energyLevels, undoablePower, powerBoxShift)
         }
 
         // Draw the systems
@@ -302,26 +345,11 @@ class ShipWindow(val game: InGameState, val ship: Ship, initialTab: Tab, private
         if (updatingButtons) {
             val reactorImg = game.getImg("img/upgradeUI/Equipment/equipment_reactor_on.png")
             val reactorHighlight = game.getImg("img/upgradeUI/Equipment/equipment_reactor_select2.png")
-            buttons += object : Button(game, ConstPoint(298, 327), reactorImg.imageSize) {
-                val currentPrice: Int
-                    get() {
-                        // Expensive first power on the Cernkov
-                        if (ship.purchasedReactorPower < 5)
-                            return 30
-
-                        return (ship.purchasedReactorPower / 5) * 5 + 15
-                    }
-
+            reactorButton = object : Button(game, ConstPoint(298, 327), reactorImg.imageSize) {
                 override fun draw(g: Graphics) {
-                    if (hovered) {
+                    if (hovered || reactorSelected) {
                         reactorHighlight.draw(pos)
-
-                        infoPanel.drawDescriptionBox(
-                            GameText.localised("upgrade_reactor"),
-                            GameText.localised("reactor_desc"),
-                            null, emptyList(),
-                            InfoPanel.INFO_HEIGHT_SYSTEM
-                        )
+                        drawReactorInfo()
                     } else {
                         reactorImg.draw(pos)
                     }
@@ -352,10 +380,7 @@ class ShipWindow(val game: InGameState, val ship: Ship, initialTab: Tab, private
                     }
 
                     // Draw the current price, or two dashes if it's maxed out.
-                    val priceStr = when (ship.purchasedReactorPower < ship.maxReactorPower) {
-                        true -> currentPrice.toString()
-                        false -> "--"
-                    }
+                    val priceStr = reactorUpgradePrice?.toString() ?: "--"
                     numberFont.drawString(pos.x + 235f, pos.y + 105f, priceStr, fontColour)
 
                     // Draw the 'n power bars' text - this is annoyingly mixed between two fonts
@@ -380,33 +405,56 @@ class ShipWindow(val game: InGameState, val ship: Ship, initialTab: Tab, private
                         return
                     }
 
-                    if (button != Input.MOUSE_LEFT_BUTTON)
-                        return
-
-                    if (ship.purchasedReactorPower >= ship.maxReactorPower)
-                        return
-
-                    // Store the price so undos work properly.
-                    val price = currentPrice
-
-                    if (ship.scrap < price) {
-                        game.shipUI.playInsufficientScrapAnimation()
-                        return
-                    }
-                    ship.scrap -= price
-
-                    ship.purchasedReactorPower++
-
-                    // This is how the user can revert an upgrade
-                    reactorUpgradeUndo += {
-                        ship.scrap += price
-                        ship.purchasedReactorPower--
-                    }
-
-                    upgradeSystemSound.play()
+                    if (button == Input.MOUSE_LEFT_BUTTON)
+                        upgradeReactor()
                 }
             }
+            buttons += reactorButton!!
         }
+
+        // The reactor button draws its description over this again later
+        if (reactorSelected) {
+            drawReactorInfo()
+            infoPanel.drawPriceTab(g, upgradeNowButton, reactorUpgradePrice) { drawReactorInfo() }
+        }
+    }
+
+    private fun drawReactorInfo() {
+        infoPanel.drawDescriptionBox(
+            GameText.localised("upgrade_reactor"),
+            GameText.localised("reactor_desc"),
+            null, emptyList(),
+            InfoPanel.INFO_HEIGHT_SYSTEM
+        )
+    }
+
+    private fun upgradeReactor() {
+        // Store the price so undos work properly.
+        val price = reactorUpgradePrice ?: return
+
+        if (ship.scrap < price) {
+            game.shipUI.playInsufficientScrapAnimation()
+            return
+        }
+        ship.scrap -= price
+
+        ship.purchasedReactorPower++
+
+        // This is how the user can revert an upgrade
+        reactorUpgradeUndo += {
+            ship.scrap += price
+            ship.purchasedReactorPower--
+        }
+
+        upgradeSystemSound.play()
+    }
+
+    private fun upgradeSelected() {
+        if (reactorSelected) {
+            upgradeReactor()
+            return
+        }
+        buttons.filterIsInstance<UpgradeButton>().firstOrNull { it.system != null && it.system == selectedSystem }?.upgrade()
     }
 
     inner class UpgradeButton(
@@ -469,6 +517,8 @@ class ShipWindow(val game: InGameState, val ship: Ship, initialTab: Tab, private
                 maxFont.drawStringCentred(pos.x.f, pos.y + size.y - 8f, size.x.f, maxStr, fontColour)
             }
         }
+
+        fun upgrade() = click(Input.MOUSE_LEFT_BUTTON)
 
         override fun click(button: Int) {
             if (button == Input.MOUSE_RIGHT_BUTTON) {
@@ -728,8 +778,26 @@ class ShipWindow(val game: InGameState, val ship: Ship, initialTab: Tab, private
         // If we were renaming a crewmember, we're not any more
         renamingCrew = null
 
-        // Deliberately NO tap-to-arm here (user decision): upgrades are
-        // single-click on touch too - the UNDO button is the safety net.
+        // Touch: a tap on a system or the reactor only selects it and shows
+        // UPGRADE (see selectedSystem), which upgrades. UNDO still works.
+        if (PlatformSpecific.INSTANCE.isTouchUi && button == Input.MOUSE_LEFT_BUTTON && tab == Tab.UPGRADES) {
+            val p = scaleWindowPoint(x, y)
+            if (hasUpgradeSelection && upgradeNowButton.contains(p.x, p.y)) {
+                upgradeSelected()
+                return
+            }
+
+            val target = buttons.firstOrNull { it.contains(p.x, p.y) }
+            val system = (target as? UpgradeButton)?.system
+            val isReactor = target != null && target == reactorButton
+
+            selectedSystem = system
+            reactorSelected = isReactor
+
+            if (system != null || isReactor)
+                return
+        }
+
         super.mouseClick(button, x, y)
 
         if (tab == Tab.EQUIPMENT) {
@@ -762,6 +830,11 @@ class ShipWindow(val game: InGameState, val ship: Ship, initialTab: Tab, private
         }
 
         super.updateUI(x, y)
+
+        if (hasUpgradeSelection) {
+            val p = scaleWindowPoint(x, y)
+            upgradeNowButton.update(p.x, p.y)
+        }
 
         if (tab == Tab.EQUIPMENT) {
             val p = scaleWindowPoint(x, y)
