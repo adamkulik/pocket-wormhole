@@ -60,6 +60,9 @@ class SectorMapWindow(private val game: InGameState, private val selectedCallbac
     private val nextSectorNameBoxes = ArrayList<Rectangle>()
 
     init {
+        // Closing the map can't do anything irreversible, so it doesn't
+        // need the tap-to-arm confirmation tap.
+        closeButton.skipTapToArm = true
         buttons += closeButton
 
         // Figure out which sectors are possible to access

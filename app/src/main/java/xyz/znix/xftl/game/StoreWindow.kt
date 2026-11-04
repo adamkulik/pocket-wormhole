@@ -152,6 +152,8 @@ class StoreWindow(val game: InGameState, val ship: Ship, val store: StoreData, p
         sellTabButton.skipTapToArm = true
         buySubTab1Button.skipTapToArm = true
         buySubTab2Button.skipTapToArm = true
+        // CLOSE buys nothing, so it closes on the first tap like on desktop.
+        closeButton.skipTapToArm = true
 
         updateButtons()
     }
