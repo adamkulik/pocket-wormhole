@@ -5,6 +5,7 @@ import xyz.znix.xftl.crew.LivingCrew
 import xyz.znix.xftl.crew.Skill
 import xyz.znix.xftl.AbstractSystem
 import xyz.znix.xftl.game.Difficulty
+import xyz.znix.xftl.game.FlagshipBoss
 import xyz.znix.xftl.game.InGameState
 import xyz.znix.xftl.game.StoreData
 import xyz.znix.xftl.sector.Beacon
@@ -124,11 +125,14 @@ object VanillaSaveWriter {
         // retreating flag, base-turn counter. xftl's bosses only exist in
         // the Last Stand sector, which maps 1:1 onto vanilla's flagship
         // pursuit being active there.
+        // The hop is how far along its path to the base the flagship is
+        // (the sector is laid out like vanilla, so the path is vanilla's).
         val boss = sector.bosses.firstOrNull()
+        val flagship = boss as? FlagshipBoss
         w.bool(boss?.beacon != null)
-        w.int(boss?.nextBeacon?.let { beacons.indexOf(it) } ?: 0)
+        w.int(flagship?.vanillaHop ?: 0)
         w.bool(boss?.jumping ?: false)
-        w.bool(false) // retreating
+        w.bool(flagship?.runningAway ?: false) // retreating
         w.int(boss?.baseTurns ?: 0) // base_turns
 
         // Visited-sector route: one bool per SectorInfo entry across the
@@ -185,10 +189,30 @@ object VanillaSaveWriter {
         writeExtendedShipInfo(w, game, player)
         w.raw(VanillaSaveFormat.TAIL_SUFFIX)
 
-        return w.toByteArray()
+        // The flagship's stage is in the block that ends the file
+        val bytes = w.toByteArray()
+        flagship?.let { setFlagshipStage(bytes, it.stage) }
+        return bytes
     }
 
     private fun shipDisplayText(player: Ship) = player.type.shipTitle
+
+    /**
+     * Set the flagship's stage in the block that ends the file: the stage,
+     * three ints, then a count and that many ints of room occupancy.
+     */
+    private fun setFlagshipStage(bytes: ByteArray, stage: Int) {
+        fun intAt(pos: Int) = (bytes[pos].toInt() and 0xFF) or ((bytes[pos + 1].toInt() and 0xFF) shl 8) or
+                ((bytes[pos + 2].toInt() and 0xFF) shl 16) or ((bytes[pos + 3].toInt() and 0xFF) shl 24)
+        for (count in 0..60) {
+            val countPos = bytes.size - 4 * (count + 1)
+            val stagePos = countPos - 4 * 3
+            if (stagePos < 0) return
+            if (intAt(countPos) != count || intAt(stagePos) !in 1..3) continue
+            for (i in 0 until 4) bytes[stagePos + i] = (stage shr (8 * i)).toByte()
+            return
+        }
+    }
 
     private fun writeShip(w: VanillaSaveByteWriter, game: InGameState, ship: Ship) {
         w.string(ship.name)

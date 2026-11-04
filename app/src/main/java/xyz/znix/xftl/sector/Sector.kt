@@ -70,6 +70,20 @@ class Sector {
     val bosses = ArrayList<BossManager>()
 
     /**
+     * The quests delayed from the last sector that the layout already placed,
+     * like vanilla does at the end of its map generation (not saved: only
+     * used on arrival, see InGameState.setCurrentBeacon).
+     */
+    val placedQuests = ArrayList<Event>()
+
+    /**
+     * Vanilla's nebula images on the beacon map (x, y, width, height), from
+     * the layout. Empty for sectors from older saves.
+     */
+    var nebulaImages: List<IntArray> = emptyList()
+        private set
+
+    /**
      * The seed used to lay out this sector's beacons, written to
      * vanilla-format saves. Our layout algorithm differs from vanilla's, so
      * this is only self-consistent for our own loader.
@@ -247,6 +261,34 @@ class Sector {
         // The flagship is set up by GameMap.generateSector
     }
 
+    /**
+     * A sector laid out the way vanilla does it ([VanillaSectorLayout]), from
+     * [layoutSeed]: [events] is the event for each of the layout's beacons.
+     */
+    constructor(info: GameMap.SectorInfo, layout: VanillaSectorLayout, layoutSeed: Int, events: List<Event>) {
+        this.info = info
+        this.layoutSeed = layoutSeed
+
+        // In vanilla's order, so the beacon indices match vanilla saves
+        for ((i, vb) in layout.beacons.withIndex()) {
+            // In the last stand the exit is the rebel base
+            val beacon = Beacon(
+                ConstPoint(vb.x, vb.y), events[i],
+                vb.isExit && !layout.isLastStand, vb.isExit && layout.isLastStand, Random.nextInt()
+            )
+            beacon.inNebula = vb.nebula
+            beacons += beacon
+        }
+        for ((i, vb) in layout.beacons.withIndex()) {
+            beacons[i].bindSector(this, vb.links.map { beacons[layout.beacons.indexOf(it)] })
+        }
+
+        startBeacon = beacons[layout.beacons.indexOf(layout.start)]
+        finishBeacon = beacons[layout.beacons.indexOf(layout.exit)]
+        dangerZoneCentre = Point(layout.fleetX, layout.fleetY)
+        nebulaImages = layout.nebulaRects.map { it.copyOf() }
+    }
+
     fun getFleetAdvanceFor(beacon: Beacon): Int {
         val isNebula = beacon.environmentType.isNebula
 
@@ -386,6 +428,15 @@ class Sector {
         SaveUtil.addAttrBool(elem, "mapRevealed", mapRevealed)
         SaveUtil.addPoint(elem, "dangerZoneCentre", dangerZoneCentre)
 
+        for (r in nebulaImages) {
+            val nebElem = Element("nebulaImage")
+            SaveUtil.addAttrInt(nebElem, "x", r[0])
+            SaveUtil.addAttrInt(nebElem, "y", r[1])
+            SaveUtil.addAttrInt(nebElem, "w", r[2])
+            SaveUtil.addAttrInt(nebElem, "h", r[3])
+            elem.addContent(nebElem)
+        }
+
         SaveUtil.addAttrRef(elem, "startBeacon", refs, startBeacon)
         SaveUtil.addAttrRef(elem, "finishBeacon", refs, finishBeacon)
 
@@ -454,6 +505,12 @@ class Sector {
         fleetAdvanceModifier = SaveUtil.getAttrInt(elem, "fleetAdvanceModifier")
         mapRevealed = SaveUtil.getAttrBool(elem, "mapRevealed")
         dangerZoneCentre = Point(SaveUtil.getPoint(elem, "dangerZoneCentre"))
+        nebulaImages = elem.getChildren("nebulaImage").map { e ->
+            intArrayOf(
+                SaveUtil.getAttrInt(e, "x"), SaveUtil.getAttrInt(e, "y"),
+                SaveUtil.getAttrInt(e, "w"), SaveUtil.getAttrInt(e, "h")
+            )
+        }
 
         // Use a separate RefLoader to find the start and finish beacons
         val beaconRefs = RefLoader()

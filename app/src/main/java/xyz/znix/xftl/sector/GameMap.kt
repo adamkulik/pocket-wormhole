@@ -3,6 +3,7 @@ package xyz.znix.xftl.sector
 import org.jdom2.Element
 import xyz.znix.xftl.BlueprintManager
 import xyz.znix.xftl.Datafile
+import xyz.znix.xftl.game.Difficulty
 import xyz.znix.xftl.game.FlagshipBoss
 import xyz.znix.xftl.game.InGameState
 import xyz.znix.xftl.game.InGameState.GameContent
@@ -12,6 +13,7 @@ import xyz.znix.xftl.savegame.ISerialReferencable
 import xyz.znix.xftl.savegame.ObjectRefs
 import xyz.znix.xftl.savegame.RefLoader
 import xyz.znix.xftl.savegame.SaveUtil
+import xyz.znix.xftl.vanillasave.VanillaRng
 import kotlin.math.abs
 import kotlin.random.Random
 
@@ -20,6 +22,19 @@ import kotlin.random.Random
  * different types of sectors) and generates a random set of them to be used in the sector map.
  */
 class GameMap private constructor(df: Datafile, private val eventManager: EventManager, enableAE: Boolean) {
+
+    /**
+     * Vanilla's event creation, to lay out sectors like vanilla. It keeps
+     * vanilla's state for the run (unique events, used text and crew names).
+     */
+    private val vanillaEvents by lazy { VanillaEventWalker(df, enableAE) }
+    private val aeEnabled = enableAE
+
+    /**
+     * The first sector's layout seed, when the tree was generated from a seed:
+     * vanilla takes it from the same random stream, right after the tree.
+     */
+    var firstLayoutSeed: Int? = null
 
     /**
      * The seed this map's sector tree was generated from, used by the
@@ -91,20 +106,39 @@ class GameMap private constructor(df: Datafile, private val eventManager: EventM
     }
 
     /**
-     * Create a new, random game map.
+     * Create a new game map from [seed], the way vanilla does: the same seed
+     * (a vanilla save's sector tree seed) gives the same sector tree as in
+     * vanilla FTL 1.6.14 - the same columns, links, sector classes and types.
+     *
+     * The draws are vanilla's, in vanilla's order: the start sector's class
+     * (then replaced by CIVILIAN_SECTOR), and for each of the six middle
+     * columns its size (2-4, not the previous column's size, two after the
+     * start), each new sector's class as the column is linked up, and then
+     * each sector's type and name in turn.
      */
-    constructor(df: Datafile, eventManager: EventManager, enableAE: Boolean, random: Random)
+    constructor(df: Datafile, eventManager: EventManager, enableAE: Boolean, seed: Int)
             : this(df, eventManager, enableAE) {
 
-        // The vanilla save format stores the RNG seed the map was generated
-        // from, so keep it around for VanillaSaveWriter. This constructor
-        // can't know the caller's seed (kotlin.random.Random doesn't expose
-        // it), so the caller sets [generationSeed] afterwards.
+        // Kept for the vanilla-format save writer, which stores it.
+        generationSeed = seed
+        val rng = VanillaRng(seed)
 
         // This assertion lets us modify the sectors array in the constructor
         require(sectors is ArrayList)
 
-        // Add the starting sector
+        // Vanilla: 20% nebula, 40% civilian, 40% hostile
+        fun rollClass(): SectorClass {
+            val roll = rng.nextInt(10)
+            return when {
+                roll < 2 -> SectorClass.NEBULA
+                roll > 5 -> SectorClass.HOSTILE
+                else -> SectorClass.CIVILIAN
+            }
+        }
+
+        // Add the starting sector. Vanilla rolls a class for it first, and
+        // then makes it a civilian sector anyway.
+        rollClass()
         val startingType = sectorTypes["CIVILIAN_SECTOR"]?.value ?: error("Cannot find CIVILIAN_SECTOR for first sector")
         val startingSector = SectorInfo(0, 0, startingType, SectorClass.CIVILIAN)
         sectors.add(listOf(startingSector))
@@ -118,90 +152,91 @@ class GameMap private constructor(df: Datafile, private val eventManager: EventM
             val lastColumn = sectors.last()
 
             // Choose how many sectors there will be in this column, choosing
-            // a number different to the previous one.
+            // a number different to the previous one. The column after the
+            // start sector joins it and thus always has two (but its size is
+            // still rolled).
             var numInColumn: Int
             do {
-                numInColumn = (2..4).random(random)
+                numInColumn = rng.nextInt(3) + 2
             } while (numInColumn == lastColumn.size)
-
-            // Except the 2nd column is special, as it joins the starting
-            // beacon and thus must only have two beacons to avoid giving
-            // the player more than two options.
             if (lastColumn.size == 1) {
                 numInColumn = 2
             }
 
-            // Build all the sectors in this column
-            val column = ArrayList<SectorInfo>()
-            for (i in 0 until numInColumn) {
-                val sectorClass = SectorClass.random(random)
+            // Create the sectors (rolling their classes) in vanilla's order,
+            // which is also their order in the column, and link them up.
+            // See sector-map for more information on the shapes.
+            val classes = ArrayList<SectorClass>()
+            val links = ArrayList<Pair<Int, Int>>() // previous column index to new index
+            if (lastColumn.size == 4 && numInColumn == 2) {
+                for (i in 0 until 2) {
+                    classes += rollClass()
+                    links += Pair(i * 2, i)
+                    links += Pair(i * 2 + 1, i)
+                }
+            } else if (lastColumn.size == 2 && numInColumn == 4) {
+                for (i in 0 until 4) {
+                    classes += rollClass()
+                    links += Pair(i / 2, i)
+                }
+            } else {
+                // This should only happen when we change size by one: each
+                // sector links to the one level with it and the next one
+                // down, except at the edge of the column with more sectors.
+                require(abs(lastColumn.size - numInColumn) == 1)
 
+                // The last sector the previous sector links to, which the
+                // next one shares.
+                var shared = -1
+                for (i in lastColumn.indices) {
+                    if (shared != -1)
+                        links += Pair(i, shared)
+                    if (i == lastColumn.size - 1 && numInColumn <= lastColumn.size)
+                        break
+
+                    classes += rollClass()
+                    links += Pair(i, classes.size - 1)
+
+                    // A bigger column has one more sector, off the first one
+                    if (i == 0 && lastColumn.size < numInColumn) {
+                        classes += rollClass()
+                        links += Pair(0, classes.size - 1)
+                    }
+                    shared = classes.size - 1
+                }
+            }
+
+            // Then pick each sector's type, out of the ones permitted at this
+            // point, and its name.
+            val column = ArrayList<SectorInfo>()
+            for ((i, sectorClass) in classes.withIndex()) {
                 val allTypes = sectorClasses[sectorClass] ?: error("No sectors for sector class $sectorClass")
 
-                // Filter down the sector types to only those permitted at this point
                 val availableTypes = allTypes.filter {
                     // Gated to later sectors
                     if (columnNum < it.minSector)
                         return@filter false
 
                     // If this is a unique sector, make sure it's not already been used
-                    if (it.unique) {
-                        if (usedSectorTypes.contains(it))
-                            return@filter false
-                    }
+                    if (it.unique && usedSectorTypes.contains(it))
+                        return@filter false
 
                     return@filter true
                 }
 
-                val type = availableTypes.random(random)
-                usedSectorTypes.add(type)
+                val type = availableTypes[rng.nextInt(availableTypes.size)]
+                if (type.unique)
+                    usedSectorTypes.add(type)
+
+                // Vanilla picks a name out of the sector type's name list here
+                // (one each in vanilla - the text ids SectorType loads).
+                rng.next()
 
                 column.add(SectorInfo(columnNum, i, type, sectorClass))
             }
 
-            // Add the connections between the previous sectors and
-            // the new ones. This depends on the number of sectors
-            // in this and the previous column, see sector-map for
-            // more information.
-
-            if (lastColumn.size == 2 && numInColumn == 4) {
-                lastColumn[0].nextSectors += column[0]
-                lastColumn[0].nextSectors += column[1]
-                lastColumn[1].nextSectors += column[2]
-                lastColumn[1].nextSectors += column[3]
-            } else if (lastColumn.size == 4 && numInColumn == 2) {
-                lastColumn[0].nextSectors += column[0]
-                lastColumn[1].nextSectors += column[0]
-                lastColumn[2].nextSectors += column[1]
-                lastColumn[3].nextSectors += column[1]
-            } else {
-                // This should only happen when we change size by one.
-                require(abs(lastColumn.size - numInColumn) == 1)
-
-                // Link each sector (except the edge ones in the column
-                // with the most sectors) to two others.
-
-                // Link the nth+a sector in the previous column to the nth+b
-                // one in the current column.
-                fun linkColumnsOffset(prevOffset: Int, currOffset: Int) {
-                    var i = 0
-                    while (prevOffset + i < lastColumn.size && currOffset + i < column.size) {
-                        lastColumn[prevOffset + i].nextSectors += column[currOffset + i]
-                        i += 1
-                    }
-                }
-
-                if (lastColumn.size > numInColumn) {
-                    // Less nodes in this column, we need the first and second
-                    // sectors in the first column linking to the first sector
-                    // in the second column, and so on.
-                    linkColumnsOffset(0, 0)
-                    linkColumnsOffset(1, 0)
-                } else {
-                    // There's more sectors in the new column, do the opposite
-                    linkColumnsOffset(0, 0)
-                    linkColumnsOffset(0, 1)
-                }
+            for ((from, to) in links) {
+                lastColumn[from].nextSectors += column[to]
             }
 
             sectors.add(column)
@@ -216,6 +251,8 @@ class GameMap private constructor(df: Datafile, private val eventManager: EventM
         for (sector in sectors[sectors.size - 2]) {
             sector.nextSectors += finalSector
         }
+
+        firstLayoutSeed = rng.next()
     }
 
     private fun parseSectorType(elem: Element, namedSectorTypes: HashMap<String, List<String>>) {
@@ -245,76 +282,45 @@ class GameMap private constructor(df: Datafile, private val eventManager: EventM
         }
     }
 
-    fun generateSector(sectorInfo: SectorInfo, game: InGameState): Sector {
-        val eventPool = ArrayList<Event>()
-        for (ev in sectorInfo.type.events) {
-            val count = ev.count.random()
-            for (i in 1..count) {
-                eventPool += ev.event.resolve()
-            }
+    /**
+     * Generate a sector, laid out the way vanilla does it from [layoutSeed] (a
+     * vanilla save's, or a new random one). [quests] are the ones delayed
+     * from the last sector: vanilla places them last, on beacons of its choice.
+     */
+    @JvmOverloads
+    fun generateSector(sectorInfo: SectorInfo, game: InGameState, layoutSeed: Int? = null, quests: List<Event> = emptyList()): Sector {
+        val seed = layoutSeed
+            ?: firstLayoutSeed?.takeIf { sectorInfo.columnNumber == 0 }
+            ?: Random.nextInt()
+
+        // Vanilla redraws crew names that are in use, the player's crew's too
+        for (crew in game.playerCrew ?: emptyList()) {
+            if (crew.info.name !in vanillaEvents.usedNames) vanillaEvents.usedNames += crew.info.name
         }
 
-        // Try ten times to generate a suitable sector
-        var attemptCount = 0
-        var sector: Sector
-        while (true) {
-            sector = try {
-                Sector(sectorInfo, eventPool, specialEvents, game.difficulty)
-            } catch (e: LayoutFailedException) {
-                // No start or finish beacon: roll the layout again, like
-                // a sector without a path to the exit.
-                continue
-            }
-
-            val path = sector.findShortestPath(sector.startBeacon, sector.finishBeacon)
-
-            // If there isn't a path to the finish beacon, try again regardless
-            // of how many attempts we've previously made.
-            if (path == null) {
-                attemptCount++
-                continue
-            }
-
-            // Otherwise try and require at least a five-beacon path
-            if (path.size < 5 && attemptCount < 10) {
-                attemptCount++
-                continue
-            }
-
-            break
-        }
-
-        // Set up the flagship, if required.
-        if (sector.isLastStand) {
-            // The flagship goes on one of the two right-most columns, and
-            // must have a path to the base. A layout where none of those
-            // beacons do used to spin here forever, freezing the jump into
-            // the last stand - roll a new layout instead.
-            val candidates = sector.beacons.filter {
-                it.gridPos.x >= 4 && sector.findShortestPath(it, sector.finishBeacon) != null
-            }
-            if (candidates.isEmpty())
-                return generateSector(sectorInfo, game)
-
-            attemptCount = 0
-            while (true) {
-                attemptCount++
-
-                val flagshipBeacon = candidates.random()
-                val path = sector.findShortestPath(flagshipBeacon, sector.finishBeacon)!!
-
-                // Try and pick a flagship position that gives the player
-                // enough time to get there!
-                // Note that the path length doesn't include the first beacon,
-                // so the limits here are one lower than specified in doc/sector-map.
-                if (path.size !in 3..5 && attemptCount < 10)
-                    continue
-
-                sector.bosses.add(FlagshipBoss(sector, game, flagshipBeacon))
-                break
+        // The first sector's events are STANDARD_SPACE's in vanilla
+        val typeName = if (sectorInfo.columnNumber == 0) "STANDARD_SPACE" else sectorInfo.type.name
+        val layout = VanillaSectorLayout(
+            vanillaEvents, seed, typeName, sectorInfo.columnNumber,
+            game.difficulty == Difficulty.HARD, aeEnabled,
+            quests.map { it.deserialisationId }
+        )
+        val events = layout.beacons.map { b ->
+            when {
+                b === layout.start && sectorInfo.columnNumber == 0 -> specialEvents.startGame.resolve()
+                else -> b.event?.let { eventManager.vanillaEvent(it) } ?: specialEvents.filler.resolve()
             }
         }
-
+        val sector = Sector(sectorInfo, layout, seed, events)
+        layout.flagship?.let { f ->
+            sector.bosses.add(FlagshipBoss(sector, game, sector.beacons[layout.beacons.indexOf(f)]))
+        }
+        for ((i, b) in layout.questBeacons) {
+            val beacon = sector.beacons[layout.beacons.indexOf(b)]
+            beacon.hasQuest = true
+            beacon.event = quests[i]
+            sector.placedQuests += quests[i]
+        }
         return sector
     }
 
@@ -482,18 +488,6 @@ class GameMap private constructor(df: Datafile, private val eventManager: EventM
     enum class SectorClass {
         CIVILIAN,
         HOSTILE,
-        NEBULA;
-
-        companion object {
-            fun random(rand: Random): SectorClass {
-                // 20% chance of a nebula
-                if (rand.nextInt(5) == 0) {
-                    return NEBULA
-                }
-
-                // Otherwise, 60% civilian and 40% hostile
-                return if (rand.nextInt(10) < 4) HOSTILE else CIVILIAN
-            }
-        }
+        NEBULA
     }
 }

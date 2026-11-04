@@ -57,6 +57,20 @@ class EventManager(
 
     operator fun get(name: String): IEvent = events[name] ?: error("Missing event $name")
 
+    /**
+     * The event vanilla made for a beacon ([VanillaEventWalker]): the named
+     * event, or the entry of the event list it came from. Null if we don't
+     * have it.
+     */
+    fun vanillaEvent(made: VanillaEventWalker.Made): Event? {
+        if (made.name != null)
+            return events[made.name]?.resolve()
+        val list = events[made.list ?: return null] ?: return null
+        if (list is EventList)
+            return list.events.getOrNull(made.index)?.resolve() ?: list.resolve()
+        return list.resolve()
+    }
+
     fun getByDeserialisationId(id: String): Event {
         return byDeserialisationId[id] ?: error("Missing event with deserialisation ID '$id'")
     }

@@ -64,9 +64,18 @@ class Beacon(
             else -> State.VISITED_CLEAR
         }
 
+    /**
+     * True if vanilla's map generator put this beacon inside a nebula. Its
+     * event is then a nebula one, except for beacons that already had an
+     * event (the start and exit), which vanilla turns into nebula beacons.
+     */
+    var inNebula: Boolean = false
+
     val environmentType: EnvironmentType
         get() {
-            val type = event.environment ?: EnvironmentType.NORMAL
+            var type = event.environment ?: EnvironmentType.NORMAL
+            if (inNebula && type == EnvironmentType.NORMAL)
+                type = EnvironmentType.NEBULA
             return when {
                 !isOvertaken -> type
 
@@ -244,6 +253,7 @@ class Beacon(
         SaveUtil.addTagBoolIfTrue(elem, "isBase", isBase)
         SaveUtil.addTagBoolIfTrue(elem, "hasStore", hasStore)
         SaveUtil.addTagBoolIfTrue(elem, "hasQuest", hasQuest)
+        SaveUtil.addTagBoolIfTrue(elem, "inNebula", inNebula)
 
         // Save the event by name - events are immutable and are
         // loaded from the game's XML, so we only need to uniquely
@@ -310,6 +320,7 @@ class Beacon(
             beacon.visited = SaveUtil.getAttrBool(elem, "visited")
             beacon.hasStore = SaveUtil.getOptionalTagBool(elem, "hasStore") ?: false
             beacon.hasQuest = SaveUtil.getOptionalTagBool(elem, "hasQuest") ?: false
+            beacon.inNebula = SaveUtil.getOptionalTagBool(elem, "inNebula") ?: false
 
             // Load environment-specific data, if we've visited this beacon.
             val envName = elem.getAttributeValue("env")
