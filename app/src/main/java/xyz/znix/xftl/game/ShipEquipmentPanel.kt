@@ -15,8 +15,12 @@ import xyz.znix.xftl.ui.Label
 import xyz.znix.xftl.ui.WidgetContainer
 import xyz.znix.xftl.weapons.AbstractWeaponBlueprint
 import xyz.znix.xftl.weapons.DroneBlueprint
+import kotlin.math.abs
 import kotlin.math.min
 import kotlin.math.roundToInt
+
+// How far (window px) a finger must move before a pressed item is dragged
+private const val TOUCH_DRAG_THRESHOLD = 8
 
 /**
  * This contains the drag-and-drop equipment UI used in the equipment tab
@@ -71,6 +75,19 @@ class ShipEquipmentPanel(private val game: InGameState, val ship: Ship) {
                 button.currentlyDraggedBlueprint = value?.blueprint
             }
         }
+
+    // On touch, a pressed item only becomes a drag once the finger moves:
+    // otherwise every tap would light up the slots it fits in and blank
+    // the info panel until the finger lifts, making them flash.
+    private var pressedBlueprint: Buttons.DragDropBlueprintButton? = null
+    private var pressPos: IPoint? = null
+
+    private fun startDrag(button: Buttons.DragDropBlueprintButton) {
+        if (PlatformSpecific.INSTANCE.isTouchUi)
+            pressedBlueprint = button
+        else
+            draggingBlueprint = button
+    }
 
     // Note: the buttons are first populated when the position is set
 
@@ -144,7 +161,7 @@ class ShipEquipmentPanel(private val game: InGameState, val ship: Ship) {
                 { it is AbstractWeaponBlueprint },
                 weapon?.type
             ) {
-                draggingBlueprint = button
+                startDrag(button)
             }
             buttons += button
             weaponButtons += button
@@ -165,7 +182,7 @@ class ShipEquipmentPanel(private val game: InGameState, val ship: Ship) {
                 // Use a separate variable so we can use the button in it's callback.
                 lateinit var button: Buttons.DragDropBlueprintButton
                 button = Buttons.DragDropBlueprintButton(buttonPos, game, images, { it is DroneBlueprint }, drone) {
-                    draggingBlueprint = button
+                    startDrag(button)
                 }
                 buttons += button
                 droneButtons += button
@@ -186,7 +203,7 @@ class ShipEquipmentPanel(private val game: InGameState, val ship: Ship) {
                 buttonPos, game, null, size,
                 { it is AugmentBlueprint },
                 augment,
-                { draggingBlueprint = button }
+                { startDrag(button) }
             ) {
                 override fun draw(g: Graphics) {
                     // Draw the empty box
@@ -261,7 +278,7 @@ class ShipEquipmentPanel(private val game: InGameState, val ship: Ship) {
                 buttonPos, game, base,
                 { it !is AugmentBlueprint },
                 blueprint,
-                { draggingBlueprint = button }) {
+                { startDrag(button) }) {
 
                 // Change the card image depending on our contents
                 override val image: ButtonImageSet
@@ -319,6 +336,15 @@ class ShipEquipmentPanel(private val game: InGameState, val ship: Ship) {
             button.update(x, y)
         }
 
+        val pressed = pressedBlueprint
+        val start = pressPos
+        if (pressed != null && start != null &&
+            (abs(x - start.x) > TOUCH_DRAG_THRESHOLD || abs(y - start.y) > TOUCH_DRAG_THRESHOLD)
+        ) {
+            pressedBlueprint = null
+            draggingBlueprint = pressed
+        }
+
         // If we're dragging a blueprint around, update it.
         draggingBlueprint?.dragPosition = ConstPoint(x, y)
     }
@@ -339,10 +365,12 @@ class ShipEquipmentPanel(private val game: InGameState, val ship: Ship) {
         for (btn in ArrayList(buttons)) {
             btn.mouseDown(button, x, y)
         }
+        pressPos = ConstPoint(x, y)
     }
 
     @Suppress("UNUSED_PARAMETER")
     fun mouseReleased(button: Int, x: Int, y: Int) {
+        pressedBlueprint = null
         if (draggingBlueprint != null)
             dropBlueprint()
     }
