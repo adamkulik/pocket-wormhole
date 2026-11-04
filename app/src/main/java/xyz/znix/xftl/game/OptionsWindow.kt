@@ -4,10 +4,10 @@ import xyz.znix.xftl.f
 import xyz.znix.xftl.math.ConstPoint
 import xyz.znix.xftl.math.IPoint
 import xyz.znix.xftl.rendering.Graphics
-import xyz.znix.xftl.replaceArg
-import xyz.znix.xftl.ui.Label
 import xyz.znix.xftl.ui.Slider
 import xyz.znix.xftl.ui.WidgetContainer
+import xyz.znix.xftl.replaceArg
+import xyz.znix.xftl.ui.Label
 
 class OptionsWindow(val game: InGameState, val close: () -> Unit) : Window() {
     private val widgetTree: WidgetContainer = game.uiLoader.load("options").mainWidget
