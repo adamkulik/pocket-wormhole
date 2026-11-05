@@ -210,6 +210,7 @@ class PauseWindow(val game: InGameState, val close: () -> Unit) : Window() {
         menuButtons = ArrayList(buttons)
         buttons.clear()
         buttons += widget.buildButtons(game, this, dialogPos)
+        positionUpdated() // the new buttons need the window's position
     }
 
     private fun closeDialog() {
