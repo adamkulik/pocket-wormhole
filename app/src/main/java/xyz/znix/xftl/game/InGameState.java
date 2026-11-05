@@ -369,7 +369,7 @@ public class InGameState extends MainGame.GameState {
         // is rebuilt from its spawn spec and seed, like vanilla does. The
         // data list is indexed by VANILLA's beacon order, which can differ
         // in length from ours - clamp before looking up.
-        int dataBeaconId = Math.min(beaconId, data.getBeacons().size() - 1);
+        int dataBeaconId = Math.min(savedBeacon, data.getBeacons().size() - 1);
         if (data.getBeacons().get(dataBeaconId).getEnemyPresent()) {
             spawnVanillaEnemy(data.getBeacons().get(dataBeaconId).getShipEventId(), data.getBeacons().get(dataBeaconId).getShipEventSeed());
             // The fight in progress: the ship as vanilla saved it - its own
