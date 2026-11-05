@@ -404,6 +404,12 @@ public class InGameState extends MainGame.GameState {
             setEnemy(currentBeacon.getShip());
         }
 
+        // Last, as drones that attack need the enemy
+        restoreVanillaDrones(player, data.getShip());
+        if (enemy != null && data.getNearbyShip() != null) {
+            restoreVanillaDrones(enemy, data.getNearbyShip());
+        }
+
         for (Beacon beacon : sector.getBeacons()) {
             if (beacon.getShip() != null)
                 beacon.getShip().update(0f);
@@ -419,6 +425,19 @@ public class InGameState extends MainGame.GameState {
         }
 
         updatePlayerCrew();
+    }
+
+    /** The drones that were armed when the save was made are launched again. */
+    private static void restoreVanillaDrones(Ship ship, VanillaSaveData.ShipData vs) {
+        Drones drones = ship.getDrones();
+        if (drones == null) {
+            return;
+        }
+        for (int i = 0; i < vs.getDrones().size() && i < drones.getDrones().size(); i++) {
+            if (vs.getDrones().get(i).getArmed()) {
+                drones.restoreDeployedDrone(i);
+            }
+        }
     }
 
     /**

@@ -471,14 +471,14 @@ object VanillaSaveWriter {
      * vanilla's loader against the ship section above.
      */
     private fun writeExtendedShipInfo(w: VanillaSaveByteWriter, game: InGameState, ship: Ship) {
-        // Deployed drones: (deployed, armed) per slot drone plus a pod for
-        // types with a flying body. In-flight drones are transient (dropped
-        // like projectiles), so both flags are false.
+        // Drones: (deployed, armed) per slot drone plus a pod for types with a
+        // flying body. Where a drone is in its flight isn't kept: vanilla
+        // launches one that's armed but not deployed as it loads the save.
         val dronesSystem = ship.systems.firstOrNull { it is Drones } as Drones?
         val slotDrones = dronesSystem?.drones?.filterNotNull() ?: emptyList()
         for (info in slotDrones) {
             w.bool(false)
-            w.bool(false)
+            w.bool(info.instance?.isPowered == true)
             writeDronePod(w, info.type.type)
         }
 
