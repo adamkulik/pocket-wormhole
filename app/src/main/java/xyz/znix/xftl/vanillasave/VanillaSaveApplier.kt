@@ -31,6 +31,7 @@ object VanillaSaveApplier {
             // Jumping to such a beacon re-runs the event, like vanilla
             // re-running its ship event.
             if (vb.enemyPresent) {
+                beacon.vanillaShipEvent = vb.shipEventId
                 game.eventManager.getVanillaEvent(vb.shipEventId)?.let { beacon.event = it }
             }
 

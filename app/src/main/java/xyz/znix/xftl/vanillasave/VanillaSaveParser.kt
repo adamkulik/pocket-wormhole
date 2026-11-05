@@ -88,6 +88,7 @@ class VanillaSaveData {
 
         /** Each weapon's charge, in ticks, from the save's extended ship info (if it could be read). */
         val weaponCharge = ArrayList<Int>()
+        var hacking: VanillaSaveData.HackingState? = null
         val systems = HashMap<String, VanillaSystem>() // keyed by vanilla slot name
         var cloneProgress: Int = 0
         var cloneGoal: Int = 0
@@ -144,6 +145,17 @@ class VanillaSaveData {
         var maxHealth: Int = 4
         var health: Int = 4
         var open: Boolean = false
+    }
+
+    /** Vanilla's hacking system: the system it targets, its probe and its pulse. */
+    class HackingState {
+        var targetSystem: Int = -1
+        var probeLaunched: Boolean = false
+        var probeLanded: Boolean = false
+        var targeting: Boolean = false
+        var pulseTicks: Int = 0
+        var pulseGoalTicks: Int = 0
+        var noProbe: Boolean = false
     }
 
     class VanillaDrone {
@@ -384,10 +396,15 @@ object VanillaSaveParser {
             skipDronePod(r, droneTypeOf(drone.name) ?: return false)
         }
         if ((ship.systems["hacking"]?.capacity ?: 0) > 0) {
-            repeat(2) { r.int() } // target room, unknown
-            r.bool()
-            repeat(3) { r.int() }
-            r.bool()
+            val state = VanillaSaveData.HackingState()
+            state.targetSystem = r.int()
+            state.probeLaunched = r.int() != 0
+            state.probeLanded = r.int() != 0
+            state.targeting = r.int() != 0
+            state.pulseTicks = r.int()
+            state.pulseGoalTicks = r.int()
+            state.noProbe = r.int() != 0
+            ship.hacking = state
             skipDronePod(r, DroneBlueprint.DroneType.HACKING)
         }
         if ((ship.systems["mind"]?.capacity ?: 0) > 0) repeat(2) { r.int() }

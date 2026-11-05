@@ -483,14 +483,22 @@ object VanillaSaveWriter {
         }
 
         // Hacking: target + timing fields + a hacking pod.
-        val hacking = ship.systems.firstOrNull { it is Hacking }
+        val hacking = ship.systems.firstOrNull { it is Hacking } as Hacking?
         if (hacking != null && hacking.energyLevels > 0) {
-            w.int(-1) // target room: none
-            w.int(0)
-            w.bool(false)
-            w.int(0)
-            w.int(0)
-            w.int(0)
+            // A landed probe: the system it's on, and the pulse's time and
+            // goal (past the goal when no pulse is running). Where the probe
+            // sits isn't kept: vanilla puts it back on the system.
+            val targetSystem = hacking.landedTarget?.system?.blueprint?.name
+            val targetId = VanillaSaveFormat.SYSTEM_SLOTS.indexOfFirst { it.first == targetSystem }
+            val landed = targetId != -1
+            val goal = (hacking.pulseDuration * VanillaSaveFormat.TICKS_PER_SECOND).toInt()
+            val pulse = hacking.pulseRemaining
+            w.int(targetId) // -1 for none
+            w.bool(landed)
+            w.bool(landed)
+            w.bool(landed)
+            w.int(if (pulse != null) (goal - pulse * VanillaSaveFormat.TICKS_PER_SECOND).toInt() else goal)
+            w.int(goal)
             w.bool(false)
             writeDronePod(w, DroneBlueprint.DroneType.HACKING)
         }
@@ -758,7 +766,7 @@ object VanillaSaveWriter {
         val ship = beacon.ship
         w.bool(ship != null)
         if (ship != null) {
-            w.string(vanillaEventName(beacon.event))
+            w.string(beacon.vanillaShipEvent ?: vanillaEventName(beacon.event))
             w.string(ship.spec?.autoBlueprint?.resolve()?.name ?: "")
             w.int(ship.generationSeed ?: 0)
         }

@@ -408,6 +408,8 @@ public class InGameState extends MainGame.GameState {
         restoreVanillaDrones(player, data.getShip());
         if (enemy != null && data.getNearbyShip() != null) {
             restoreVanillaDrones(enemy, data.getNearbyShip());
+            restoreVanillaProbe(player, data.getShip(), enemy);
+            restoreVanillaProbe(enemy, data.getNearbyShip(), player);
         }
 
         for (Beacon beacon : sector.getBeacons()) {
@@ -425,6 +427,27 @@ public class InGameState extends MainGame.GameState {
         }
 
         updatePlayerCrew();
+    }
+
+    /** A landed hacking probe goes back on the system it was hacking. */
+    private static void restoreVanillaProbe(Ship owner, VanillaSaveData.ShipData vs, Ship target) {
+        VanillaSaveData.HackingState state = vs.getHacking();
+        if (state == null || owner.getHacking() == null || !state.getProbeLanded()) {
+            return;
+        }
+        List<kotlin.Pair<String, String>> slots = VanillaSaveFormat.INSTANCE.getSYSTEM_SLOTS();
+        if (state.getTargetSystem() < 0 || state.getTargetSystem() >= slots.size()) {
+            return;
+        }
+        String name = slots.get(state.getTargetSystem()).getFirst();
+        for (AbstractSystem system : target.getSystems()) {
+            if (system.getBlueprint().getName().equals(name) && system.getRoom() != null) {
+                boolean running = state.getPulseTicks() < state.getPulseGoalTicks();
+                float left = (state.getPulseGoalTicks() - state.getPulseTicks()) / VanillaSaveFormat.TICKS_PER_SECOND;
+                owner.getHacking().restoreLandedProbe(system.getRoom(), running ? left : null);
+                return;
+            }
+        }
     }
 
     /** The drones that were armed when the save was made are launched again. */
