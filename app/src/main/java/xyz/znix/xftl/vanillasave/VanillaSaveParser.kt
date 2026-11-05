@@ -423,7 +423,7 @@ object VanillaSaveParser {
             DroneBlueprint.DroneType.REPAIR, DroneBlueprint.DroneType.BATTLE -> return
             else -> {}
         }
-        repeat(27) { r.int() }
+        repeat(29) { r.int() }
         skipAnim()
         when (type) {
             DroneBlueprint.DroneType.BOARDER -> repeat(9) { r.int() }

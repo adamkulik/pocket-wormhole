@@ -535,9 +535,10 @@ object VanillaSaveWriter {
             DroneBlueprint.DroneType.REPAIR, DroneBlueprint.DroneType.BATTLE -> return
             else -> {}
         }
-        // mourning, space, dest, pos x10, ticks x6, hops, pi, rho, overload,
-        // tau, upsilon, dpos x2, death anim (2 bools + 5 ints)
-        repeat(3 + 10 + 6 + 6 + 2) { w.int(0) }
+        // 29 ints, then the death animation (2 bools + 5 ints). Vanilla reads
+        // a fixed size: short pods shift everything after them, and what it
+        // reads as the weapon modules' count then crashes it.
+        repeat(29) { w.int(0) }
         w.bool(false); w.bool(false)
         repeat(5) { w.int(0) }
         when (type) {
