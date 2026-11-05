@@ -43,7 +43,7 @@
             <!-- Middle of no button -->
             <widget type="image" ix="85" w="5">
                 <widget type="button" id="no" pLeft="-10" pRight="-10" pTop="4">
-                    <widget type="label" text="confirm_no"/>
+                    <widget type="label" id="no_label" text="confirm_no"/>
                 </widget>
             </widget>
 

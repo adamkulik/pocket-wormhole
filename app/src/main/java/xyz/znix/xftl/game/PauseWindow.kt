@@ -23,6 +23,13 @@ class PauseWindow(val game: InGameState, val close: () -> Unit) : Window() {
 
     override val size: IPoint = widgetTree.root.size
 
+    private var dialog: WidgetContainer? = null
+    private val dialogPos = Point(0, 0)
+    private var menuButtons: List<Button> = emptyList()
+
+    /** A file chosen in the picker, waiting for the next frame. */
+    private var pickedSave: ByteArray? = null
+
     init {
         buttons += widgetTree.buildButtons(game, this, ConstPoint.ZERO)
 
@@ -115,6 +122,15 @@ class PauseWindow(val game: InGameState, val close: () -> Unit) : Window() {
         // TODO show the dots that indicate the player has won with a given layout
 
         g.popTransform()
+
+        dialog?.let {
+            g.colour = DIALOG_DIM
+            g.fillRect(0f, 0f, 1280f, 720f)
+            g.pushTransform()
+            g.translate(position.x + dialogPos.x.f, position.y + dialogPos.y.f)
+            it.draw(g)
+            g.popTransform()
+        }
     }
 
     private fun decorateAchievement(g: Graphics, img: ImageView, index: Int) {
@@ -157,10 +173,58 @@ class PauseWindow(val game: InGameState, val close: () -> Unit) : Window() {
         super.updateUI(x, y)
 
         mousePos.set(x - position.x, y - position.y)
+
+        pickedSave?.let {
+            pickedSave = null
+            importSave(it)
+        }
     }
 
     override fun escapePressed() {
+        if (dialog != null) {
+            closeDialog()
+            return
+        }
         close()
+    }
+
+    /**
+     * A box over the menu, which takes the clicks while it's open: yes/no
+     * with [onConfirm], or just a message to dismiss without.
+     */
+    private fun showDialog(message: String, onConfirm: (() -> Unit)?) {
+        val widget = game.uiLoader.load("confirm").mainWidget
+
+        // Labels don't wrap by themselves
+        val label = widget.byId["message"] as Label
+        label.text = label.font.wrapString(message, DIALOG_TEXT_WIDTH).joinToString("\n")
+        if (onConfirm == null) {
+            widget.byId["yes"]?.isVisible = false
+            (widget.byId["no_label"] as Label).text = "OK"
+        }
+        widget.root.updateSizes()
+        widget.root.expandToParent(ConstPoint.ZERO)
+        widget.root.updateLayout()
+        dialogPos.x = (size.x - widget.root.size.x) / 2
+        dialogPos.y = (size.y - widget.root.size.y) / 2
+
+        widget.addButtonListener("yes") {
+            closeDialog()
+            onConfirm?.invoke()
+        }
+        widget.addButtonListener("no") { closeDialog() }
+
+        dialog = widget
+        menuButtons = ArrayList(buttons)
+        buttons.clear()
+        buttons += widget.buildButtons(game, this, dialogPos)
+        positionUpdated() // the new buttons need the window's position
+    }
+
+    private fun closeDialog() {
+        dialog = null
+        buttons.clear()
+        buttons += menuButtons
     }
 
     // Vanilla-format exports are only meaningful at a sector boundary: the
@@ -186,15 +250,28 @@ class PauseWindow(val game: InGameState, val close: () -> Unit) : Window() {
     }
 
     private fun importSaveClicked() {
+        showDialog("Import a save? It replaces the run you're playing now.", this::pickSaveToImport)
+    }
+
+    private fun pickSaveToImport() {
         val transfer = xyz.znix.xftl.sys.PlatformSpecific.INSTANCE.saveTransfer ?: return
-        transfer.importSave { bytes ->
-            if (bytes != null) {
-                val path = game.mainGame.getVanillaSavePath()
-                java.nio.file.Files.createDirectories(path.parent)
-                java.nio.file.Files.write(path, bytes)
-                // Switch to the imported run (also handles parse errors).
-                game.mainGame.continueVanillaSave()
-            }
+        // Loaded on the next frame (see updateUI): coming back from the file
+        // picker, this can run before the app has its GL context again, and
+        // loading a run needs it for the ship's images.
+        transfer.importSave { bytes -> pickedSave = bytes }
+    }
+
+    private fun importSave(bytes: ByteArray) {
+        val path = game.mainGame.getVanillaSavePath()
+        java.nio.file.Files.createDirectories(path.parent)
+        // Keep the current run's save if this one turns out not to load
+        val previous = if (java.nio.file.Files.exists(path)) java.nio.file.Files.readAllBytes(path) else null
+        java.nio.file.Files.write(path, bytes)
+        // Switch to the imported run
+        if (!game.mainGame.continueVanillaSave()) {
+            if (previous != null) java.nio.file.Files.write(path, previous)
+            else java.nio.file.Files.delete(path)
+            showDialog("Couldn't load that save. It may be damaged, or made with different mods.", null)
         }
     }
 
@@ -228,5 +305,11 @@ class PauseWindow(val game: InGameState, val close: () -> Unit) : Window() {
 
     private fun quitClicked() {
         game.mainGame.quitGame()
+    }
+
+    companion object {
+        /** The width of confirm.xml's box, less its margins. */
+        private const val DIALOG_TEXT_WIDTH = 266
+        private val DIALOG_DIM = Colour(0, 0, 0, 200)
     }
 }
