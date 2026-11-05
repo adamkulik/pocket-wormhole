@@ -27,6 +27,9 @@ class PauseWindow(val game: InGameState, val close: () -> Unit) : Window() {
     private val dialogPos = Point(0, 0)
     private var menuButtons: List<Button> = emptyList()
 
+    /** A file chosen in the picker, waiting for the next frame. */
+    private var pickedSave: ByteArray? = null
+
     init {
         buttons += widgetTree.buildButtons(game, this, ConstPoint.ZERO)
 
@@ -170,6 +173,11 @@ class PauseWindow(val game: InGameState, val close: () -> Unit) : Window() {
         super.updateUI(x, y)
 
         mousePos.set(x - position.x, y - position.y)
+
+        pickedSave?.let {
+            pickedSave = null
+            importSave(it)
+        }
     }
 
     override fun escapePressed() {
@@ -247,20 +255,23 @@ class PauseWindow(val game: InGameState, val close: () -> Unit) : Window() {
 
     private fun pickSaveToImport() {
         val transfer = xyz.znix.xftl.sys.PlatformSpecific.INSTANCE.saveTransfer ?: return
-        transfer.importSave { bytes ->
-            if (bytes != null) {
-                val path = game.mainGame.getVanillaSavePath()
-                java.nio.file.Files.createDirectories(path.parent)
-                // Keep the current run's save if this one turns out not to load
-                val previous = if (java.nio.file.Files.exists(path)) java.nio.file.Files.readAllBytes(path) else null
-                java.nio.file.Files.write(path, bytes)
-                // Switch to the imported run
-                if (!game.mainGame.continueVanillaSave()) {
-                    if (previous != null) java.nio.file.Files.write(path, previous)
-                    else java.nio.file.Files.delete(path)
-                    showDialog("Couldn't load that save. It may be damaged, or made with different mods.", null)
-                }
-            }
+        // Loaded on the next frame (see updateUI): coming back from the file
+        // picker, this can run before the app has its GL context again, and
+        // loading a run needs it for the ship's images.
+        transfer.importSave { bytes -> pickedSave = bytes }
+    }
+
+    private fun importSave(bytes: ByteArray) {
+        val path = game.mainGame.getVanillaSavePath()
+        java.nio.file.Files.createDirectories(path.parent)
+        // Keep the current run's save if this one turns out not to load
+        val previous = if (java.nio.file.Files.exists(path)) java.nio.file.Files.readAllBytes(path) else null
+        java.nio.file.Files.write(path, bytes)
+        // Switch to the imported run
+        if (!game.mainGame.continueVanillaSave()) {
+            if (previous != null) java.nio.file.Files.write(path, previous)
+            else java.nio.file.Files.delete(path)
+            showDialog("Couldn't load that save. It may be damaged, or made with different mods.", null)
         }
     }
 
