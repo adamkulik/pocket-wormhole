@@ -171,6 +171,10 @@ public class MainGame implements Game {
                     tiles.add(room.getSize().getX() * room.getSize().getY());
                 }
                 return new kotlin.Pair<>(tiles, bp.getDoors().size());
+            }, droneId -> {
+                Object bp = content.blueprintManager.getBlueprints().get(droneId);
+                return bp instanceof xyz.znix.xftl.weapons.DroneBlueprint
+                        ? ((xyz.znix.xftl.weapons.DroneBlueprint) bp).getType() : null;
             });
             setCurrentState(new InGameState(this, getGameContent(data.getAdvanced()), data));
             // Consumed: rename to a backup so it can't shadow newer saves.

@@ -524,19 +524,37 @@ public class InGameState extends MainGame.GameState {
         Element crewList = xml.getChild("crew");
         crewList.removeChildren("crewMember");
         int crewIndex = 0;
-        for (VanillaSaveData.VanillaCrew vc : vs.getCrew()) {
-            if (vc.getCloneReady() > 0) {
-                continue; // crew waiting in the clonebay is dropped on import
+
+        // Crew waiting in the clonebay go in its queue, in the order they
+        // died (which is the order they're cloned in), not on the ship.
+        Clonebay clonebay = ship.getClonebay();
+        Element cloningQueue = null;
+        for (Element sysElem : xml.getChild("systems").getChildren("system")) {
+            if (clonebay != null && sysElem.getAttributeValue("name").equals("clonebay")) {
+                cloningQueue = sysElem.getChild("cloningQueue");
+                if (vs.getCloneGoal() > 0) {
+                    SaveUtil.INSTANCE.addTagFloat(sysElem, "cloneProgress", vs.getCloneProgress() / (float) vs.getCloneGoal());
+                }
             }
-            if (!isPlayer && vc.isPlayer()) {
+        }
+        List<VanillaSaveData.VanillaCrew> savedCrew = new ArrayList<>(vs.getCrew());
+        savedCrew.sort(Comparator.comparingInt(vc -> vc.getCloneReady() > 0 ? vc.getDeathOrder() : Integer.MIN_VALUE));
+
+        for (VanillaSaveData.VanillaCrew vc : savedCrew) {
+            boolean cloning = vc.getCloneReady() > 0;
+            if (cloning && (cloningQueue == null || vc.isPlayer() != isPlayer)) {
+                continue; // no clonebay of theirs here: vanilla loses them too
+            }
+            if (!cloning && !isPlayer && vc.isPlayer()) {
                 continue; // the player's boarders aren't this ship's crew
             }
-            if (vc.getRoomId() < 0 || vc.getRoomId() >= ship.getRooms().size()) {
+            if (!cloning && (vc.getRoomId() < 0 || vc.getRoomId() >= ship.getRooms().size())) {
                 continue;
             }
-            Room room = ship.getRooms().get(vc.getRoomId());
-            int sqX = vc.getRoomSquare() % room.getWidth();
-            int sqY = vc.getRoomSquare() / room.getWidth();
+            Room room = cloning ? clonebay.getRoom() : ship.getRooms().get(vc.getRoomId());
+            int square = cloning ? 0 : vc.getRoomSquare();
+            int sqX = square % room.getWidth();
+            int sqY = square / room.getWidth();
             // The crew's position is their square's top-left corner: exactly
             // on the square, so they stand there rather than walk off it.
             float x = Constants.ROOM_SIZE * (room.getX() + ship.getOffset().getX() + sqX);
@@ -566,7 +584,7 @@ public class InGameState extends MainGame.GameState {
                 skillElem.setAttribute("value", Float.toString(Math.min(progress, 2f)));
                 crewElem.addContent(skillElem);
             }
-            crewList.addContent(crewElem);
+            (cloning ? cloningQueue : crewList).addContent(crewElem);
             crewIndex++;
         }
 

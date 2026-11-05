@@ -1,6 +1,7 @@
 package xyz.znix.xftl.vanillasave
 
 import xyz.znix.xftl.game.Difficulty
+import xyz.znix.xftl.weapons.DroneBlueprint
 
 /** A parsed vanilla continue.sav (format 11). */
 class VanillaSaveData {
@@ -115,6 +116,7 @@ class VanillaSaveData {
         var roomSquare: Int = 0
         var isPlayer: Boolean = true
         var cloneReady: Int = 0
+        var deathOrder: Int = -1
         var savedSquare: Int = 0
         var savedRoom: Int = 0
         val skills = HashMap<String, Int>() // slot name to xp actions
@@ -193,7 +195,15 @@ object VanillaSaveParser {
      * counts per room and door count for the saved blueprint id (the format
      * stores rooms and doors without counts, so the layout resolves them).
      */
-    fun parse(data: ByteArray, layoutFor: (String) -> Pair<List<Int>, Int>): VanillaSaveData {
+    fun parse(data: ByteArray, layoutFor: (String) -> Pair<List<Int>, Int>): VanillaSaveData =
+        parse(data, layoutFor) { null }
+
+    /** With [droneTypeOf], the weapons' charge can be read past the ship's drones. */
+    fun parse(
+        data: ByteArray,
+        layoutFor: (String) -> Pair<List<Int>, Int>,
+        droneTypeOf: (String) -> DroneBlueprint.DroneType?
+    ): VanillaSaveData {
         val r = VanillaSaveReader(data)
         val out = VanillaSaveData()
 
@@ -320,7 +330,7 @@ object VanillaSaveParser {
         // player's (FTL Profile Editor's SavedGameParser). Best effort: a
         // save it can't be read from still loads, just without the ship's state.
         try {
-            readNearbyShip(r, out, layoutFor)
+            readNearbyShip(r, out, layoutFor, droneTypeOf)
         } catch (e: Exception) {
             trace?.invoke(r.pos, "nearbyError: $e")
             out.nearbyShip = null
@@ -329,7 +339,8 @@ object VanillaSaveParser {
     }
 
     private fun readNearbyShip(
-        r: VanillaSaveReader, out: VanillaSaveData, layoutFor: (String) -> Pair<List<Int>, Int>
+        r: VanillaSaveReader, out: VanillaSaveData, layoutFor: (String) -> Pair<List<Int>, Int>,
+        droneTypeOf: (String) -> DroneBlueprint.DroneType?
     ) {
         r.int() // unknown_mu
         // The encounter: the ship event's seed, the surrender, escape,
@@ -354,20 +365,31 @@ object VanillaSaveParser {
             if (r.bool()) repeat(5) { r.int() } // asteroid field
             repeat(3) { r.int() } // solar flare fade, havoc, PDS ticks
             if (r.int() != 0) return // projectiles in flight aren't read yet
-            if (!readExtendedShipInfo(r, out.ship)) return
-            out.nearbyShip?.let { readExtendedShipInfo(r, it) }
+            if (!readExtendedShipInfo(r, out.ship, droneTypeOf)) return
+            out.nearbyShip?.let { readExtendedShipInfo(r, it, droneTypeOf) }
         } catch (e: Exception) {
             trace?.invoke(r.pos, "extendedInfoError: $e")
         }
     }
 
     /**
-     * A ship's extended info, as far as the weapons: false if it has
-     * something before them that isn't read yet (drones, hacking).
+     * A ship's extended info, as far as the weapons: false if it has a drone
+     * of a type [droneTypeOf] doesn't know, so what follows can't be found.
      */
-    private fun readExtendedShipInfo(r: VanillaSaveReader, ship: VanillaSaveData.ShipData): Boolean {
-        if (ship.drones.isNotEmpty()) return false
-        if ((ship.systems["hacking"]?.capacity ?: 0) > 0) return false
+    private fun readExtendedShipInfo(
+        r: VanillaSaveReader, ship: VanillaSaveData.ShipData, droneTypeOf: (String) -> DroneBlueprint.DroneType?
+    ): Boolean {
+        for (drone in ship.drones) {
+            r.bool(); r.bool() // deployed, armed
+            skipDronePod(r, droneTypeOf(drone.name) ?: return false)
+        }
+        if ((ship.systems["hacking"]?.capacity ?: 0) > 0) {
+            repeat(2) { r.int() } // target room, unknown
+            r.bool()
+            repeat(3) { r.int() }
+            r.bool()
+            skipDronePod(r, DroneBlueprint.DroneType.HACKING)
+        }
         if ((ship.systems["mind"]?.capacity ?: 0) > 0) repeat(2) { r.int() }
         if ((ship.systems["weapons"]?.capacity ?: 0) <= 0) return true
         val count = r.int()
@@ -388,6 +410,31 @@ object VanillaSaveParser {
         ship.weaponCharge.clear()
         ship.weaponCharge += charges
         return true
+    }
+
+    /** A drone's flight state (see VanillaSaveWriter.writeDronePod). */
+    private fun skipDronePod(r: VanillaSaveReader, type: DroneBlueprint.DroneType) {
+        fun skipAnim() {
+            r.bool(); r.bool()
+            repeat(5) { r.int() }
+        }
+
+        when (type) {
+            DroneBlueprint.DroneType.REPAIR, DroneBlueprint.DroneType.BATTLE -> return
+            else -> {}
+        }
+        repeat(27) { r.int() }
+        skipAnim()
+        when (type) {
+            DroneBlueprint.DroneType.BOARDER -> repeat(9) { r.int() }
+            DroneBlueprint.DroneType.HACKING -> {
+                repeat(4) { r.int() }
+                repeat(2) { skipAnim() }
+            }
+            DroneBlueprint.DroneType.COMBAT, DroneBlueprint.DroneType.SHIP_REPAIR -> repeat(5) { r.int() }
+            DroneBlueprint.DroneType.SHIELD -> r.int()
+            else -> {}
+        }
     }
 
     private fun readNearbyShipItself(
@@ -572,7 +619,7 @@ object VanillaSaveParser {
         crew.roomSquare = r.int()
         crew.isPlayer = r.bool()
         crew.cloneReady = r.int()
-        r.int() // death order
+        crew.deathOrder = r.int()
         val tintCount = r.int()
         val tints = ArrayList<Int>()
         repeat(tintCount) { tints.add(r.int()) }

@@ -7,6 +7,7 @@ import xyz.znix.xftl.AbstractSystem
 import xyz.znix.xftl.game.Difficulty
 import xyz.znix.xftl.game.InGameState
 import xyz.znix.xftl.game.StoreData
+import xyz.znix.xftl.layout.Room
 import xyz.znix.xftl.sector.Beacon
 import xyz.znix.xftl.sector.Event
 import xyz.znix.xftl.sector.TextList
@@ -316,10 +317,17 @@ object VanillaSaveWriter {
 
         // Crew. Boarding-drone pawns are AbstractCrew but not LivingCrew;
         // vanilla stores them via the drones section, which we cover below.
+        // Crew waiting in the clonebay are in vanilla's list too, dead, in the
+        // order they'll be cloned.
         val crew = ship.crew.filterIsInstance<LivingCrew>()
-        w.int(crew.size)
+        val cloneSystem = ship.clonebay
+        val cloning = cloneSystem?.queue ?: emptyList()
+        w.int(crew.size + cloning.size)
         for (member in crew) {
             writeCrew(w, game, member)
+        }
+        cloning.forEachIndexed { order, member ->
+            writeCrew(w, game, member, cloneSystem?.room, order)
         }
 
         // Reactor
@@ -501,7 +509,8 @@ object VanillaSaveWriter {
         if (weaponsSystem != null && weaponsSystem.energyLevels > 0) {
             w.int(weapons.size)
             for (weapon in weapons) {
-                writeWeaponModule(w, (weapon.type.chargeTime * 1000).toInt())
+                val goal = (weapon.type.chargeTime * 1000).toInt()
+                writeWeaponModule(w, goal, (weapon.chargeProgress * goal).toInt())
             }
         }
 
@@ -551,10 +560,10 @@ object VanillaSaveWriter {
     /**
      * A weapon module: per-gun charge/targeting state. The defaults match
      * the template's fresh-loadout modules (the only bytes of this structure
-     * vanilla has ever been proven to accept from us).
+     * vanilla has ever been proven to accept from us), but for the charge.
      */
-    private fun writeWeaponModule(w: VanillaSaveByteWriter, coolGoalMs: Int) {
-        w.int(0) // cool
+    private fun writeWeaponModule(w: VanillaSaveByteWriter, coolGoalMs: Int, coolMs: Int = 0) {
+        w.int(coolMs)
         w.int(coolGoalMs)
         w.int(0) // subcool
         w.int(0) // subgoal
@@ -579,21 +588,25 @@ object VanillaSaveWriter {
         w.int(0) // pending projectiles
     }
 
-    private fun writeCrew(w: VanillaSaveByteWriter, game: InGameState, member: LivingCrew) {
+    /** A crewmember; with [cloneRoom], one waiting there to be cloned ([deathOrder]th). */
+    private fun writeCrew(
+        w: VanillaSaveByteWriter, game: InGameState, member: LivingCrew,
+        cloneRoom: Room? = null, deathOrder: Int = -1
+    ) {
         w.string(member.info.name)
         w.string(member.blueprint.name)
         w.bool(false) // boarding_drone
-        w.int(member.health.roundToInt())
+        w.int(if (cloneRoom != null) 0 else member.health.roundToInt())
 
         // Sprite position + room/square. Vanilla's sprite frame includes the
         // ship's layout offset - without it crew render outside the hull on
         // load. 17 = half a room-square, centring the crew in their square.
-        val standing = member.standingPosition
-        val room = standing?.room ?: member.room
+        val standing = member.standingPosition.takeIf { cloneRoom == null }
+        val room = cloneRoom ?: standing?.room ?: member.room
         val squareX = standing?.x ?: 0
         val squareY = standing?.y ?: 0
         val square = squareY * room.width + squareX
-        val off = member.room.ship.offset
+        val off = room.ship.offset
         val spriteX = xyz.znix.xftl.Constants.ROOM_SIZE * (room.x + off.x + squareX) + 17
         val spriteY = xyz.znix.xftl.Constants.ROOM_SIZE * (room.y + off.y + squareY) + 17
         w.int(spriteX)
@@ -602,8 +615,8 @@ object VanillaSaveWriter {
         w.int(square)
         w.bool(member.ownerShip === game.player)
 
-        w.int(0) // clone_ready
-        w.int(-1) // death_order
+        w.int(if (cloneRoom != null) 1 else 0) // clone_ready
+        w.int(deathOrder)
 
         // Sprite tints: (0, colour index) matches real saves.
         w.int(2)
