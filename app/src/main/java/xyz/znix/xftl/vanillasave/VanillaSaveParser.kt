@@ -364,7 +364,7 @@ object VanillaSaveParser {
             r.int() // vulnerable ships
             if (r.bool()) repeat(5) { r.int() } // asteroid field
             repeat(3) { r.int() } // solar flare fade, havoc, PDS ticks
-            if (r.int() != 0) return // projectiles in flight aren't read yet
+            skipProjectiles(r)
             if (!readExtendedShipInfo(r, out.ship, droneTypeOf)) return
             out.nearbyShip?.let { readExtendedShipInfo(r, it, droneTypeOf) }
         } catch (e: Exception) {
@@ -373,8 +373,8 @@ object VanillaSaveParser {
     }
 
     /**
-     * A ship's extended info, as far as the weapons: false if it has a drone
-     * of a type [droneTypeOf] doesn't know, so what follows can't be found.
+     * A ship's extended info: false if it has something that isn't read yet,
+     * so what follows can't be found.
      */
     private fun readExtendedShipInfo(
         r: VanillaSaveReader, ship: VanillaSaveData.ShipData, droneTypeOf: (String) -> DroneBlueprint.DroneType?
@@ -391,25 +391,55 @@ object VanillaSaveParser {
             skipDronePod(r, DroneBlueprint.DroneType.HACKING)
         }
         if ((ship.systems["mind"]?.capacity ?: 0) > 0) repeat(2) { r.int() }
-        if ((ship.systems["weapons"]?.capacity ?: 0) <= 0) return true
-        val count = r.int()
-        check(count == ship.weapons.size) { "weapon modules" }
-        val charges = ArrayList<Int>()
-        repeat(count) {
-            charges += r.int() // cooldown ticks
-            repeat(5) { r.int() } // goal, subcooldown and its goal, boost, charge
-            repeat(r.int() * 2) { r.int() } // current targets
-            repeat(r.int() * 2) { r.int() } // previous targets
-            r.bool(); r.bool(); r.int() // autofire, fire when ready, target
-            repeat(7) { r.int() } // weapon animation
-            r.int(); r.bool(); r.bool() // protract ticks, firing, unknown
-            r.int(); repeat(7) { r.int() } // anim charge, charge animation
-            r.int() // last projectile id
-            if (r.int() != 0) return false // pending projectiles aren't read yet
+        if ((ship.systems["weapons"]?.capacity ?: 0) > 0) {
+            val count = r.int()
+            check(count == ship.weapons.size) { "weapon modules" }
+            val charges = ArrayList<Int>()
+            repeat(count) { charges += readWeaponModule(r) }
+            ship.weaponCharge.clear()
+            ship.weaponCharge += charges
         }
-        ship.weaponCharge.clear()
-        ship.weaponCharge += charges
-        return true
+        if ((ship.systems["artillery"]?.capacity ?: 0) > 0) readWeaponModule(r)
+        return r.int() == 0 // drones without a system aren't read yet
+    }
+
+    /** A weapon's state; returns its charge, in cooldown ticks. */
+    private fun readWeaponModule(r: VanillaSaveReader): Int {
+        val charge = r.int()
+        repeat(5) { r.int() } // goal, subcooldown and its goal, boost, charge
+        repeat(r.int() * 2) { r.int() } // current targets
+        repeat(r.int() * 2) { r.int() } // previous targets
+        r.bool(); r.bool(); r.int() // autofire, fire when ready, target
+        repeat(7) { r.int() } // weapon animation
+        r.int(); r.bool(); r.bool() // protract ticks, firing, unknown
+        r.int(); repeat(7) { r.int() } // anim charge, charge animation
+        r.int() // last projectile id
+        skipProjectiles(r)
+        return charge
+    }
+
+    /** Projectiles in flight: a count, then each one. */
+    private fun skipProjectiles(r: VanillaSaveReader) {
+        repeat(r.int()) { skipProjectile(r) }
+    }
+
+    /** A projectile: its type (0 for none), what all types share, what its type adds. */
+    private fun skipProjectile(r: VanillaSaveReader) {
+        val type = r.int()
+        if (type == 0) return
+        check(type in 1..6) { "unknown projectile type $type" }
+        trace?.invoke(r.pos, "projectile$type@${r.pos}")
+        repeat(29) { r.int() }
+        repeat(2) { r.string() }
+        repeat(18) { r.int() } // two animations, four more fields
+        repeat(3) { r.string() }
+        repeat(5) { r.int() }
+        when (type) {
+            1 -> repeat(2) { r.int() }
+            4 -> repeat(5) { r.int() }
+            5 -> repeat(25) { r.int() }
+            6 -> repeat(12) { r.int() }
+        }
     }
 
     /** A drone's flight state (see VanillaSaveWriter.writeDronePod). */
