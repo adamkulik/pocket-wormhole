@@ -469,7 +469,11 @@ public class InGameState extends MainGame.GameState {
      * rather than a serialised ship, so imports rebuild them this way.
      */
     public void spawnVanillaEnemy(String eventId, int seed) {
+        // An event list picks one at random, and some of them have no ship
         Event event = eventManager.getVanillaEvent(eventId);
+        for (int i = 0; i < 64 && event != null && event.getLoadShipName() == null; i++) {
+            event = eventManager.getVanillaEvent(eventId);
+        }
         if (event == null || event.getLoadShipName() == null) {
             setEnemy(null);
             return;

@@ -726,7 +726,7 @@ object VanillaSaveWriter {
         w.int((system.damageProgress * VanillaSaveFormat.TICKS_PER_SECOND).toInt())
         w.int(0) // battery_power
         w.int(system.hackedBy?.powerSelected ?: 0)
-        w.bool(system.isHackActive)
+        w.bool(system.hackedBy != null) // the probe is on it, pulsing or not
         // Every system in a real FTL 1.6.14 save carries this triple: an
         // effectively-unlimited temporary capacity cap, no temporary loss,
         // and a divisor of one. Writing zeros instead makes vanilla treat the
