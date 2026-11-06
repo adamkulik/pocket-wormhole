@@ -383,9 +383,15 @@ public class InGameState extends MainGame.GameState {
             ShipBlueprint nearbyBlueprint = nearby != null && blueprintManager.getOrNull(nearby.getBlueprint()) instanceof LazyShipBlueprint
                     ? blueprintManager.getShip(nearby.getBlueprint()) : null;
             if (enemy != null && nearbyBlueprint != null) {
-                Ship fresh = enemy.getType() == nearbyBlueprint ? enemy
+                // The flagship belongs to its boss, which isn't anywhere in the ship event
+                BossManager nearbyBoss = !data.getNearbyShipIsFlagship() ? null
+                        : sector.getBosses().stream().findFirst().orElse(null);
+                Ship fresh = nearbyBoss != null ? new Ship(nearbyBlueprint, this, null, null, nearbyBoss)
+                        : enemy.getType() == nearbyBlueprint ? enemy
                         : new Ship(nearbyBlueprint, this, null, enemy.getSpec(), null);
-                fresh.setGenerationSeed(enemy.getGenerationSeed());
+                if (nearbyBoss == null) {
+                    fresh.setGenerationSeed(enemy.getGenerationSeed());
+                }
                 Ship restored = applyVanillaShip(fresh, data, nearby, false);
                 // Its AI: when it gives up or runs, and whether it's running
                 VanillaSaveData.NearbyShipAI ai = data.getNearbyAI();
