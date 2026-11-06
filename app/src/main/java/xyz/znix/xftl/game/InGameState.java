@@ -372,6 +372,10 @@ public class InGameState extends MainGame.GameState {
         int dataBeaconId = Math.min(savedBeacon, data.getBeacons().size() - 1);
         if (data.getBeacons().get(dataBeaconId).getEnemyPresent()) {
             spawnVanillaEnemy(data.getBeacons().get(dataBeaconId).getShipEventId(), data.getBeacons().get(dataBeaconId).getShipEventSeed());
+            // Our map can differ from the save's (the last stand), which puts
+            // the player on another beacon than the one holding this event:
+            // an export has to name it there too, or the next import has no enemy.
+            currentBeacon.setVanillaShipEvent(data.getBeacons().get(dataBeaconId).getShipEventId());
             // The fight in progress: the ship as vanilla saved it - its own
             // blueprint (our generator may pick another one from the same
             // list and seed), hull, systems, weapons, drones, crew and doors
