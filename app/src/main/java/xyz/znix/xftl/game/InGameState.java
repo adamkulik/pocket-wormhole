@@ -370,12 +370,19 @@ public class InGameState extends MainGame.GameState {
         // data list is indexed by VANILLA's beacon order, which can differ
         // in length from ours - clamp before looking up.
         int dataBeaconId = Math.min(savedBeacon, data.getBeacons().size() - 1);
-        if (data.getBeacons().get(dataBeaconId).getEnemyPresent()) {
-            spawnVanillaEnemy(data.getBeacons().get(dataBeaconId).getShipEventId(), data.getBeacons().get(dataBeaconId).getShipEventSeed());
+        // A ship can be here without the beacon holding it: one that stayed
+        // after its event, like a neutral one. It's known by its blueprint then.
+        boolean beaconHoldsShip = data.getBeacons().get(dataBeaconId).getEnemyPresent();
+        String shipEventId = beaconHoldsShip ? data.getBeacons().get(dataBeaconId).getShipEventId()
+                : data.getNearbyShip() == null ? null
+                : data.getNearbyShipIsFlagship() ? "LONG_FLEET"
+                : shipNameOf(data.getNearbyShip().getBlueprint());
+        if (shipEventId != null) {
+            spawnVanillaEnemy(shipEventId, beaconHoldsShip ? data.getBeacons().get(dataBeaconId).getShipEventSeed() : 0);
             // Our map can differ from the save's (the last stand), which puts
             // the player on another beacon than the one holding this event:
             // an export has to name it there too, or the next import has no enemy.
-            currentBeacon.setVanillaShipEvent(data.getBeacons().get(dataBeaconId).getShipEventId());
+            currentBeacon.setVanillaShipEvent(shipEventId);
             // The fight in progress: the ship as vanilla saved it - its own
             // blueprint (our generator may pick another one from the same
             // list and seed), hull, systems, weapons, drones, crew and doors
@@ -443,6 +450,18 @@ public class InGameState extends MainGame.GameState {
         }
 
         updatePlayerCrew();
+    }
+
+    /** The name of a ship spec that can be this blueprint, for a ship with no event of its own. */
+    private String shipNameOf(String blueprint) {
+        for (EnemyShipSpec spec : eventManager.getShips()) {
+            for (Blueprint candidate : spec.getAutoBlueprint().list()) {
+                if (candidate.getName().equals(blueprint)) {
+                    return spec.getName();
+                }
+            }
+        }
+        return null;
     }
 
     /** A landed hacking probe goes back on the system it was hacking. */
