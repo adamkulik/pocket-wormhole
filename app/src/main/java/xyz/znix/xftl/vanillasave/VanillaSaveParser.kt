@@ -96,6 +96,7 @@ class VanillaSaveData {
         var shieldsRechargeTicks: Int = 0
         var superShield: Int = 0
         var superShieldMax: Int = 5
+        var hostile: Boolean = true
         var cloakTicks: Int = 0
         var cloakGoal: Int = 0
         var cloakActive: Boolean = false
@@ -518,7 +519,7 @@ object VanillaSaveParser {
         ship.gfx = r.string()
 
         repeat(r.int()) { r.string(); r.string() } // starting crew (hangar display)
-        r.bool() // hostile
+        ship.hostile = r.bool()
         ship.ftlProgressTicks = r.int()
         r.bool() // jumping
         r.int() // jump anim ticks

@@ -304,7 +304,7 @@ object VanillaSaveWriter {
 
         // Vanilla writes hostile=true for the player ship (verified in real
         // saves), then the jump state.
-        w.bool(true)
+        w.bool(ship === game.player || game.isEnemyHostile)
         w.int((ship.ftlChargeProgress * 85000f).roundToInt())
         w.bool(false)
         w.int(0)
