@@ -335,8 +335,11 @@ object VanillaSaveWriter {
 
         // The 16 fixed system slots
         for ((_, xftlName) in VanillaSaveFormat.SYSTEM_SLOTS) {
-            val system = ship.systems.firstOrNull { it.blueprint.name == xftlName }
-            writeSystem(w, system)
+            // Each artillery gun (the flagship's) has a slot of its own
+            val systems = ship.systems.filter { it.blueprint.name == xftlName }
+            if (systems.isEmpty()) writeSystem(w, null)
+            else if (xftlName == "artillery") systems.forEach { writeSystem(w, it) }
+            else writeSystem(w, systems.first())
         }
 
         // Conditional post-system blocks, in vanilla's order: clonebay,

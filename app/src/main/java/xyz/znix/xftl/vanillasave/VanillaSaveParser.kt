@@ -97,6 +97,9 @@ class VanillaSaveData {
         var superShield: Int = 0
         var superShieldMax: Int = 5
         var hostile: Boolean = true
+
+        /** Every artillery gun's system: the flagship has one per gun, in its blueprint's order. */
+        val artillery: MutableList<VanillaSystem> = ArrayList()
         var cloakTicks: Int = 0
         var cloakGoal: Int = 0
         var cloakActive: Boolean = false
@@ -216,6 +219,14 @@ object VanillaSaveParser {
         data: ByteArray,
         layoutFor: (String) -> Pair<List<Int>, Int>,
         droneTypeOf: (String) -> DroneBlueprint.DroneType?
+    ): VanillaSaveData = parse(data, layoutFor, droneTypeOf) { 1 }
+
+    /** With [artilleryOf], the number of artillery guns on a blueprint, the flagship can be read. */
+    fun parse(
+        data: ByteArray,
+        layoutFor: (String) -> Pair<List<Int>, Int>,
+        droneTypeOf: (String) -> DroneBlueprint.DroneType?,
+        artilleryOf: (String) -> Int
     ): VanillaSaveData {
         val r = VanillaSaveReader(data)
         val out = VanillaSaveData()
@@ -246,7 +257,7 @@ object VanillaSaveParser {
 
         val (roomTiles, doorCount) = layoutFor(out.blueprintName)
         trace?.invoke(r.pos, "beforeShip")
-        readShip(r, out.ship, roomTiles, doorCount)
+        readShip(r, out.ship, roomTiles, doorCount, artilleryOf(out.blueprintName))
 
         trace?.invoke(r.pos, "afterShip/beforeCargo")
         repeat(r.int()) { out.cargo.add(r.string()) }
@@ -343,7 +354,7 @@ object VanillaSaveParser {
         // player's (FTL Profile Editor's SavedGameParser). Best effort: a
         // save it can't be read from still loads, just without the ship's state.
         try {
-            readNearbyShip(r, out, layoutFor, droneTypeOf)
+            readNearbyShip(r, out, layoutFor, droneTypeOf, artilleryOf)
         } catch (e: Exception) {
             trace?.invoke(r.pos, "nearbyError: $e")
             out.nearbyShip = null
@@ -353,7 +364,8 @@ object VanillaSaveParser {
 
     private fun readNearbyShip(
         r: VanillaSaveReader, out: VanillaSaveData, layoutFor: (String) -> Pair<List<Int>, Int>,
-        droneTypeOf: (String) -> DroneBlueprint.DroneType?
+        droneTypeOf: (String) -> DroneBlueprint.DroneType?,
+        artilleryOf: (String) -> Int
     ) {
         r.int() // unknown_mu
         // The encounter: the ship event's seed, the surrender, escape,
@@ -368,7 +380,7 @@ object VanillaSaveParser {
         check(choices in 0..64) { "bad encounter" }
         repeat(choices) { r.int() }
 
-        if (r.bool()) readNearbyShipItself(r, out, layoutFor)
+        if (r.bool()) readNearbyShipItself(r, out, layoutFor, artilleryOf)
 
         // The environment, the projectiles in flight, then each ship's
         // extended info: as far as it's modelled (the weapons' charge).
@@ -417,7 +429,7 @@ object VanillaSaveParser {
             ship.weaponCharge.clear()
             ship.weaponCharge += charges
         }
-        if ((ship.systems["artillery"]?.capacity ?: 0) > 0) readWeaponModule(r)
+        repeat(ship.artillery.size) { readWeaponModule(r) }
         return r.int() == 0 // drones without a system aren't read yet
     }
 
@@ -486,7 +498,8 @@ object VanillaSaveParser {
     }
 
     private fun readNearbyShipItself(
-        r: VanillaSaveReader, out: VanillaSaveData, layoutFor: (String) -> Pair<List<Int>, Int>
+        r: VanillaSaveReader, out: VanillaSaveData, layoutFor: (String) -> Pair<List<Int>, Int>,
+        artilleryOf: (String) -> Int
     ) {
         out.nearbyShipIsFlagship = r.bool()
         val start = r.pos
@@ -495,7 +508,7 @@ object VanillaSaveParser {
         val (tiles, doors) = layoutFor(blueprint)
         val ship = VanillaSaveData.ShipData()
         trace?.invoke(r.pos, "nearbyShipStart")
-        readShip(r, ship, tiles, doors)
+        readShip(r, ship, tiles, doors, artilleryOf(blueprint))
         out.nearbyShip = ship
         trace?.invoke(r.pos, "nearbyShipEnd")
 
@@ -513,7 +526,9 @@ object VanillaSaveParser {
         out.nearbyAI = ai
     }
 
-    private fun readShip(r: VanillaSaveReader, ship: VanillaSaveData.ShipData, roomTiles: List<Int>, doorCount: Int) {
+    private fun readShip(
+        r: VanillaSaveReader, ship: VanillaSaveData.ShipData, roomTiles: List<Int>, doorCount: Int, artilleryCount: Int
+    ) {
         ship.blueprint = r.string()
         ship.name = r.string()
         ship.gfx = r.string()
@@ -538,22 +553,26 @@ object VanillaSaveParser {
         ship.reactor = r.int()
 
         for ((slotName, _) in VanillaSaveFormat.SYSTEM_SLOTS) {
-            val sys = VanillaSaveData.VanillaSystem()
-            sys.capacity = r.int()
-            if (sys.capacity > 0) {
-                sys.power = r.int()
-                sys.damaged = r.int()
-                sys.ion = r.int()
-                sys.deionisationTicks = r.int()
-                sys.repairProgress = r.int()
-                sys.damageProgress = r.int()
-                r.int() // battery power
-                sys.hackLevel = r.int()
-                sys.hacked = r.bool()
-                sys.tempCapacityCap = r.int()
-                sys.tempCapacityLoss = r.int()
-                sys.tempCapacityDivisor = r.int()
-                ship.systems[slotName] = sys
+            // A slot per system, but each artillery gun is a system
+            repeat(if (slotName == "artillery") artilleryCount.coerceAtLeast(1) else 1) {
+                val sys = VanillaSaveData.VanillaSystem()
+                sys.capacity = r.int()
+                if (sys.capacity > 0) {
+                    sys.power = r.int()
+                    sys.damaged = r.int()
+                    sys.ion = r.int()
+                    sys.deionisationTicks = r.int()
+                    sys.repairProgress = r.int()
+                    sys.damageProgress = r.int()
+                    r.int() // battery power
+                    sys.hackLevel = r.int()
+                    sys.hacked = r.bool()
+                    sys.tempCapacityCap = r.int()
+                    sys.tempCapacityLoss = r.int()
+                    sys.tempCapacityDivisor = r.int()
+                    ship.systems.putIfAbsent(slotName, sys)
+                    if (slotName == "artillery") ship.artillery += sys
+                }
             }
         }
 

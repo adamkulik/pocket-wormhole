@@ -542,11 +542,13 @@ public class InGameState extends MainGame.GameState {
         // skipped (they can only be lost if vanilla bought a system our
         // layout has no slot for, which the dat doesn't allow for player
         // ships).
+        int nextArtillery = 0;
         for (Element sysElem : xml.getChild("systems").getChildren("system")) {
             String xftlName = sysElem.getAttributeValue("name");
             String slot = vanillaSlotForXftlName(xftlName);
             if (slot == null) continue;
-            VanillaSaveData.VanillaSystem vsSys = vs.getSystems().get(slot);
+            VanillaSaveData.VanillaSystem vsSys = "artillery".equals(slot) && nextArtillery < vs.getArtillery().size()
+                    ? vs.getArtillery().get(nextArtillery++) : vs.getSystems().get(slot);
             if (vsSys == null) continue;
 
             AbstractSystem system = null;

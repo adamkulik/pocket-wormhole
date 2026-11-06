@@ -175,7 +175,7 @@ public class MainGame implements Game {
                 Object bp = content.blueprintManager.getBlueprints().get(droneId);
                 return bp instanceof xyz.znix.xftl.weapons.DroneBlueprint
                         ? ((xyz.znix.xftl.weapons.DroneBlueprint) bp).getType() : null;
-            });
+            }, bpId -> content.blueprintManager.getShip(bpId).getArtilleryCount());
             setCurrentState(new InGameState(this, getGameContent(data.getAdvanced()), data));
             // Consumed: rename to a backup so it can't shadow newer saves.
             try {
