@@ -497,7 +497,7 @@ object VanillaSaveWriter {
             w.bool(landed)
             w.bool(landed)
             w.bool(landed)
-            w.int(if (pulse != null) (goal - pulse * VanillaSaveFormat.TICKS_PER_SECOND).toInt() else goal)
+            w.int(if (pulse != null) (goal - pulse * VanillaSaveFormat.TICKS_PER_SECOND).toInt().coerceAtLeast(1) else goal)
             w.int(goal)
             w.bool(false)
             writeDronePod(w, DroneBlueprint.DroneType.HACKING)

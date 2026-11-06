@@ -446,7 +446,8 @@ public class InGameState extends MainGame.GameState {
         String name = slots.get(state.getTargetSystem()).getFirst();
         for (AbstractSystem system : target.getSystems()) {
             if (system.getBlueprint().getName().equals(name) && system.getRoom() != null) {
-                boolean running = state.getPulseTicks() < state.getPulseGoalTicks();
+                // (0: no pulse yet on this probe, vanilla doesn't start one from it)
+                boolean running = state.getPulseTicks() > 0 && state.getPulseTicks() < state.getPulseGoalTicks();
                 float left = (state.getPulseGoalTicks() - state.getPulseTicks()) / VanillaSaveFormat.TICKS_PER_SECOND;
                 owner.getHacking().restoreLandedProbe(system.getRoom(), running ? left : null);
                 return;
