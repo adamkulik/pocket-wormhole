@@ -44,6 +44,12 @@ class VanillaSaveData {
      */
     var nearbyShip: ShipData? = null
     var nearbyShipIsFlagship: Boolean = false
+
+    // The current beacon's hazards
+    var redGiant: Boolean = false
+    var pulsar: Boolean = false
+    var pds: Boolean = false
+    var asteroids: Boolean = false
     var nearbyAI: NearbyShipAI? = null
 
     /** The nearby ship's AI: whether it gave up or is running, and when it will. */
@@ -388,9 +394,12 @@ object VanillaSaveParser {
         // The environment, the projectiles in flight, then each ship's
         // extended info: as far as it's modelled (the weapons' charge).
         try {
-            repeat(3) { r.bool() } // red giant, pulsar, PDS
+            out.redGiant = r.bool()
+            out.pulsar = r.bool()
+            out.pds = r.bool()
             r.int() // vulnerable ships
-            if (r.bool()) repeat(5) { r.int() } // asteroid field
+            out.asteroids = r.bool()
+            if (out.asteroids) repeat(5) { r.int() } // asteroid field
             repeat(3) { r.int() } // solar flare fade, havoc, PDS ticks
             skipProjectiles(r)
             if (!readExtendedShipInfo(r, out.ship, droneTypeOf)) return
