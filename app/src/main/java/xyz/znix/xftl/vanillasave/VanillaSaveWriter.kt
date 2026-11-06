@@ -209,7 +209,15 @@ object VanillaSaveWriter {
         val suffix = VanillaSaveFormat.TAIL_SUFFIX
         w.raw(suffix.copyOfRange(0, 4)) // nu
         if (nearby != null) w.int(0) // xi
-        w.raw(suffix.copyOfRange(4, suffix.size))
+        if (nearby?.boss != null) {
+            // The block that ends the file: the flagship has its rooms'
+            // previous occupancy there, a count and an int per room
+            w.raw(suffix.copyOfRange(4, suffix.size - 4))
+            w.int(nearby.rooms.size)
+            nearby.rooms.forEach { w.int(if (it.crew.isEmpty()) 0 else 1) }
+        } else {
+            w.raw(suffix.copyOfRange(4, suffix.size))
+        }
 
         return w.toByteArray()
     }
@@ -766,10 +774,12 @@ object VanillaSaveWriter {
 
         w.bool(visited || beacon.vanillaSeen) // seen
 
-        val ship = beacon.ship
+        // (the flagship is on its boss, not on the beacon it's at)
+        val flagship = game.enemy?.takeIf { it.boss != null && it.health > 0 && beacon === game.currentBeacon }
+        val ship = beacon.ship ?: flagship
         w.bool(ship != null)
         if (ship != null) {
-            w.string(beacon.vanillaShipEvent ?: vanillaEventName(beacon.event))
+            w.string(beacon.vanillaShipEvent ?: if (flagship != null) "LONG_FLEET" else vanillaEventName(beacon.event))
             w.string(ship.spec?.autoBlueprint?.resolve()?.name ?: "")
             w.int(ship.generationSeed ?: 0)
         }

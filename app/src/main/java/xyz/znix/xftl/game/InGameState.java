@@ -389,6 +389,10 @@ public class InGameState extends MainGame.GameState {
                 Ship fresh = nearbyBoss != null ? new Ship(nearbyBlueprint, this, null, null, nearbyBoss)
                         : enemy.getType() == nearbyBlueprint ? enemy
                         : new Ship(nearbyBlueprint, this, null, enemy.getSpec(), null);
+                // (a new ship has no systems yet: the save's are matched to them)
+                if (fresh != enemy) {
+                    fresh.loadDefaultContents();
+                }
                 if (nearbyBoss == null) {
                     fresh.setGenerationSeed(enemy.getGenerationSeed());
                 }
@@ -407,7 +411,8 @@ public class InGameState extends MainGame.GameState {
                     }
                 }
                 setEnemy(restored);
-                currentBeacon.setShip(restored);
+                // (a beacon can't hold the flagship: its boss does)
+                currentBeacon.setShip(nearbyBoss != null ? null : restored);
                 // (a civilian at a distress beacon, one that's given up...)
                 setEnemyIsHostile(nearby.getHostile());
             }
@@ -526,6 +531,11 @@ public class InGameState extends MainGame.GameState {
     }
 
     private Ship applyVanillaShip(Ship ship, VanillaSaveData data, VanillaSaveData.ShipData vs, boolean isPlayer) {
+        // The flagship's boss is set again on the ship this rebuilds: it's not
+        // an object this ship's own XML can refer to.
+        BossManager boss = ship.getBoss();
+        ship.setBoss(null);
+
         Element xml = new Element("playerShip");
         ObjectRefs refs = new ObjectRefs();
         refs.register(ship, isPlayer ? "player" : "nearby");
@@ -753,7 +763,9 @@ public class InGameState extends MainGame.GameState {
             xml.addContent(cargoElem);
         }
 
-        return deserialiseSingleShip(xml, new RefLoader(), null);
+        Ship rebuilt = deserialiseSingleShip(xml, new RefLoader(), null);
+        rebuilt.setBoss(boss);
+        return rebuilt;
     }
 
     private static String vanillaSlotForXftlName(String xftlName) {
