@@ -428,6 +428,10 @@ public class InGameState extends MainGame.GameState {
         }
 
         // Last, as drones that attack need the enemy
+        restoreVanillaBoarders(player, data.getShip(), enemy, false);
+        if (enemy != null && data.getNearbyShip() != null) {
+            restoreVanillaBoarders(enemy, data.getNearbyShip(), player, true);
+        }
         restoreVanillaDrones(player, data.getShip());
         if (enemy != null && data.getNearbyShip() != null) {
             restoreVanillaDrones(enemy, data.getNearbyShip());
@@ -462,6 +466,61 @@ public class InGameState extends MainGame.GameState {
             }
         }
         return null;
+    }
+
+    /** A vanilla crewmember, as the XML that a ship's crew load from. */
+    private static Element vanillaCrewElement(Ship ship, VanillaSaveData.VanillaCrew vc, Room room, int square, String oid) {
+        int sqX = square % room.getWidth();
+        int sqY = square / room.getWidth();
+        // The crew's position is their square's top-left corner: exactly
+        // on the square, so they stand there rather than walk off it.
+        float x = Constants.ROOM_SIZE * (room.getX() + ship.getOffset().getX() + sqX);
+        float y = Constants.ROOM_SIZE * (room.getY() + ship.getOffset().getY() + sqY);
+
+        Element crewElem = new Element("crewMember");
+        // The deserialiser registers every crew element by oid
+        // (SaveUtil.registerObjectId) - freshly built elements need one
+        // too, else Ship.loadFromXml dies with "Missing object ID!".
+        // Nothing else in the fresh ship's XML references crew oids,
+        // so any unique id works.
+        crewElem.setAttribute("oid", oid);
+        crewElem.setAttribute("type", vc.getRace());
+        crewElem.setAttribute("x", Float.toString(x));
+        crewElem.setAttribute("y", Float.toString(y));
+        crewElem.setAttribute("health", Integer.toString(vc.getHealth()));
+        crewElem.setAttribute("action", "IDLE");
+        crewElem.setAttribute("selectedName", vc.getName());
+        crewElem.setAttribute("colour", Integer.toString(vc.getColour()));
+        for (Map.Entry<String, Integer> skill : vc.getSkills().entrySet()) {
+            xyz.znix.xftl.crew.Skill skillEnum = xftlSkillEnum(skill.getKey());
+            float progress = skill.getValue() * skillEnum.getAmountPerAction();
+            if (progress <= 0) continue;
+            Element skillElem = new Element("skill");
+            skillElem.setAttribute("id", skillEnum.name());
+            skillElem.setAttribute("value", Float.toString(Math.min(progress, 2f)));
+            crewElem.addContent(skillElem);
+        }
+        return crewElem;
+    }
+
+    /**
+     * Crew standing on the other side's ship: vanilla lists them with the ship
+     * they're on, so they're brought in once both ships exist. [owner] is null
+     * for intruders whose ship is gone.
+     */
+    private void restoreVanillaBoarders(Ship on, VanillaSaveData.ShipData vs, Ship owner, boolean ownedByPlayer) {
+        int index = 0;
+        for (VanillaSaveData.VanillaCrew vc : vs.getCrew()) {
+            if (isWaitingToClone(vc) || vc.isPlayer() != ownedByPlayer) continue;
+            if (vc.getRoomId() < 0 || vc.getRoomId() >= on.getRooms().size()) continue;
+            CrewBlueprint race = (CrewBlueprint) blueprintManager.get(vc.getRace());
+            LivingCrew boarder = on.addCrewMember(LivingCrewInfo.Companion.generateRandom(race, this), false, true);
+            Room room = on.getRooms().get(vc.getRoomId());
+            Element boarderElem = vanillaCrewElement(on, vc, room, vc.getRoomSquare(), "vanillaboarder:" + index++);
+            boarderElem.setAttribute("ownerShip", new ObjectRefs().get(null));
+            boarder.loadFromXML(boarderElem, new RefLoader());
+            boarder.setOwnerShip(owner);
+        }
     }
 
     /** A landed hacking probe goes back on the system it was hacking. */
@@ -648,45 +707,16 @@ public class InGameState extends MainGame.GameState {
             if (cloning && (cloningQueue == null || vc.isPlayer() != isPlayer)) {
                 continue; // no clonebay of theirs here: vanilla loses them too
             }
-            if (!cloning && !isPlayer && vc.isPlayer()) {
-                continue; // the player's boarders aren't this ship's crew
+            if (!cloning && vc.isPlayer() != isPlayer) {
+                continue; // boarders: vanilla lists crew on the ship they're on (restoreVanillaBoarders)
             }
             if (!cloning && (vc.getRoomId() < 0 || vc.getRoomId() >= ship.getRooms().size())) {
                 continue;
             }
             Room room = cloning ? clonebay.getRoom() : ship.getRooms().get(vc.getRoomId());
             int square = cloning ? 0 : vc.getRoomSquare();
-            int sqX = square % room.getWidth();
-            int sqY = square / room.getWidth();
-            // The crew's position is their square's top-left corner: exactly
-            // on the square, so they stand there rather than walk off it.
-            float x = Constants.ROOM_SIZE * (room.getX() + ship.getOffset().getX() + sqX);
-            float y = Constants.ROOM_SIZE * (room.getY() + ship.getOffset().getY() + sqY);
-
-            Element crewElem = new Element("crewMember");
-            // The deserialiser registers every crew element by oid
-            // (SaveUtil.registerObjectId) — freshly built elements need one
-            // too, else Ship.loadFromXml dies with "Missing object ID!".
-            // Nothing else in the fresh ship's XML references crew oids,
-            // so any unique id works.
-            crewElem.setAttribute("oid", "vanillacrew:" + crewIndex);
-            crewElem.setAttribute("type", vc.getRace());
-            crewElem.setAttribute("x", Float.toString(x));
-            crewElem.setAttribute("y", Float.toString(y));
-            crewElem.setAttribute("health", Integer.toString(vc.getHealth()));
-            crewElem.setAttribute("action", "IDLE");
+            Element crewElem = vanillaCrewElement(ship, vc, room, square, "vanillacrew:" + crewIndex);
             crewElem.setAttribute("ownerShip", refs.get(ship));
-            crewElem.setAttribute("selectedName", vc.getName());
-            crewElem.setAttribute("colour", Integer.toString(vc.getColour()));
-            for (Map.Entry<String, Integer> skill : vc.getSkills().entrySet()) {
-                xyz.znix.xftl.crew.Skill skillEnum = xftlSkillEnum(skill.getKey());
-                float progress = skill.getValue() * skillEnum.getAmountPerAction();
-                if (progress <= 0) continue;
-                Element skillElem = new Element("skill");
-                skillElem.setAttribute("id", skillEnum.name());
-                skillElem.setAttribute("value", Float.toString(Math.min(progress, 2f)));
-                crewElem.addContent(skillElem);
-            }
             (cloning ? cloningQueue : crewList).addContent(crewElem);
             crewIndex++;
         }
