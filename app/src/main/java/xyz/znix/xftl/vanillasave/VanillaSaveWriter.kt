@@ -207,7 +207,16 @@ object VanillaSaveWriter {
             writeShip(w, game, nearby)
             writeNearbyShipAI(w, nearby)
         }
-        w.raw(tail.copyOfRange(VanillaSaveFormat.TAIL_NEARBY_FLAG + 4, tail.size))
+        // The environment: red giant, pulsar, PDS, vulnerable ships, asteroid
+        // field (with 5 ints of its own). The rest is proven template.
+        val hazard = game.currentBeacon.environmentType
+        val afterFlag = VanillaSaveFormat.TAIL_NEARBY_FLAG + 4
+        w.bool(hazard == Beacon.EnvironmentType.SUN)
+        w.bool(hazard == Beacon.EnvironmentType.PULSAR)
+        w.raw(tail.copyOfRange(afterFlag + 8, afterFlag + 16))
+        w.bool(hazard == Beacon.EnvironmentType.ASTEROID)
+        if (hazard == Beacon.EnvironmentType.ASTEROID) repeat(5) { w.int(0) }
+        w.raw(tail.copyOfRange(afterFlag + 20, tail.size))
         writeExtendedShipInfo(w, game, player)
         if (nearby != null) writeExtendedShipInfo(w, game, nearby)
         val suffix = VanillaSaveFormat.TAIL_SUFFIX

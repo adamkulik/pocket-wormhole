@@ -427,6 +427,15 @@ public class InGameState extends MainGame.GameState {
             setEnemy(currentBeacon.getShip());
         }
 
+        // The beacon's hazard, which a ship's event doesn't say
+        Beacon.EnvironmentType savedHazard = data.getRedGiant() ? Beacon.EnvironmentType.SUN
+                : data.getPulsar() ? Beacon.EnvironmentType.PULSAR
+                : data.getAsteroids() ? Beacon.EnvironmentType.ASTEROID : null;
+        if (savedHazard != null && savedHazard != currentBeacon.getEnvironmentType()) {
+            currentBeacon.setVanillaEnvironment(savedHazard);
+            currentBeacon.clearEnvironment();
+        }
+
         // Last, as drones that attack need the enemy
         restoreVanillaBoarders(player, data.getShip(), enemy, false);
         if (enemy != null && data.getNearbyShip() != null) {
