@@ -474,16 +474,22 @@ public class InGameState extends MainGame.GameState {
      * rather than a serialised ship, so imports rebuild them this way.
      */
     public void spawnVanillaEnemy(String eventId, int seed) {
-        // An event list picks one at random, and some of them have no ship
-        Event event = eventManager.getVanillaEvent(eventId);
-        for (int i = 0; i < 64 && event != null && event.getLoadShipName() == null; i++) {
-            event = eventManager.getVanillaEvent(eventId);
+        // Vanilla saves the ship's name, which is often an event's name too,
+        // but not always (the last stand's REBEL_AND_AUTO). Saves we wrote
+        // before this may hold an event instead: an event list picks one at
+        // random, and some of them have no ship.
+        EnemyShipSpec spec = eventManager.hasShip(eventId) ? eventManager.getShip(eventId) : null;
+        if (spec == null) {
+            Event event = eventManager.getVanillaEvent(eventId);
+            for (int i = 0; i < 64 && event != null && event.getLoadShipName() == null; i++) {
+                event = eventManager.getVanillaEvent(eventId);
+            }
+            if (event == null || event.getLoadShipName() == null) {
+                setEnemy(null);
+                return;
+            }
+            spec = eventManager.getShip(event.getLoadShipName());
         }
-        if (event == null || event.getLoadShipName() == null) {
-            setEnemy(null);
-            return;
-        }
-        EnemyShipSpec spec = eventManager.getShip(event.getLoadShipName());
         int sectorNum = currentBeacon.getSector().getSectorNumber();
         setEnemy(content.generator.buildShip(this, spec, sectorNum, difficulty, seed));
         currentBeacon.setShip(enemy);
