@@ -98,6 +98,9 @@ class VanillaSaveData {
         var superShieldMax: Int = 5
         var hostile: Boolean = true
 
+        /** Burning tiles: room, tile as in the file (columns first) and the fire's health, 1-100. */
+        val fires: MutableList<Triple<Int, Int, Int>> = ArrayList()
+
         /** Every artillery gun's system: the flagship has one per gun, in its blueprint's order. */
         val artillery: MutableList<VanillaSystem> = ArrayList()
         var cloakTicks: Int = 0
@@ -605,13 +608,15 @@ object VanillaSaveParser {
 
         trace?.invoke(r.pos, "afterConditionals")
         // Rooms: o2, then 3 ints per tile (fire health, ignition, extinguish
-        // progress), then the station's square and direction. Only the
-        // oxygen percentage is kept (0-1 floats for the loader).
+        // progress), then the station's square and direction. The oxygen
+        // percentage (0-1 floats for the loader) and the fires are kept.
         ship.roomOxygen.clear()
-        for (tiles in roomTiles) {
+        for ((room, tiles) in roomTiles.withIndex()) {
             ship.roomOxygen.add(r.int() / 100f)
-            repeat(tiles) {
-                r.int(); r.int(); r.int()
+            repeat(tiles) { tile ->
+                val fireHealth = r.int()
+                r.int(); r.int()
+                if (fireHealth > 0) ship.fires += Triple(room, tile, fireHealth)
             }
             r.int(); r.int()
         }

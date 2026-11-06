@@ -747,6 +747,25 @@ public class InGameState extends MainGame.GameState {
             breachElem.setAttribute("health", Float.toString(breach.getThird() / 10f));
             roomElem.addContent(breachElem);
         }
+        for (Triple<Integer, Integer, Integer> fire : vs.getFires()) {
+            if (fire.getFirst() >= ship.getRooms().size())
+                continue;
+            Element roomElem = breachRooms.computeIfAbsent(fire.getFirst(), k -> {
+                Element elem = new Element("room");
+                elem.setAttribute("id", k.toString());
+                roomsElem.addContent(elem);
+                return elem;
+            });
+            // Tiles are in columns in the file, the room's slots are in rows
+            Room burning = ship.getRooms().get(fire.getFirst());
+            int fireSlot = fire.getSecond() / burning.getHeight() + fire.getSecond() % burning.getHeight() * burning.getWidth();
+            Element fireElem = new Element("fire");
+            fireElem.setAttribute("slot", Integer.toString(fireSlot));
+            fireElem.setAttribute("health", Float.toString(fire.getThird() / 100f));
+            fireElem.setAttribute("burnoutTimer", "null");
+            fireElem.setAttribute("animation", "0");
+            roomElem.addContent(fireElem);
+        }
         xml.addContent(roomsElem);
 
         Element oxygenElem = new Element("oxygenLevels");

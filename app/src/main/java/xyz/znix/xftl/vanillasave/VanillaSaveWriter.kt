@@ -392,14 +392,16 @@ object VanillaSaveWriter {
 
         // Rooms: o2, then per tile (fire health, ignition progress,
         // extinguish progress), then the station's square and direction
-        // (FTL Profile Editor's SavedGameParser.readRoom). No fires: (0, 0, -1).
+        // (FTL Profile Editor's SavedGameParser.readRoom). No fire: (0, 0, -1).
         val layoutRooms = ship.type.rooms
         for ((index, layoutRoom) in layoutRooms.withIndex()) {
             val room = ship.rooms.getOrNull(index)
             w.int(((room?.oxygen ?: 1f) * 100f).roundToInt())
-            val tiles = layoutRoom.size.x * layoutRoom.size.y
-            repeat(tiles) {
-                w.int(0); w.int(0); w.int(-1)
+            // (columns first, unlike the room's slots)
+            for (x in 0 until layoutRoom.size.x) for (y in 0 until layoutRoom.size.y) {
+                val fire = room?.fires?.getOrNull(x + y * layoutRoom.size.x)
+                w.int(fire?.let { (it.health * 100f).roundToInt().coerceAtLeast(1) } ?: 0)
+                w.int(0); w.int(-1)
             }
             val config = room?.system?.configuration
             val station = config?.computerPoint
