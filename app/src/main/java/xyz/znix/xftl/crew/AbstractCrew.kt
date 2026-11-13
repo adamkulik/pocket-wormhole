@@ -1694,6 +1694,8 @@ abstract class AbstractCrew(
 
         SaveUtil.addAttrFloat(elem, "health", health)
         SaveUtil.addAttr(elem, "action", currentAction.name)
+        if (stunTimer > 0f)
+            SaveUtil.addAttrFloat(elem, "stun", stunTimer)
 
         if (pathingTarget != null) {
             SaveUtil.addRoomPoint(elem, "pathingTarget", pathingTarget!!)
@@ -1777,6 +1779,7 @@ abstract class AbstractCrew(
 
         health = SaveUtil.getAttrFloat(elem, "health")
         currentAction = Action.valueOf(SaveUtil.getAttr(elem, "action"))
+        stunTimer = elem.getAttributeValue("stun")?.toFloatOrNull() ?: 0f
 
         if (elem.getChild("pathingTarget") != null) {
             pathingTarget = SaveUtil.getRoomPoint(elem, "pathingTarget", room.ship)

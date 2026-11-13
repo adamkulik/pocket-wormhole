@@ -224,6 +224,13 @@ abstract class AbstractProjectile(
         onSwitchedToTarget()
     }
 
+    /** Put this projectile straight where it's going, without it arriving there. */
+    protected fun placeAtTarget() {
+        pos.set(targetPos)
+        hasReachedTarget = true
+        hasPassedShields = true
+    }
+
     fun setInitialPath(initialPos: IPoint, targetPos: IPoint) {
         pos.set(initialPos)
 

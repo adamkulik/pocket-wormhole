@@ -78,7 +78,6 @@ class Ship(
      * If this ship is a boss, this points to its manager. Null otherwise.
      */
     var boss: BossManager? = boss
-        private set // Mutable only for deserialisation
 
     val rooms: List<Room>
     val doors: List<Door>

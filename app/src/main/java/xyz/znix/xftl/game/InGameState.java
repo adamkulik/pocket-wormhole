@@ -150,6 +150,12 @@ public class InGameState extends MainGame.GameState {
     @Nullable
     public byte[] vanillaTail;
 
+    /**
+     * Vanilla's state variables (achievement counters and such) from an
+     * imported vanilla save, kept so exporting the run gives them back.
+     */
+    public final Map<String, Integer> vanillaStateVars = new HashMap<>();
+
     // Used for animation rendering only
     private float renderingDeltaTime;
 
@@ -310,6 +316,7 @@ public class InGameState extends MainGame.GameState {
         scoreScrapCollected = data.getScoreScrapCollected();
 
         vanillaTail = data.getTail();
+        vanillaStateVars.putAll(data.getStateVars());
         isCurrentlyLoadingSave = true;
 
         // Rebuild the sector tree from the save's seed and walk to the saved
@@ -362,11 +369,85 @@ public class InGameState extends MainGame.GameState {
         // is rebuilt from its spawn spec and seed, like vanilla does. The
         // data list is indexed by VANILLA's beacon order, which can differ
         // in length from ours - clamp before looking up.
-        int dataBeaconId = Math.min(beaconId, data.getBeacons().size() - 1);
-        if (data.getBeacons().get(dataBeaconId).getEnemyPresent()) {
-            spawnVanillaEnemy(data.getBeacons().get(dataBeaconId).getShipEventId(), data.getBeacons().get(dataBeaconId).getShipEventSeed());
+        int dataBeaconId = Math.min(savedBeacon, data.getBeacons().size() - 1);
+        // A ship can be here without the beacon holding it: one that stayed
+        // after its event, like a neutral one. It's known by its blueprint then.
+        boolean beaconHoldsShip = data.getBeacons().get(dataBeaconId).getEnemyPresent();
+        String shipEventId = beaconHoldsShip ? data.getBeacons().get(dataBeaconId).getShipEventId()
+                : data.getNearbyShip() == null ? null
+                : data.getNearbyShipIsFlagship() ? "LONG_FLEET"
+                : shipNameOf(data.getNearbyShip().getBlueprint());
+        if (shipEventId != null) {
+            spawnVanillaEnemy(shipEventId, beaconHoldsShip ? data.getBeacons().get(dataBeaconId).getShipEventSeed() : 0);
+            // Our map can differ from the save's (the last stand), which puts
+            // the player on another beacon than the one holding this event:
+            // an export has to name it there too, or the next import has no enemy.
+            currentBeacon.setVanillaShipEvent(shipEventId);
+            // The fight in progress: the ship as vanilla saved it - its own
+            // blueprint (our generator may pick another one from the same
+            // list and seed), hull, systems, weapons, drones, crew and doors
+            VanillaSaveData.ShipData nearby = data.getNearbyShip();
+            ShipBlueprint nearbyBlueprint = nearby != null && blueprintManager.getOrNull(nearby.getBlueprint()) instanceof LazyShipBlueprint
+                    ? blueprintManager.getShip(nearby.getBlueprint()) : null;
+            if (enemy != null && nearbyBlueprint != null) {
+                // The flagship belongs to its boss, which isn't anywhere in the ship event
+                BossManager nearbyBoss = !data.getNearbyShipIsFlagship() ? null
+                        : sector.getBosses().stream().findFirst().orElse(null);
+                Ship fresh = nearbyBoss != null ? new Ship(nearbyBlueprint, this, null, null, nearbyBoss)
+                        : enemy.getType() == nearbyBlueprint ? enemy
+                        : new Ship(nearbyBlueprint, this, null, enemy.getSpec(), null);
+                // (a new ship has no systems yet: the save's are matched to them)
+                if (fresh != enemy) {
+                    fresh.loadDefaultContents();
+                }
+                if (nearbyBoss == null) {
+                    fresh.setGenerationSeed(enemy.getGenerationSeed());
+                }
+                Ship restored = applyVanillaShip(fresh, data, nearby, false);
+                // Its AI: when it gives up or runs, and whether it's running
+                VanillaSaveData.NearbyShipAI ai = data.getNearbyAI();
+                // (only with the ship's surrender and escape events, which
+                // our AI shows when the threshold is reached)
+                EnemyShipSpec nearbySpec = restored.getSpec();
+                if (ai != null && nearbySpec != null) {
+                    if (nearbySpec.getSurrender() != null)
+                        restored.setSurrenderHealth(ai.getSurrendered() ? 0 : Math.max(ai.getSurrenderThreshold(), 0));
+                    if (nearbySpec.getEscape() != null) {
+                        restored.setEscapeHealth(ai.getEscaping() ? 0 : Math.max(ai.getEscapeThreshold(), 0));
+                        restored.setEscapeTimer(ai.getEscaping() ? ai.getEscapeTicks() / VanillaSaveFormat.TICKS_PER_SECOND : null);
+                    }
+                }
+                setEnemy(restored);
+                // (a beacon can't hold the flagship: its boss does)
+                currentBeacon.setShip(nearbyBoss != null ? null : restored);
+                // (a civilian at a distress beacon, one that's given up...)
+                setEnemyIsHostile(nearby.getHostile());
+            }
         } else {
             setEnemy(currentBeacon.getShip());
+        }
+
+        // The beacon's hazard, which a ship's event doesn't say
+        Beacon.EnvironmentType savedHazard = data.getRedGiant() ? Beacon.EnvironmentType.SUN
+                : data.getPulsar() ? Beacon.EnvironmentType.PULSAR
+                : data.getAsteroids() ? Beacon.EnvironmentType.ASTEROID : null;
+        if (savedHazard != null && savedHazard != currentBeacon.getEnvironmentType()) {
+            currentBeacon.setVanillaEnvironment(savedHazard);
+            currentBeacon.clearEnvironment();
+        }
+
+        // Last, as drones that attack need the enemy
+        restoreVanillaBoarders(player, data.getShip(), enemy, false);
+        if (enemy != null && data.getNearbyShip() != null) {
+            restoreVanillaBoarders(enemy, data.getNearbyShip(), player, true);
+        }
+        restoreVanillaDrones(player, data.getShip());
+        if (enemy != null && data.getNearbyShip() != null) {
+            restoreVanillaDrones(enemy, data.getNearbyShip());
+            restoreVanillaProbe(player, data.getShip(), enemy);
+            restoreVanillaProbe(enemy, data.getNearbyShip(), player);
+            restoreVanillaMindControl(player, data.getShip(), enemy, data.getNearbyShip(), player);
+            restoreVanillaMindControl(enemy, data.getNearbyShip(), player, data.getShip(), player);
         }
 
         for (Beacon beacon : sector.getBeacons()) {
@@ -386,18 +467,165 @@ public class InGameState extends MainGame.GameState {
         updatePlayerCrew();
     }
 
+    /** The name of a ship spec that can be this blueprint, for a ship with no event of its own. */
+    private String shipNameOf(String blueprint) {
+        for (EnemyShipSpec spec : eventManager.getShips()) {
+            for (Blueprint candidate : spec.getAutoBlueprint().list()) {
+                if (candidate.getName().equals(blueprint)) {
+                    return spec.getName();
+                }
+            }
+        }
+        return null;
+    }
+
+    /** A vanilla crewmember, as the XML that a ship's crew load from. */
+    private static Element vanillaCrewElement(Ship ship, VanillaSaveData.VanillaCrew vc, Room room, int square, String oid) {
+        int sqX = square % room.getWidth();
+        int sqY = square / room.getWidth();
+        // The crew's position is their square's top-left corner: exactly
+        // on the square, so they stand there rather than walk off it.
+        float x = Constants.ROOM_SIZE * (room.getX() + ship.getOffset().getX() + sqX);
+        float y = Constants.ROOM_SIZE * (room.getY() + ship.getOffset().getY() + sqY);
+
+        Element crewElem = new Element("crewMember");
+        // The deserialiser registers every crew element by oid
+        // (SaveUtil.registerObjectId) - freshly built elements need one
+        // too, else Ship.loadFromXml dies with "Missing object ID!".
+        // Nothing else in the fresh ship's XML references crew oids,
+        // so any unique id works.
+        crewElem.setAttribute("oid", oid);
+        crewElem.setAttribute("type", vc.getRace());
+        crewElem.setAttribute("x", Float.toString(x));
+        crewElem.setAttribute("y", Float.toString(y));
+        crewElem.setAttribute("health", Integer.toString(vc.getHealth()));
+        crewElem.setAttribute("action", "IDLE");
+        if (vc.getStunTicks() > 0) {
+            crewElem.setAttribute("stun", Float.toString(vc.getStunTicks() / VanillaSaveFormat.TICKS_PER_SECOND));
+        }
+        crewElem.setAttribute("selectedName", vc.getName());
+        crewElem.setAttribute("colour", Integer.toString(vc.getColour()));
+        for (Map.Entry<String, Integer> skill : vc.getSkills().entrySet()) {
+            xyz.znix.xftl.crew.Skill skillEnum = xftlSkillEnum(skill.getKey());
+            float progress = skill.getValue() * skillEnum.getAmountPerAction();
+            if (progress <= 0) continue;
+            Element skillElem = new Element("skill");
+            skillElem.setAttribute("id", skillEnum.name());
+            skillElem.setAttribute("value", Float.toString(Math.min(progress, 2f)));
+            crewElem.addContent(skillElem);
+        }
+        return crewElem;
+    }
+
+    /**
+     * Crew standing on the other side's ship: vanilla lists them with the ship
+     * they're on, so they're brought in once both ships exist. [owner] is null
+     * for intruders whose ship is gone.
+     */
+    private void restoreVanillaBoarders(Ship on, VanillaSaveData.ShipData vs, Ship owner, boolean ownedByPlayer) {
+        int index = 0;
+        for (VanillaSaveData.VanillaCrew vc : vs.getCrew()) {
+            if (isWaitingToClone(vc) || vc.isPlayer() != ownedByPlayer) continue;
+            if (vc.getRoomId() < 0 || vc.getRoomId() >= on.getRooms().size()) continue;
+            CrewBlueprint race = (CrewBlueprint) blueprintManager.get(vc.getRace());
+            LivingCrew boarder = on.addCrewMember(LivingCrewInfo.Companion.generateRandom(race, this), false, true);
+            Room room = on.getRooms().get(vc.getRoomId());
+            Element boarderElem = vanillaCrewElement(on, vc, room, vc.getRoomSquare(), "vanillaboarder:" + index++);
+            boarderElem.setAttribute("ownerShip", new ObjectRefs().get(null));
+            boarder.loadFromXML(boarderElem, new RefLoader());
+            boarder.setOwnerShip(owner);
+        }
+    }
+
+    /** A landed hacking probe goes back on the system it was hacking. */
+    private static void restoreVanillaProbe(Ship owner, VanillaSaveData.ShipData vs, Ship target) {
+        VanillaSaveData.HackingState state = vs.getHacking();
+        if (state == null || owner.getHacking() == null || !state.getProbeLanded()) {
+            return;
+        }
+        List<kotlin.Pair<String, String>> slots = VanillaSaveFormat.INSTANCE.getSYSTEM_SLOTS();
+        if (state.getTargetSystem() < 0 || state.getTargetSystem() >= slots.size()) {
+            return;
+        }
+        String name = slots.get(state.getTargetSystem()).getFirst();
+        for (AbstractSystem system : target.getSystems()) {
+            if (system.getBlueprint().getName().equals(name) && system.getRoom() != null) {
+                // (0: no pulse yet on this probe, vanilla doesn't start one from it)
+                boolean running = state.getPulseTicks() > 0 && state.getPulseTicks() < state.getPulseGoalTicks();
+                float left = (state.getPulseGoalTicks() - state.getPulseTicks()) / VanillaSaveFormat.TICKS_PER_SECOND;
+                owner.getHacking().restoreLandedProbe(system.getRoom(), running ? left : null);
+                return;
+            }
+        }
+    }
+
+    /**
+     * Mind-controlled crew: vanilla lists them on the ship they stand on, owned
+     * by whoever owned them before, with the other side's system holding the
+     * time. [othersData] is the save's data of [other].
+     */
+    private static void restoreVanillaMindControl(Ship on, VanillaSaveData.ShipData vs, Ship other,
+                                                  VanillaSaveData.ShipData othersData, Ship player) {
+        for (VanillaSaveData.VanillaCrew vc : vs.getCrew()) {
+            if (!vc.getMindControlled() || isWaitingToClone(vc)) continue;
+            // Controlled by the side that doesn't own them
+            boolean playerOwned = vc.isPlayer();
+            Ship controller = playerOwned ? (on == player ? other : on) : player;
+            VanillaSaveData.ShipData controllerData = controller == on ? vs : othersData;
+            MindControl mind = controller.getMindControl();
+            if (mind == null || mind.getControlledCrew() != null) continue;
+
+            LivingCrew found = null;
+            for (AbstractCrew crew : on.getCrew()) {
+                if (!(crew instanceof LivingCrew living) || living.getMindControlledBy() != null) continue;
+                if (!living.getInfo().getName().equals(vc.getName())) continue;
+                if ((living.getOwnerShip() == player) != playerOwned) continue;
+                if (found == null || living.getRoom().getId() == vc.getRoomId()) found = living;
+            }
+            if (found == null) continue;
+
+            int ticks = controllerData.getMindTicks();
+            int goal = controllerData.getMindGoal();
+            float left = goal > 0 && ticks < goal ? (goal - ticks) / VanillaSaveFormat.TICKS_PER_SECOND : mind.getDuration();
+            mind.restoreControl(found, left);
+        }
+    }
+
+    /** The drones that were armed when the save was made are launched again. */
+    private static void restoreVanillaDrones(Ship ship, VanillaSaveData.ShipData vs) {
+        Drones drones = ship.getDrones();
+        if (drones == null) {
+            return;
+        }
+        for (int i = 0; i < vs.getDrones().size() && i < drones.getDrones().size(); i++) {
+            if (vs.getDrones().get(i).getArmed()) {
+                drones.restoreDeployedDrone(i);
+            }
+        }
+    }
+
     /**
      * Spawns a hostile ship at the current beacon from an event and the
      * recorded generation seed - vanilla stores enemies as a spawn spec
      * rather than a serialised ship, so imports rebuild them this way.
      */
     public void spawnVanillaEnemy(String eventId, int seed) {
-        Event event = eventManager.getByDeserialisationIdOrNull(eventId);
-        if (event == null || event.getLoadShipName() == null) {
-            setEnemy(null);
-            return;
+        // Vanilla saves the ship's name, which is often an event's name too,
+        // but not always (the last stand's REBEL_AND_AUTO). Saves we wrote
+        // before this may hold an event instead: an event list picks one at
+        // random, and some of them have no ship.
+        EnemyShipSpec spec = eventManager.hasShip(eventId) ? eventManager.getShip(eventId) : null;
+        if (spec == null) {
+            Event event = eventManager.getVanillaEvent(eventId);
+            for (int i = 0; i < 64 && event != null && event.getLoadShipName() == null; i++) {
+                event = eventManager.getVanillaEvent(eventId);
+            }
+            if (event == null || event.getLoadShipName() == null) {
+                setEnemy(null);
+                return;
+            }
+            spec = eventManager.getShip(event.getLoadShipName());
         }
-        EnemyShipSpec spec = eventManager.getShip(event.getLoadShipName());
         int sectorNum = currentBeacon.getSector().getSectorNumber();
         setEnemy(content.generator.buildShip(this, spec, sectorNum, difficulty, seed));
         currentBeacon.setShip(enemy);
@@ -409,34 +637,62 @@ public class InGameState extends MainGame.GameState {
      * values and reloads it through the regular deserialiser.
      */
     private Ship applyVanillaShip(VanillaSaveData data, VanillaSaveData.ShipData vs) {
+        return applyVanillaShip(player, data, vs, true);
+    }
+
+    /**
+     * Patches [ship]'s freshly-serialised XML with a vanilla save's values
+     * for it and reloads it through the regular deserialiser: the player's
+     * ship, or ([isPlayer] false) the ship at the current beacon, which has
+     * no cargo.
+     */
+    /**
+     * Vanilla sets clone_ready on living crew too, once they've been through
+     * a loaded game with a clonebay: only the dead ones are in its queue.
+     */
+    private static boolean isWaitingToClone(VanillaSaveData.VanillaCrew crew) {
+        return crew.getCloneReady() > 0 && crew.getHealth() < 1;
+    }
+
+    private Ship applyVanillaShip(Ship ship, VanillaSaveData data, VanillaSaveData.ShipData vs, boolean isPlayer) {
+        // The flagship's boss is set again on the ship this rebuilds: it's not
+        // an object this ship's own XML can refer to.
+        BossManager boss = ship.getBoss();
+        ship.setBoss(null);
+
         Element xml = new Element("playerShip");
         ObjectRefs refs = new ObjectRefs();
-        refs.register(player, "player");
-        player.saveToXML(xml, refs);
+        refs.register(ship, isPlayer ? "player" : "nearby");
+        ship.saveToXML(xml, refs);
 
         xml.setAttribute("health", Integer.toString(vs.getHull()));
         xml.setAttribute("reactorPower", Integer.toString(vs.getReactor()));
         xml.setAttribute("ftlProgress", Float.toString(vs.getFtlProgressTicks() / 85000f));
 
+        // Resources: an enemy's count too (its missiles run out like vanilla's)
         Element resources = xml.getChild("resources");
-        resources.setAttribute("FUEL", Integer.toString(vs.getFuel()));
-        resources.setAttribute("MISSILES", Integer.toString(vs.getMissiles()));
-        resources.setAttribute("DRONES", Integer.toString(vs.getDroneParts()));
-        resources.setAttribute("SCRAP", Integer.toString(vs.getScrap()));
+        if (resources != null) {
+            resources.setAttribute("FUEL", Integer.toString(vs.getFuel()));
+            resources.setAttribute("MISSILES", Integer.toString(vs.getMissiles()));
+            resources.setAttribute("DRONES", Integer.toString(vs.getDroneParts()));
+            resources.setAttribute("SCRAP", Integer.toString(vs.getScrap()));
+        }
 
         // Patch systems by name; systems the blueprint has no slot for are
         // skipped (they can only be lost if vanilla bought a system our
         // layout has no slot for, which the dat doesn't allow for player
         // ships).
+        int nextArtillery = 0;
         for (Element sysElem : xml.getChild("systems").getChildren("system")) {
             String xftlName = sysElem.getAttributeValue("name");
             String slot = vanillaSlotForXftlName(xftlName);
             if (slot == null) continue;
-            VanillaSaveData.VanillaSystem vsSys = vs.getSystems().get(slot);
+            VanillaSaveData.VanillaSystem vsSys = "artillery".equals(slot) && nextArtillery < vs.getArtillery().size()
+                    ? vs.getArtillery().get(nextArtillery++) : vs.getSystems().get(slot);
             if (vsSys == null) continue;
 
             AbstractSystem system = null;
-            for (AbstractSystem candidate : player.getSystems()) {
+            for (AbstractSystem candidate : ship.getSystems()) {
                 if (candidate.getBlueprint().getName().equals(xftlName)) {
                     system = candidate;
                     break;
@@ -476,54 +732,56 @@ public class InGameState extends MainGame.GameState {
         Element crewList = xml.getChild("crew");
         crewList.removeChildren("crewMember");
         int crewIndex = 0;
-        for (VanillaSaveData.VanillaCrew vc : vs.getCrew()) {
-            if (vc.getCloneReady() > 0) {
-                continue; // crew waiting in the clonebay is dropped on import
+
+        // Crew waiting in the clonebay go in its queue, in the order they
+        // died (which is the order they're cloned in), not on the ship.
+        Clonebay clonebay = ship.getClonebay();
+        Element cloningQueue = null;
+        for (Element sysElem : xml.getChild("systems").getChildren("system")) {
+            if (clonebay != null && sysElem.getAttributeValue("name").equals("clonebay")) {
+                cloningQueue = sysElem.getChild("cloningQueue");
+                if (vs.getCloneGoal() > 0) {
+                    SaveUtil.INSTANCE.addTagFloat(sysElem, "cloneProgress", vs.getCloneProgress() / (float) vs.getCloneGoal());
+                }
             }
-            if (vc.getRoomId() < 0 || vc.getRoomId() >= player.getRooms().size()) {
+        }
+        List<VanillaSaveData.VanillaCrew> savedCrew = new ArrayList<>(vs.getCrew());
+        savedCrew.sort(Comparator.comparingInt(vc -> isWaitingToClone(vc) ? vc.getDeathOrder() : Integer.MIN_VALUE));
+
+        for (VanillaSaveData.VanillaCrew vc : savedCrew) {
+            boolean cloning = isWaitingToClone(vc);
+            if (cloning && (cloningQueue == null || vc.isPlayer() != isPlayer)) {
+                continue; // no clonebay of theirs here: vanilla loses them too
+            }
+            if (!cloning && vc.isPlayer() != isPlayer) {
+                continue; // boarders: vanilla lists crew on the ship they're on (restoreVanillaBoarders)
+            }
+            if (!cloning && (vc.getRoomId() < 0 || vc.getRoomId() >= ship.getRooms().size())) {
                 continue;
             }
-            Room room = player.getRooms().get(vc.getRoomId());
-            int sqX = vc.getRoomSquare() % room.getWidth();
-            int sqY = vc.getRoomSquare() / room.getWidth();
-            float x = Constants.ROOM_SIZE * (room.getX() + player.getOffset().getX() + sqX + 0.5f);
-            float y = Constants.ROOM_SIZE * (room.getY() + player.getOffset().getY() + sqY + 0.5f);
-
-            Element crewElem = new Element("crewMember");
-            // The deserialiser registers every crew element by oid
-            // (SaveUtil.registerObjectId) — freshly built elements need one
-            // too, else Ship.loadFromXml dies with "Missing object ID!".
-            // Nothing else in the fresh ship's XML references crew oids,
-            // so any unique id works.
-            crewElem.setAttribute("oid", "vanillacrew:" + crewIndex);
-            crewElem.setAttribute("type", vc.getRace());
-            crewElem.setAttribute("x", Float.toString(x));
-            crewElem.setAttribute("y", Float.toString(y));
-            crewElem.setAttribute("health", Integer.toString(vc.getHealth()));
-            crewElem.setAttribute("action", "IDLE");
-            crewElem.setAttribute("ownerShip", refs.get(player));
-            crewElem.setAttribute("selectedName", vc.getName());
-            crewElem.setAttribute("colour", Integer.toString(vc.getColour()));
-            for (Map.Entry<String, Integer> skill : vc.getSkills().entrySet()) {
-                xyz.znix.xftl.crew.Skill skillEnum = xftlSkillEnum(skill.getKey());
-                float progress = skill.getValue() * skillEnum.getAmountPerAction();
-                if (progress <= 0) continue;
-                Element skillElem = new Element("skill");
-                skillElem.setAttribute("id", skillEnum.name());
-                skillElem.setAttribute("value", Float.toString(Math.min(progress, 2f)));
-                crewElem.addContent(skillElem);
-            }
-            crewList.addContent(crewElem);
+            Room room = cloning ? clonebay.getRoom() : ship.getRooms().get(vc.getRoomId());
+            int square = cloning ? 0 : vc.getRoomSquare();
+            Element crewElem = vanillaCrewElement(ship, vc, room, square, "vanillacrew:" + crewIndex);
+            crewElem.setAttribute("ownerShip", refs.get(ship));
+            (cloning ? cloningQueue : crewList).addContent(crewElem);
             crewIndex++;
         }
 
-        // Doors: open/closed state string; damage is reset on import.
+        // Doors: open or closed, and the damage boarders have done to them.
         Element doorsElem = xml.getChild("doors");
         doorsElem.removeChildren("door");
         StringBuilder doorState = new StringBuilder();
-        for (int i = 0; i < player.getDoors().size(); i++) {
+        for (int i = 0; i < ship.getDoors().size(); i++) {
             VanillaSaveData.VanillaDoor vd = i < vs.getDoors().size() ? vs.getDoors().get(i) : null;
             doorState.append(vd != null && vd.getOpen() ? 'Y' : 'n');
+            int damage = vd == null ? 0 : Math.min(vd.getMaxHealth() - vd.getHealth(), vd.getMaxHealth() - 1);
+            if (damage > 0) {
+                Element doorElem = new Element("door");
+                doorElem.setAttribute("doorIndex", Integer.toString(i));
+                doorElem.setAttribute("damage", Integer.toString(damage));
+                doorElem.setAttribute("brokenOpen", "null");
+                doorsElem.addContent(doorElem);
+            }
         }
         doorsElem.getChild("isOpen").setText(doorState.toString());
 
@@ -543,11 +801,30 @@ public class InGameState extends MainGame.GameState {
             breachElem.setAttribute("health", Float.toString(breach.getThird() / 10f));
             roomElem.addContent(breachElem);
         }
+        for (Triple<Integer, Integer, Integer> fire : vs.getFires()) {
+            if (fire.getFirst() >= ship.getRooms().size())
+                continue;
+            Element roomElem = breachRooms.computeIfAbsent(fire.getFirst(), k -> {
+                Element elem = new Element("room");
+                elem.setAttribute("id", k.toString());
+                roomsElem.addContent(elem);
+                return elem;
+            });
+            // Tiles are in columns in the file, the room's slots are in rows
+            Room burning = ship.getRooms().get(fire.getFirst());
+            int fireSlot = fire.getSecond() / burning.getHeight() + fire.getSecond() % burning.getHeight() * burning.getWidth();
+            Element fireElem = new Element("fire");
+            fireElem.setAttribute("slot", Integer.toString(fireSlot));
+            fireElem.setAttribute("health", Float.toString(fire.getThird() / 100f));
+            fireElem.setAttribute("burnoutTimer", "null");
+            fireElem.setAttribute("animation", "0");
+            roomElem.addContent(fireElem);
+        }
         xml.addContent(roomsElem);
 
         Element oxygenElem = new Element("oxygenLevels");
         StringBuilder oxygen = new StringBuilder();
-        for (int i = 0; i < player.getRooms().size(); i++) {
+        for (int i = 0; i < ship.getRooms().size(); i++) {
             float o2 = i < vs.getRoomOxygen().size() ? vs.getRoomOxygen().get(i) : 1f;
             oxygen.append(o2);
             oxygen.append(' ');
@@ -563,13 +840,16 @@ public class InGameState extends MainGame.GameState {
         // the per-weapon 'armed' (powered) flag.
         Element weaponsElem = xml.getChild("weapons");
         weaponsElem.removeChildren("weapon");
-        int weaponSlots = player.getHardpoints().size();
+        int weaponSlots = ship.getHardpoints().size();
         for (int i = 0; i < vs.getWeapons().size() && i < weaponSlots; i++) {
             Element weaponElem = new Element("weapon");
             weaponElem.setAttribute("hardpoint", Integer.toString(i));
             weaponElem.setAttribute("type", vs.getWeapons().get(i).getFirst());
             weaponElem.setAttribute("powered", Boolean.toString(vs.getWeapons().get(i).getSecond()));
-            weaponElem.setAttribute("chargeTime", "0");
+            // The charge vanilla saved (seconds), when the save's extended
+            // ship info could be read
+            int chargeTicks = i < vs.getWeaponCharge().size() ? vs.getWeaponCharge().get(i) : 0;
+            weaponElem.setAttribute("chargeTime", Float.toString(chargeTicks / VanillaSaveFormat.TICKS_PER_SECOND));
             weaponsElem.addContent(weaponElem);
         }
 
@@ -598,14 +878,16 @@ public class InGameState extends MainGame.GameState {
 
         // Cargo
         xml.removeChildren("cargoBlueprint");
-        for (int index = 0; index < data.getCargo().size() && index < 4; index++) {
+        for (int index = 0; isPlayer && index < data.getCargo().size() && index < 4; index++) {
             Element cargoElem = new Element("cargoBlueprint");
             cargoElem.setAttribute("name", data.getCargo().get(index));
             cargoElem.setAttribute("index", Integer.toString(index));
             xml.addContent(cargoElem);
         }
 
-        return deserialiseSingleShip(xml, new RefLoader(), null);
+        Ship rebuilt = deserialiseSingleShip(xml, new RefLoader(), null);
+        rebuilt.setBoss(boss);
+        return rebuilt;
     }
 
     private static String vanillaSlotForXftlName(String xftlName) {
@@ -1976,6 +2258,14 @@ public class InGameState extends MainGame.GameState {
             refs.register(boss, "boss");
         }
 
+        // Vanilla state variables an imported vanilla save brought along
+        for (Map.Entry<String, Integer> var : vanillaStateVars.entrySet()) {
+            Element varElem = new Element("vanillaStateVar");
+            varElem.setAttribute("name", var.getKey());
+            varElem.setAttribute("value", Integer.toString(var.getValue()));
+            root.addContent(varElem);
+        }
+
         // If the player ship has a custom layout, save that.
         if (player.getCustomised() != null) {
             Element customLayout = new Element("customLayout");
@@ -2054,6 +2344,10 @@ public class InGameState extends MainGame.GameState {
         String scoreShips = root.getAttributeValue("scoreShips");
         if (scoreShips != null)
             scoreShipsDefeated = Integer.parseInt(scoreShips);
+
+        for (Element varElem : root.getChildren("vanillaStateVar")) {
+            vanillaStateVars.put(varElem.getAttributeValue("name"), Integer.parseInt(varElem.getAttributeValue("value")));
+        }
 
         // If the player ship has a custom layout, load that.
         Element customLayout = root.getChild("customLayout");
@@ -3131,6 +3425,10 @@ public class InGameState extends MainGame.GameState {
     public void updateHotkeyBindings() {
         assert mainGame != null;
         getHotkeyManager().calculateBindings(mainGame.getProfile(), forwardHotkeyBindings, reverseHotkeyBindings);
+    }
+
+    public boolean isEnemyHostile() {
+        return enemyIsHostile;
     }
 
     private void setEnemyIsHostile(boolean enemyIsHostile) {

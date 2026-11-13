@@ -1,6 +1,7 @@
 package xyz.znix.xftl.vanillasave
 
 import xyz.znix.xftl.game.Difficulty
+import xyz.znix.xftl.weapons.DroneBlueprint
 
 /** A parsed vanilla continue.sav (format 11). */
 class VanillaSaveData {
@@ -37,6 +38,36 @@ class VanillaSaveData {
     // The encounter tail, preserved verbatim for re-export
     var tail: ByteArray = ByteArray(0)
 
+    /**
+     * The ship at the current beacon (the one being fought or talked to), as
+     * vanilla saved it, if there is one and its section could be read.
+     */
+    var nearbyShip: ShipData? = null
+    var nearbyShipIsFlagship: Boolean = false
+
+    // The current beacon's hazards
+    var redGiant: Boolean = false
+    var pulsar: Boolean = false
+    var pds: Boolean = false
+    var asteroids: Boolean = false
+    var nearbyAI: NearbyShipAI? = null
+
+    /** The nearby ship's AI: whether it gave up or is running, and when it will. */
+    class NearbyShipAI {
+        var surrendered = false
+        var escaping = false
+        var destroyed = false
+        var surrenderThreshold = 0
+        var escapeThreshold = -1
+
+        /** Counts down to 0, when the ship jumps away. */
+        var escapeTicks = 15000
+        var stalemateTriggered = false
+        var stalemateTicks = 0
+        var boardingAttempts = 0
+        var boardersNeeded = 0
+    }
+
     // Map
     var currentBeaconId: Int = 0
     var hiddenCrystalWorld: Boolean = false
@@ -60,6 +91,14 @@ class VanillaSaveData {
         var ftlProgressTicks: Int = 0
 
         val crew = ArrayList<VanillaCrew>()
+
+        /** Each weapon's charge, in ticks, from the save's extended ship info (if it could be read). */
+        val weaponCharge = ArrayList<Int>()
+        var hacking: VanillaSaveData.HackingState? = null
+
+        /** Mind control: ticks since it took hold and how long it lasts (0, 0 when idle). */
+        var mindTicks: Int = 0
+        var mindGoal: Int = 0
         val systems = HashMap<String, VanillaSystem>() // keyed by vanilla slot name
         var cloneProgress: Int = 0
         var cloneGoal: Int = 0
@@ -67,6 +106,13 @@ class VanillaSaveData {
         var shieldsRechargeTicks: Int = 0
         var superShield: Int = 0
         var superShieldMax: Int = 5
+        var hostile: Boolean = true
+
+        /** Burning tiles: room, tile as in the file (columns first) and the fire's health, 1-100. */
+        val fires: MutableList<Triple<Int, Int, Int>> = ArrayList()
+
+        /** Every artillery gun's system: the flagship has one per gun, in its blueprint's order. */
+        val artillery: MutableList<VanillaSystem> = ArrayList()
         var cloakTicks: Int = 0
         var cloakGoal: Int = 0
         var cloakActive: Boolean = false
@@ -88,10 +134,13 @@ class VanillaSaveData {
         var roomSquare: Int = 0
         var isPlayer: Boolean = true
         var cloneReady: Int = 0
+        var deathOrder: Int = -1
         var savedSquare: Int = 0
         var savedRoom: Int = 0
         val skills = HashMap<String, Int>() // slot name to xp actions
         var colour: Int = 0
+        var mindControlled: Boolean = false
+        var stunTicks: Int = 0
     }
 
     class VanillaSystem {
@@ -114,7 +163,19 @@ class VanillaSaveData {
     class VanillaDoor {
         var maxHealth: Int = 4
         var health: Int = 4
+        var nominalHealth: Int = 4
         var open: Boolean = false
+    }
+
+    /** Vanilla's hacking system: the system it targets, its probe and its pulse. */
+    class HackingState {
+        var targetSystem: Int = -1
+        var probeLaunched: Boolean = false
+        var probeLanded: Boolean = false
+        var targeting: Boolean = false
+        var pulseTicks: Int = 0
+        var pulseGoalTicks: Int = 0
+        var noProbe: Boolean = false
     }
 
     class VanillaDrone {
@@ -166,7 +227,23 @@ object VanillaSaveParser {
      * counts per room and door count for the saved blueprint id (the format
      * stores rooms and doors without counts, so the layout resolves them).
      */
-    fun parse(data: ByteArray, layoutFor: (String) -> Pair<List<Int>, Int>): VanillaSaveData {
+    fun parse(data: ByteArray, layoutFor: (String) -> Pair<List<Int>, Int>): VanillaSaveData =
+        parse(data, layoutFor) { null }
+
+    /** With [droneTypeOf], the weapons' charge can be read past the ship's drones. */
+    fun parse(
+        data: ByteArray,
+        layoutFor: (String) -> Pair<List<Int>, Int>,
+        droneTypeOf: (String) -> DroneBlueprint.DroneType?
+    ): VanillaSaveData = parse(data, layoutFor, droneTypeOf) { 1 }
+
+    /** With [artilleryOf], the number of artillery guns on a blueprint, the flagship can be read. */
+    fun parse(
+        data: ByteArray,
+        layoutFor: (String) -> Pair<List<Int>, Int>,
+        droneTypeOf: (String) -> DroneBlueprint.DroneType?,
+        artilleryOf: (String) -> Int
+    ): VanillaSaveData {
         val r = VanillaSaveReader(data)
         val out = VanillaSaveData()
 
@@ -196,7 +273,7 @@ object VanillaSaveParser {
 
         val (roomTiles, doorCount) = layoutFor(out.blueprintName)
         trace?.invoke(r.pos, "beforeShip")
-        readShip(r, out.ship, roomTiles, doorCount)
+        readShip(r, out.ship, roomTiles, doorCount, artilleryOf(out.blueprintName))
 
         trace?.invoke(r.pos, "afterShip/beforeCargo")
         repeat(r.int()) { out.cargo.add(r.string()) }
@@ -288,16 +365,198 @@ object VanillaSaveParser {
         // the mu int), matching VanillaSaveFormat.TEMPLATE_TAIL's
         // convention.
         out.tail = data.copyOfRange(r.pos, data.size)
+
+        // The encounter and the nearby ship, in the same layout as the
+        // player's (FTL Profile Editor's SavedGameParser). Best effort: a
+        // save it can't be read from still loads, just without the ship's state.
+        try {
+            readNearbyShip(r, out, layoutFor, droneTypeOf, artilleryOf)
+        } catch (e: Exception) {
+            trace?.invoke(r.pos, "nearbyError: $e")
+            out.nearbyShip = null
+        }
         return out
     }
 
-    private fun readShip(r: VanillaSaveReader, ship: VanillaSaveData.ShipData, roomTiles: List<Int>, doorCount: Int) {
+    private fun readNearbyShip(
+        r: VanillaSaveReader, out: VanillaSaveData, layoutFor: (String) -> Pair<List<Int>, Int>,
+        droneTypeOf: (String) -> DroneBlueprint.DroneType?,
+        artilleryOf: (String) -> Int
+    ) {
+        r.int() // unknown_mu
+        // The encounter: the ship event's seed, the surrender, escape,
+        // destroyed, dead crew, got away and last event ids, an unknown int,
+        // the text, the affected crew seed and the choices made
+        r.int()
+        repeat(6) { r.string() }
+        r.int()
+        r.string()
+        r.int()
+        val choices = r.int()
+        check(choices in 0..64) { "bad encounter" }
+        repeat(choices) { r.int() }
+
+        if (r.bool()) readNearbyShipItself(r, out, layoutFor, artilleryOf)
+
+        // The environment, the projectiles in flight, then each ship's
+        // extended info: as far as it's modelled (the weapons' charge).
+        try {
+            out.redGiant = r.bool()
+            out.pulsar = r.bool()
+            out.pds = r.bool()
+            r.int() // vulnerable ships
+            out.asteroids = r.bool()
+            if (out.asteroids) repeat(5) { r.int() } // asteroid field
+            repeat(3) { r.int() } // solar flare fade, havoc, PDS ticks
+            skipProjectiles(r)
+            if (!readExtendedShipInfo(r, out.ship, droneTypeOf)) return
+            out.nearbyShip?.let { readExtendedShipInfo(r, it, droneTypeOf) }
+        } catch (e: Exception) {
+            trace?.invoke(r.pos, "extendedInfoError: $e")
+        }
+    }
+
+    /**
+     * A ship's extended info: false if it has something that isn't read yet,
+     * so what follows can't be found.
+     */
+    private fun readExtendedShipInfo(
+        r: VanillaSaveReader, ship: VanillaSaveData.ShipData, droneTypeOf: (String) -> DroneBlueprint.DroneType?
+    ): Boolean {
+        for (drone in ship.drones) {
+            r.bool(); r.bool() // deployed, armed
+            skipDronePod(r, droneTypeOf(drone.name) ?: return false)
+        }
+        if ((ship.systems["hacking"]?.capacity ?: 0) > 0) {
+            val state = VanillaSaveData.HackingState()
+            state.targetSystem = r.int()
+            state.probeLaunched = r.int() != 0
+            state.probeLanded = r.int() != 0
+            state.targeting = r.int() != 0
+            state.pulseTicks = r.int()
+            state.pulseGoalTicks = r.int()
+            state.noProbe = r.int() != 0
+            ship.hacking = state
+            skipDronePod(r, DroneBlueprint.DroneType.HACKING)
+        }
+        if ((ship.systems["mind"]?.capacity ?: 0) > 0) {
+            ship.mindTicks = r.int()
+            ship.mindGoal = r.int()
+        }
+        if ((ship.systems["weapons"]?.capacity ?: 0) > 0) {
+            val count = r.int()
+            check(count == ship.weapons.size) { "weapon modules" }
+            val charges = ArrayList<Int>()
+            repeat(count) { charges += readWeaponModule(r) }
+            ship.weaponCharge.clear()
+            ship.weaponCharge += charges
+        }
+        repeat(ship.artillery.size) { readWeaponModule(r) }
+        return r.int() == 0 // drones without a system aren't read yet
+    }
+
+    /** A weapon's state; returns its charge, in cooldown ticks. */
+    private fun readWeaponModule(r: VanillaSaveReader): Int {
+        val charge = r.int()
+        repeat(5) { r.int() } // goal, subcooldown and its goal, boost, charge
+        repeat(r.int() * 2) { r.int() } // current targets
+        repeat(r.int() * 2) { r.int() } // previous targets
+        r.bool(); r.bool(); r.int() // autofire, fire when ready, target
+        repeat(7) { r.int() } // weapon animation
+        r.int(); r.bool(); r.bool() // protract ticks, firing, unknown
+        r.int(); repeat(7) { r.int() } // anim charge, charge animation
+        r.int() // last projectile id
+        skipProjectiles(r)
+        return charge
+    }
+
+    /** Projectiles in flight: a count, then each one. */
+    private fun skipProjectiles(r: VanillaSaveReader) {
+        repeat(r.int()) { skipProjectile(r) }
+    }
+
+    /** A projectile: its type (0 for none), what all types share, what its type adds. */
+    private fun skipProjectile(r: VanillaSaveReader) {
+        val type = r.int()
+        if (type == 0) return
+        check(type in 1..6) { "unknown projectile type $type" }
+        trace?.invoke(r.pos, "projectile$type@${r.pos}")
+        repeat(29) { r.int() }
+        repeat(2) { r.string() }
+        repeat(18) { r.int() } // two animations, four more fields
+        repeat(3) { r.string() }
+        repeat(5) { r.int() }
+        when (type) {
+            1 -> repeat(2) { r.int() }
+            4 -> repeat(5) { r.int() }
+            5 -> repeat(25) { r.int() }
+            6 -> repeat(12) { r.int() }
+        }
+    }
+
+    /** A drone's flight state (see VanillaSaveWriter.writeDronePod). */
+    private fun skipDronePod(r: VanillaSaveReader, type: DroneBlueprint.DroneType) {
+        fun skipAnim() {
+            r.bool(); r.bool()
+            repeat(5) { r.int() }
+        }
+
+        when (type) {
+            DroneBlueprint.DroneType.REPAIR, DroneBlueprint.DroneType.BATTLE -> return
+            else -> {}
+        }
+        repeat(29) { r.int() }
+        skipAnim()
+        when (type) {
+            DroneBlueprint.DroneType.BOARDER -> repeat(9) { r.int() }
+            DroneBlueprint.DroneType.HACKING -> {
+                repeat(4) { r.int() }
+                repeat(2) { skipAnim() }
+            }
+            DroneBlueprint.DroneType.COMBAT, DroneBlueprint.DroneType.SHIP_REPAIR -> repeat(5) { r.int() }
+            DroneBlueprint.DroneType.SHIELD -> r.int()
+            else -> {}
+        }
+    }
+
+    private fun readNearbyShipItself(
+        r: VanillaSaveReader, out: VanillaSaveData, layoutFor: (String) -> Pair<List<Int>, Int>,
+        artilleryOf: (String) -> Int
+    ) {
+        out.nearbyShipIsFlagship = r.bool()
+        val start = r.pos
+        val blueprint = r.string()
+        r.seek(start)
+        val (tiles, doors) = layoutFor(blueprint)
+        val ship = VanillaSaveData.ShipData()
+        trace?.invoke(r.pos, "nearbyShipStart")
+        readShip(r, ship, tiles, doors, artilleryOf(blueprint))
+        out.nearbyShip = ship
+        trace?.invoke(r.pos, "nearbyShipEnd")
+
+        val ai = VanillaSaveData.NearbyShipAI()
+        ai.surrendered = r.bool()
+        ai.escaping = r.bool()
+        ai.destroyed = r.bool()
+        ai.surrenderThreshold = r.int()
+        ai.escapeThreshold = r.int()
+        ai.escapeTicks = r.int()
+        ai.stalemateTriggered = r.bool()
+        ai.stalemateTicks = r.int()
+        ai.boardingAttempts = r.int()
+        ai.boardersNeeded = r.int()
+        out.nearbyAI = ai
+    }
+
+    private fun readShip(
+        r: VanillaSaveReader, ship: VanillaSaveData.ShipData, roomTiles: List<Int>, doorCount: Int, artilleryCount: Int
+    ) {
         ship.blueprint = r.string()
         ship.name = r.string()
         ship.gfx = r.string()
 
         repeat(r.int()) { r.string(); r.string() } // starting crew (hangar display)
-        r.bool() // hostile
+        ship.hostile = r.bool()
         ship.ftlProgressTicks = r.int()
         r.bool() // jumping
         r.int() // jump anim ticks
@@ -316,22 +575,26 @@ object VanillaSaveParser {
         ship.reactor = r.int()
 
         for ((slotName, _) in VanillaSaveFormat.SYSTEM_SLOTS) {
-            val sys = VanillaSaveData.VanillaSystem()
-            sys.capacity = r.int()
-            if (sys.capacity > 0) {
-                sys.power = r.int()
-                sys.damaged = r.int()
-                sys.ion = r.int()
-                sys.deionisationTicks = r.int()
-                sys.repairProgress = r.int()
-                sys.damageProgress = r.int()
-                r.int() // battery power
-                sys.hackLevel = r.int()
-                sys.hacked = r.bool()
-                sys.tempCapacityCap = r.int()
-                sys.tempCapacityLoss = r.int()
-                sys.tempCapacityDivisor = r.int()
-                ship.systems[slotName] = sys
+            // A slot per system, but each artillery gun is a system
+            repeat(if (slotName == "artillery") artilleryCount.coerceAtLeast(1) else 1) {
+                val sys = VanillaSaveData.VanillaSystem()
+                sys.capacity = r.int()
+                if (sys.capacity > 0) {
+                    sys.power = r.int()
+                    sys.damaged = r.int()
+                    sys.ion = r.int()
+                    sys.deionisationTicks = r.int()
+                    sys.repairProgress = r.int()
+                    sys.damageProgress = r.int()
+                    r.int() // battery power
+                    sys.hackLevel = r.int()
+                    sys.hacked = r.bool()
+                    sys.tempCapacityCap = r.int()
+                    sys.tempCapacityLoss = r.int()
+                    sys.tempCapacityDivisor = r.int()
+                    ship.systems.putIfAbsent(slotName, sys)
+                    if (slotName == "artillery") ship.artillery += sys
+                }
             }
         }
 
@@ -363,16 +626,18 @@ object VanillaSaveParser {
         }
 
         trace?.invoke(r.pos, "afterConditionals")
-        // Rooms: per room (o2, a, b) + 3 ints per tile; the tile values and
-        // a/b are transient state we don't consume. The oxygen percentage is
-        // kept (0-1 floats for the loader).
+        // Rooms: o2, then 3 ints per tile (fire health, ignition, extinguish
+        // progress), then the station's square and direction. The oxygen
+        // percentage (0-1 floats for the loader) and the fires are kept.
         ship.roomOxygen.clear()
-        for (tiles in roomTiles) {
+        for ((room, tiles) in roomTiles.withIndex()) {
             ship.roomOxygen.add(r.int() / 100f)
-            r.int(); r.int()
-            repeat(tiles) {
-                r.int(); r.int(); r.int()
+            repeat(tiles) { tile ->
+                val fireHealth = r.int()
+                r.int(); r.int()
+                if (fireHealth > 0) ship.fires += Triple(room, tile, fireHealth)
             }
+            r.int(); r.int()
         }
 
         trace?.invoke(r.pos, "afterRooms")
@@ -390,7 +655,7 @@ object VanillaSaveParser {
             val door = VanillaSaveData.VanillaDoor()
             door.maxHealth = r.int()
             door.health = r.int()
-            r.int() // nominal health
+            door.nominalHealth = r.int()
             door.open = r.bool()
             r.bool() // walking through
             r.int() // unknown
@@ -445,12 +710,12 @@ object VanillaSaveParser {
         crew.roomSquare = r.int()
         crew.isPlayer = r.bool()
         crew.cloneReady = r.int()
-        r.int() // death order
+        crew.deathOrder = r.int()
         val tintCount = r.int()
         val tints = ArrayList<Int>()
         repeat(tintCount) { tints.add(r.int()) }
         crew.colour = tints.getOrNull(1) ?: 0
-        r.bool() // mind controlled
+        crew.mindControlled = r.bool()
         crew.savedSquare = r.int()
         crew.savedRoom = r.int()
         // Skills are in vanilla slot order: pilot, engines, shields, weapons,
@@ -461,7 +726,7 @@ object VanillaSaveParser {
         }
         r.bool() // male
         repeat(5) { r.int() } // repairs, kills, evasions, jumps, masteries
-        r.int() // stun ticks
+        crew.stunTicks = r.int()
         r.int() // health boost
         r.int() // clonebay priority
         r.int() // damage boost

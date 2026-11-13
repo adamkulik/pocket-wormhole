@@ -7,8 +7,14 @@ import xyz.znix.xftl.AbstractSystem
 import xyz.znix.xftl.game.Difficulty
 import xyz.znix.xftl.game.InGameState
 import xyz.znix.xftl.game.StoreData
+import xyz.znix.xftl.layout.Room
 import xyz.znix.xftl.sector.Beacon
+import xyz.znix.xftl.sector.Event
+import xyz.znix.xftl.sector.TextList
+import xyz.znix.xftl.sector.IEventText
+import xyz.znix.xftl.sector.EventText
 import xyz.znix.xftl.layout.Door
+import xyz.znix.xftl.math.Direction
 import xyz.znix.xftl.systems.Artillery
 import xyz.znix.xftl.systems.BackupBattery
 import xyz.znix.xftl.systems.Cloaking
@@ -37,6 +43,9 @@ import kotlin.math.roundToInt
  * validated against real vanilla saves.
  */
 object VanillaSaveWriter {
+    /** A room with no crew station. */
+    private const val STATION_NONE = 4
+
     fun write(game: InGameState, out: OutputStream) {
         out.use { it.write(writeToByteArray(game)) }
     }
@@ -66,9 +75,13 @@ object VanillaSaveWriter {
         w.int(sector.sectorNumber + 1)
         w.int(0) // unknown_beta
 
-        // state_vars: vanilla stores achievement counters here; xftl doesn't
-        // track them. Written empty, which is a valid state.
-        w.int(0)
+        // state_vars: vanilla's achievement counters and such; we only keep
+        // the ones an imported vanilla save brought along.
+        w.int(game.vanillaStateVars.size)
+        for ((name, value) in game.vanillaStateVars) {
+            w.string(name)
+            w.int(value)
+        }
 
         // 2. Player ship
         writeShip(w, game, player)
@@ -161,14 +174,14 @@ object VanillaSaveWriter {
         val questBeacons = beacons.withIndex().filter { it.value.hasQuest && !it.value.visited }
         w.int(questBeacons.size)
         for ((_, beacon) in questBeacons) {
-            w.string(beacon.event.deserialisationId)
+            w.string(vanillaEventName(beacon.event))
             w.int(exportOrder.indexOf(beacon))
         }
 
         val delayed = game.delayedQuests
         w.int(delayed.size)
         for (quest in delayed) {
-            w.string(quest.deserialisationId)
+            w.string(vanillaEventName(quest))
         }
 
         // 8. Encounter tail: the template's bytes are real vanilla output
@@ -181,19 +194,118 @@ object VanillaSaveWriter {
         // freeze. Splice: proven prefix (mu, encounter, environment,
         // projectiles) + OUR ship's extended info + proven suffix (nu,
         // autofire, flagship, occupancy).
-        w.raw(VanillaSaveFormat.TAIL_PREFIX)
+        //
+        // A ship at the beacon (being fought or talked to) goes in after the
+        // encounter, like the player's, with its AI state; then its own
+        // extended info after the player's, and an extra int after nu.
+        val nearby = game.enemy?.takeIf { it.health > 0 }
+        val tail = VanillaSaveFormat.TAIL_PREFIX
+        writeEncounter(w, nearby, textId(game.currentBeacon.event.text))
+        w.bool(nearby != null)
+        if (nearby != null) {
+            w.bool(nearby.boss != null) // the rebel flagship
+            writeShip(w, game, nearby)
+            writeNearbyShipAI(w, nearby)
+        }
+        // The environment: red giant, pulsar, PDS, vulnerable ships, asteroid
+        // field (with 5 ints of its own). The rest is proven template.
+        val hazard = game.currentBeacon.environmentType
+        val afterFlag = VanillaSaveFormat.TAIL_NEARBY_FLAG + 4
+        w.bool(hazard == Beacon.EnvironmentType.SUN)
+        w.bool(hazard == Beacon.EnvironmentType.PULSAR)
+        w.raw(tail.copyOfRange(afterFlag + 8, afterFlag + 16))
+        w.bool(hazard == Beacon.EnvironmentType.ASTEROID)
+        if (hazard == Beacon.EnvironmentType.ASTEROID) repeat(5) { w.int(0) }
+        w.raw(tail.copyOfRange(afterFlag + 20, tail.size))
         writeExtendedShipInfo(w, game, player)
-        w.raw(VanillaSaveFormat.TAIL_SUFFIX)
+        if (nearby != null) writeExtendedShipInfo(w, game, nearby)
+        val suffix = VanillaSaveFormat.TAIL_SUFFIX
+        w.raw(suffix.copyOfRange(0, 4)) // nu
+        if (nearby != null) w.int(0) // xi
+        if (nearby?.boss != null) {
+            // The block that ends the file: the flagship has its rooms'
+            // previous occupancy there, a count and an int per room
+            w.raw(suffix.copyOfRange(4, suffix.size - 4))
+            w.int(nearby.rooms.size)
+            nearby.rooms.forEach { w.int(if (it.crew.isEmpty()) 0 else 1) }
+        } else {
+            w.raw(suffix.copyOfRange(4, suffix.size))
+        }
 
         return w.toByteArray()
     }
 
     private fun shipDisplayText(player: Ship) = player.type.shipTitle
 
+    /**
+     * unknown_mu and the encounter: the ship event's seed, the surrender,
+     * escape, destroyed, dead crew, got away and last event ids, an unknown
+     * int, the event text and the affected crew seed, and the choices made.
+     * The text is the current beacon's event's, which vanilla shows again on
+     * loading, like its own saves; no choices, so nothing is replayed. (The
+     * template's encounter was another run's nebula event, which vanilla
+     * replayed: a nebula and boarders at the beacon.)
+     */
+    private fun writeEncounter(w: VanillaSaveByteWriter, nearby: Ship?, text: String) {
+        w.int(0) // unknown_mu
+        w.int(nearby?.generationSeed ?: 0)
+        w.string(VanillaSaveFormat.DEFAULT_SURRENDER_EVENT)
+        w.string(VanillaSaveFormat.DEFAULT_ESCAPE_EVENT)
+        w.string(VanillaSaveFormat.DEFAULT_DESTROYED_EVENT)
+        w.string(VanillaSaveFormat.DEFAULT_DEAD_CREW_EVENT)
+        w.string("") // got away
+        w.string("") // last event
+        w.int(0)
+        w.string(text)
+        w.int(-1) // affected crew seed
+        w.int(0) // choices
+    }
+
+    /** A text's id in the text files (a text list's first), or "" if it has none. */
+    private fun textId(text: IEventText?): String = when (text) {
+        is EventText -> text.id ?: ""
+        is TextList -> text.items.firstOrNull()?.let { textId(it) } ?: ""
+        else -> ""
+    }
+
+    /**
+     * The nearby ship's AI: surrendered, escaping, destroyed, the surrender
+     * and escape hull thresholds, the ticks until it escapes, the stalemate
+     * flag and ticks, boarding attempts and boarders needed.
+     */
+    private fun writeNearbyShipAI(w: VanillaSaveByteWriter, ship: Ship) {
+        val escapeTimer = ship.escapeTimer
+        w.bool(false)
+        w.bool(escapeTimer != null)
+        w.bool(false)
+        w.int(ship.surrenderHealth)
+        w.int(if (ship.escapeHealth > 0 || escapeTimer != null) ship.escapeHealth else -1)
+        w.int(((escapeTimer ?: 15f) * VanillaSaveFormat.TICKS_PER_SECOND).toInt())
+        w.bool(false)
+        w.int(0)
+        w.int(0)
+        w.int(0)
+    }
+
+    /**
+     * The name vanilla knows an event by: a named event's own name, or the
+     * event list an entry of it came from (vanilla saves name the list and
+     * pick from it again). Our IDs are rootEvent::NAME and LIST::eventListN.
+     */
+    private fun vanillaEventName(event: Event): String {
+        val id = event.deserialisationId
+        return when {
+            id.startsWith("rootEvent::") -> id.removePrefix("rootEvent::")
+            "::eventList" in id -> id.substringBefore("::eventList")
+            else -> id
+        }
+    }
+
     private fun writeShip(w: VanillaSaveByteWriter, game: InGameState, ship: Ship) {
         w.string(ship.name)
         val title = ship.type.shipTitle
-        w.string(if (title != null) game.translator[title] else ship.name)
+        // Vanilla's other ships all have this name
+        w.string(if (ship !== game.player) "should not be seen" else if (title != null) game.translator[title] else ship.name)
         w.string(ship.type.img)
 
         // Vanilla writes ONE (race, name) pair PER CREW MEMBER (with the
@@ -213,7 +325,7 @@ object VanillaSaveWriter {
 
         // Vanilla writes hostile=true for the player ship (verified in real
         // saves), then the jump state.
-        w.bool(true)
+        w.bool(ship === game.player || game.isEnemyHostile)
         w.int((ship.ftlChargeProgress * 85000f).roundToInt())
         w.bool(false)
         w.int(0)
@@ -226,10 +338,17 @@ object VanillaSaveWriter {
 
         // Crew. Boarding-drone pawns are AbstractCrew but not LivingCrew;
         // vanilla stores them via the drones section, which we cover below.
+        // Crew waiting in the clonebay are in vanilla's list too, dead, in the
+        // order they'll be cloned.
         val crew = ship.crew.filterIsInstance<LivingCrew>()
-        w.int(crew.size)
+        val cloneSystem = ship.clonebay
+        val cloning = cloneSystem?.queue ?: emptyList()
+        w.int(crew.size + cloning.size)
         for (member in crew) {
             writeCrew(w, game, member)
+        }
+        cloning.forEachIndexed { order, member ->
+            writeCrew(w, game, member, cloneSystem?.room, order)
         }
 
         // Reactor
@@ -237,8 +356,11 @@ object VanillaSaveWriter {
 
         // The 16 fixed system slots
         for ((_, xftlName) in VanillaSaveFormat.SYSTEM_SLOTS) {
-            val system = ship.systems.firstOrNull { it.blueprint.name == xftlName }
-            writeSystem(w, system)
+            // Each artillery gun (the flagship's) has a slot of its own
+            val systems = ship.systems.filter { it.blueprint.name == xftlName }
+            if (systems.isEmpty()) writeSystem(w, null)
+            else if (xftlName == "artillery") systems.forEach { writeSystem(w, it) }
+            else writeSystem(w, systems.first())
         }
 
         // Conditional post-system blocks, in vanilla's order: clonebay,
@@ -277,17 +399,27 @@ object VanillaSaveWriter {
             w.int(((cloaking.timeRemaining ?: 0f) * VanillaSaveFormat.TICKS_PER_SECOND).toInt())
         }
 
-        // Rooms: (o2, a, b) per room + 3 ints per tile. The a/b/tile values
-        // are transient state we don't model - zeros match pristine saves.
+        // Rooms: o2, then per tile (fire health, ignition progress,
+        // extinguish progress), then the station's square and direction
+        // (FTL Profile Editor's SavedGameParser.readRoom). No fire: (0, 0, -1).
         val layoutRooms = ship.type.rooms
         for ((index, layoutRoom) in layoutRooms.withIndex()) {
             val room = ship.rooms.getOrNull(index)
             w.int(((room?.oxygen ?: 1f) * 100f).roundToInt())
-            w.int(0)
-            w.int(0)
-            val tiles = layoutRoom.size.x * layoutRoom.size.y
-            repeat(tiles) {
-                w.int(-1); w.int(0); w.int(0)
+            // (columns first, unlike the room's slots)
+            for (x in 0 until layoutRoom.size.x) for (y in 0 until layoutRoom.size.y) {
+                val fire = room?.fires?.getOrNull(x + y * layoutRoom.size.x)
+                w.int(fire?.let { (it.health * 100f).roundToInt().coerceAtLeast(1) } ?: 0)
+                w.int(0); w.int(-1)
+            }
+            val config = room?.system?.configuration
+            val station = config?.computerPoint
+            if (room != null && station != null) {
+                w.int(station.x + station.y * room.width)
+                w.int(stationDirection(config.computerDirection))
+            } else {
+                w.int(-1)
+                w.int(STATION_NONE)
             }
         }
 
@@ -373,35 +505,46 @@ object VanillaSaveWriter {
      * vanilla's loader against the ship section above.
      */
     private fun writeExtendedShipInfo(w: VanillaSaveByteWriter, game: InGameState, ship: Ship) {
-        // Deployed drones: (deployed, armed) per slot drone plus a pod for
-        // types with a flying body. In-flight drones are transient (dropped
-        // like projectiles), so both flags are false.
+        // Drones: (deployed, armed) per slot drone plus a pod for types with a
+        // flying body. Where a drone is in its flight isn't kept: vanilla
+        // launches one that's armed but not deployed as it loads the save.
         val dronesSystem = ship.systems.firstOrNull { it is Drones } as Drones?
         val slotDrones = dronesSystem?.drones?.filterNotNull() ?: emptyList()
         for (info in slotDrones) {
             w.bool(false)
-            w.bool(false)
+            w.bool(info.instance?.isPowered == true)
             writeDronePod(w, info.type.type)
         }
 
         // Hacking: target + timing fields + a hacking pod.
-        val hacking = ship.systems.firstOrNull { it is Hacking }
+        val hacking = ship.systems.firstOrNull { it is Hacking } as Hacking?
         if (hacking != null && hacking.energyLevels > 0) {
-            w.int(-1) // target room: none
-            w.int(0)
-            w.bool(false)
-            w.int(0)
-            w.int(0)
-            w.int(0)
+            // A landed probe: the system it's on, and the pulse's time and
+            // goal (past the goal when no pulse is running). Where the probe
+            // sits isn't kept: vanilla puts it back on the system.
+            val targetSystem = hacking.landedTarget?.system?.blueprint?.name
+            val targetId = VanillaSaveFormat.SYSTEM_SLOTS.indexOfFirst { it.first == targetSystem }
+            val landed = targetId != -1
+            val goal = (hacking.pulseDuration * VanillaSaveFormat.TICKS_PER_SECOND).toInt()
+            val pulse = hacking.pulseRemaining
+            w.int(targetId) // -1 for none
+            w.bool(landed)
+            w.bool(landed)
+            w.bool(landed)
+            w.int(if (pulse != null) (goal - pulse * VanillaSaveFormat.TICKS_PER_SECOND).toInt().coerceAtLeast(1) else goal)
+            w.int(goal)
             w.bool(false)
             writeDronePod(w, DroneBlueprint.DroneType.HACKING)
         }
 
-        // Mind control: two scalars.
-        val mind = ship.systems.firstOrNull { it is MindControl }
+        // Mind control: the time since it took hold and how long it lasts
+        // (vanilla's idle timer is full: goal, goal).
+        val mind = ship.systems.firstOrNull { it is MindControl } as MindControl?
         if (mind != null && mind.energyLevels > 0) {
-            w.int(0)
-            w.int(0)
+            val goal = (mind.duration * VanillaSaveFormat.TICKS_PER_SECOND).roundToInt()
+            val left = mind.timeRemaining?.takeIf { mind.controlledCrew != null }
+            w.int(if (left != null) (goal - left * VanillaSaveFormat.TICKS_PER_SECOND).roundToInt().coerceIn(0, goal - 1) else goal)
+            w.int(goal)
         }
 
         // Weapon modules - the count MUST equal the ship section's weapon
@@ -411,7 +554,8 @@ object VanillaSaveWriter {
         if (weaponsSystem != null && weaponsSystem.energyLevels > 0) {
             w.int(weapons.size)
             for (weapon in weapons) {
-                writeWeaponModule(w, (weapon.type.chargeTime * 1000).toInt())
+                val goal = (weapon.type.chargeTime * 1000).toInt()
+                writeWeaponModule(w, goal, (weapon.chargeProgress * goal).toInt())
             }
         }
 
@@ -436,9 +580,10 @@ object VanillaSaveWriter {
             DroneBlueprint.DroneType.REPAIR, DroneBlueprint.DroneType.BATTLE -> return
             else -> {}
         }
-        // mourning, space, dest, pos x10, ticks x6, hops, pi, rho, overload,
-        // tau, upsilon, dpos x2, death anim (2 bools + 5 ints)
-        repeat(3 + 10 + 6 + 6 + 2) { w.int(0) }
+        // 29 ints, then the death animation (2 bools + 5 ints). Vanilla reads
+        // a fixed size: short pods shift everything after them, and what it
+        // reads as the weapon modules' count then crashes it.
+        repeat(29) { w.int(0) }
         w.bool(false); w.bool(false)
         repeat(5) { w.int(0) }
         when (type) {
@@ -461,10 +606,10 @@ object VanillaSaveWriter {
     /**
      * A weapon module: per-gun charge/targeting state. The defaults match
      * the template's fresh-loadout modules (the only bytes of this structure
-     * vanilla has ever been proven to accept from us).
+     * vanilla has ever been proven to accept from us), but for the charge.
      */
-    private fun writeWeaponModule(w: VanillaSaveByteWriter, coolGoalMs: Int) {
-        w.int(0) // cool
+    private fun writeWeaponModule(w: VanillaSaveByteWriter, coolGoalMs: Int, coolMs: Int = 0) {
+        w.int(coolMs)
         w.int(coolGoalMs)
         w.int(0) // subcool
         w.int(0) // subgoal
@@ -489,21 +634,25 @@ object VanillaSaveWriter {
         w.int(0) // pending projectiles
     }
 
-    private fun writeCrew(w: VanillaSaveByteWriter, game: InGameState, member: LivingCrew) {
+    /** A crewmember; with [cloneRoom], one waiting there to be cloned ([deathOrder]th). */
+    private fun writeCrew(
+        w: VanillaSaveByteWriter, game: InGameState, member: LivingCrew,
+        cloneRoom: Room? = null, deathOrder: Int = -1
+    ) {
         w.string(member.info.name)
         w.string(member.blueprint.name)
         w.bool(false) // boarding_drone
-        w.int(member.health.roundToInt())
+        w.int(if (cloneRoom != null) 0 else member.health.roundToInt())
 
         // Sprite position + room/square. Vanilla's sprite frame includes the
         // ship's layout offset - without it crew render outside the hull on
         // load. 17 = half a room-square, centring the crew in their square.
-        val standing = member.standingPosition
-        val room = standing?.room ?: member.room
+        val standing = member.standingPosition.takeIf { cloneRoom == null }
+        val room = cloneRoom ?: standing?.room ?: member.room
         val squareX = standing?.x ?: 0
         val squareY = standing?.y ?: 0
         val square = squareY * room.width + squareX
-        val off = member.room.ship.offset
+        val off = room.ship.offset
         val spriteX = xyz.znix.xftl.Constants.ROOM_SIZE * (room.x + off.x + squareX) + 17
         val spriteY = xyz.znix.xftl.Constants.ROOM_SIZE * (room.y + off.y + squareY) + 17
         w.int(spriteX)
@@ -512,8 +661,8 @@ object VanillaSaveWriter {
         w.int(square)
         w.bool(member.ownerShip === game.player)
 
-        w.int(0) // clone_ready
-        w.int(-1) // death_order
+        w.int(if (cloneRoom != null) 1 else 0) // clone_ready
+        w.int(deathOrder)
 
         // Sprite tints: (0, colour index) matches real saves.
         w.int(2)
@@ -550,7 +699,7 @@ object VanillaSaveWriter {
         // doesn't track these.
         repeat(5) { w.int(0) }
 
-        w.int(0) // stun_ticks
+        w.int((member.stunTimer * VanillaSaveFormat.TICKS_PER_SECOND).roundToInt()) // stun_ticks
         w.int(0) // health_boost
         w.int(-1) // clonebay_priority
         w.int(0) // damage_boost
@@ -614,7 +763,7 @@ object VanillaSaveWriter {
         w.int((system.damageProgress * VanillaSaveFormat.TICKS_PER_SECOND).toInt())
         w.int(0) // battery_power
         w.int(system.hackedBy?.powerSelected ?: 0)
-        w.bool(system.isHackActive)
+        w.bool(system.hackedBy != null) // the probe is on it, pulsing or not
         // Every system in a real FTL 1.6.14 save carries this triple: an
         // effectively-unlimited temporary capacity cap, no temporary loss,
         // and a divisor of one. Writing zeros instead makes vanilla treat the
@@ -649,12 +798,14 @@ object VanillaSaveWriter {
             w.int(180)
         }
 
-        w.bool(visited) // seen
+        w.bool(visited || beacon.vanillaSeen) // seen
 
-        val ship = beacon.ship
+        // (the flagship is on its boss, not on the beacon it's at)
+        val flagship = game.enemy?.takeIf { it.boss != null && it.health > 0 && beacon === game.currentBeacon }
+        val ship = beacon.ship ?: flagship
         w.bool(ship != null)
         if (ship != null) {
-            w.string(beacon.event.deserialisationId)
+            w.string(beacon.vanillaShipEvent ?: if (flagship != null) "LONG_FLEET" else vanillaEventName(beacon.event))
             w.string(ship.spec?.autoBlueprint?.resolve()?.name ?: "")
             w.int(ship.generationSeed ?: 0)
         }
@@ -731,6 +882,15 @@ object VanillaSaveWriter {
      * been byte-verified against vanilla's own writer - see the validation
      * checklist.
      */
+
+    /** Vanilla's station direction: 0 down, 1 right, 2 up, 3 left. */
+    private fun stationDirection(dir: Direction?): Int = when (dir) {
+        Direction.DOWN -> 0
+        Direction.RIGHT -> 1
+        Direction.UP -> 2
+        Direction.LEFT -> 3
+        else -> STATION_NONE
+    }
 
     private val Difficulty.saveFormatValue: Int
         get() = when (this) {
