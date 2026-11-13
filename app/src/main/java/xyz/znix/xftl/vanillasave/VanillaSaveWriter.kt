@@ -537,11 +537,14 @@ object VanillaSaveWriter {
             writeDronePod(w, DroneBlueprint.DroneType.HACKING)
         }
 
-        // Mind control: two scalars.
-        val mind = ship.systems.firstOrNull { it is MindControl }
+        // Mind control: the time since it took hold and how long it lasts
+        // (vanilla's idle timer is full: goal, goal).
+        val mind = ship.systems.firstOrNull { it is MindControl } as MindControl?
         if (mind != null && mind.energyLevels > 0) {
-            w.int(0)
-            w.int(0)
+            val goal = (mind.duration * VanillaSaveFormat.TICKS_PER_SECOND).roundToInt()
+            val left = mind.timeRemaining?.takeIf { mind.controlledCrew != null }
+            w.int(if (left != null) (goal - left * VanillaSaveFormat.TICKS_PER_SECOND).roundToInt().coerceIn(0, goal - 1) else goal)
+            w.int(goal)
         }
 
         // Weapon modules - the count MUST equal the ship section's weapon
@@ -696,7 +699,7 @@ object VanillaSaveWriter {
         // doesn't track these.
         repeat(5) { w.int(0) }
 
-        w.int(0) // stun_ticks
+        w.int((member.stunTimer * VanillaSaveFormat.TICKS_PER_SECOND).roundToInt()) // stun_ticks
         w.int(0) // health_boost
         w.int(-1) // clonebay_priority
         w.int(0) // damage_boost

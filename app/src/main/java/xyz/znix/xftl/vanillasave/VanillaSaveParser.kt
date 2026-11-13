@@ -95,6 +95,10 @@ class VanillaSaveData {
         /** Each weapon's charge, in ticks, from the save's extended ship info (if it could be read). */
         val weaponCharge = ArrayList<Int>()
         var hacking: VanillaSaveData.HackingState? = null
+
+        /** Mind control: ticks since it took hold and how long it lasts (0, 0 when idle). */
+        var mindTicks: Int = 0
+        var mindGoal: Int = 0
         val systems = HashMap<String, VanillaSystem>() // keyed by vanilla slot name
         var cloneProgress: Int = 0
         var cloneGoal: Int = 0
@@ -135,6 +139,8 @@ class VanillaSaveData {
         var savedRoom: Int = 0
         val skills = HashMap<String, Int>() // slot name to xp actions
         var colour: Int = 0
+        var mindControlled: Boolean = false
+        var stunTicks: Int = 0
     }
 
     class VanillaSystem {
@@ -157,6 +163,7 @@ class VanillaSaveData {
     class VanillaDoor {
         var maxHealth: Int = 4
         var health: Int = 4
+        var nominalHealth: Int = 4
         var open: Boolean = false
     }
 
@@ -432,7 +439,10 @@ object VanillaSaveParser {
             ship.hacking = state
             skipDronePod(r, DroneBlueprint.DroneType.HACKING)
         }
-        if ((ship.systems["mind"]?.capacity ?: 0) > 0) repeat(2) { r.int() }
+        if ((ship.systems["mind"]?.capacity ?: 0) > 0) {
+            ship.mindTicks = r.int()
+            ship.mindGoal = r.int()
+        }
         if ((ship.systems["weapons"]?.capacity ?: 0) > 0) {
             val count = r.int()
             check(count == ship.weapons.size) { "weapon modules" }
@@ -645,7 +655,7 @@ object VanillaSaveParser {
             val door = VanillaSaveData.VanillaDoor()
             door.maxHealth = r.int()
             door.health = r.int()
-            r.int() // nominal health
+            door.nominalHealth = r.int()
             door.open = r.bool()
             r.bool() // walking through
             r.int() // unknown
@@ -705,7 +715,7 @@ object VanillaSaveParser {
         val tints = ArrayList<Int>()
         repeat(tintCount) { tints.add(r.int()) }
         crew.colour = tints.getOrNull(1) ?: 0
-        r.bool() // mind controlled
+        crew.mindControlled = r.bool()
         crew.savedSquare = r.int()
         crew.savedRoom = r.int()
         // Skills are in vanilla slot order: pilot, engines, shields, weapons,
@@ -716,7 +726,7 @@ object VanillaSaveParser {
         }
         r.bool() // male
         repeat(5) { r.int() } // repairs, kills, evasions, jumps, masteries
-        r.int() // stun ticks
+        crew.stunTicks = r.int()
         r.int() // health boost
         r.int() // clonebay priority
         r.int() // damage boost

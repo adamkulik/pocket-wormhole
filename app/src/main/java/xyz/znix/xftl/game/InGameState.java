@@ -446,6 +446,8 @@ public class InGameState extends MainGame.GameState {
             restoreVanillaDrones(enemy, data.getNearbyShip());
             restoreVanillaProbe(player, data.getShip(), enemy);
             restoreVanillaProbe(enemy, data.getNearbyShip(), player);
+            restoreVanillaMindControl(player, data.getShip(), enemy, data.getNearbyShip(), player);
+            restoreVanillaMindControl(enemy, data.getNearbyShip(), player, data.getShip(), player);
         }
 
         for (Beacon beacon : sector.getBeacons()) {
@@ -498,6 +500,9 @@ public class InGameState extends MainGame.GameState {
         crewElem.setAttribute("y", Float.toString(y));
         crewElem.setAttribute("health", Integer.toString(vc.getHealth()));
         crewElem.setAttribute("action", "IDLE");
+        if (vc.getStunTicks() > 0) {
+            crewElem.setAttribute("stun", Float.toString(vc.getStunTicks() / VanillaSaveFormat.TICKS_PER_SECOND));
+        }
         crewElem.setAttribute("selectedName", vc.getName());
         crewElem.setAttribute("colour", Integer.toString(vc.getColour()));
         for (Map.Entry<String, Integer> skill : vc.getSkills().entrySet()) {
@@ -551,6 +556,38 @@ public class InGameState extends MainGame.GameState {
                 owner.getHacking().restoreLandedProbe(system.getRoom(), running ? left : null);
                 return;
             }
+        }
+    }
+
+    /**
+     * Mind-controlled crew: vanilla lists them on the ship they stand on, owned
+     * by whoever owned them before, with the other side's system holding the
+     * time. [othersData] is the save's data of [other].
+     */
+    private static void restoreVanillaMindControl(Ship on, VanillaSaveData.ShipData vs, Ship other,
+                                                  VanillaSaveData.ShipData othersData, Ship player) {
+        for (VanillaSaveData.VanillaCrew vc : vs.getCrew()) {
+            if (!vc.getMindControlled() || isWaitingToClone(vc)) continue;
+            // Controlled by the side that doesn't own them
+            boolean playerOwned = vc.isPlayer();
+            Ship controller = playerOwned ? (on == player ? other : on) : player;
+            VanillaSaveData.ShipData controllerData = controller == on ? vs : othersData;
+            MindControl mind = controller.getMindControl();
+            if (mind == null || mind.getControlledCrew() != null) continue;
+
+            LivingCrew found = null;
+            for (AbstractCrew crew : on.getCrew()) {
+                if (!(crew instanceof LivingCrew living) || living.getMindControlledBy() != null) continue;
+                if (!living.getInfo().getName().equals(vc.getName())) continue;
+                if ((living.getOwnerShip() == player) != playerOwned) continue;
+                if (found == null || living.getRoom().getId() == vc.getRoomId()) found = living;
+            }
+            if (found == null) continue;
+
+            int ticks = controllerData.getMindTicks();
+            int goal = controllerData.getMindGoal();
+            float left = goal > 0 && ticks < goal ? (goal - ticks) / VanillaSaveFormat.TICKS_PER_SECOND : mind.getDuration();
+            mind.restoreControl(found, left);
         }
     }
 
@@ -730,13 +767,21 @@ public class InGameState extends MainGame.GameState {
             crewIndex++;
         }
 
-        // Doors: open/closed state string; damage is reset on import.
+        // Doors: open or closed, and the damage boarders have done to them.
         Element doorsElem = xml.getChild("doors");
         doorsElem.removeChildren("door");
         StringBuilder doorState = new StringBuilder();
         for (int i = 0; i < ship.getDoors().size(); i++) {
             VanillaSaveData.VanillaDoor vd = i < vs.getDoors().size() ? vs.getDoors().get(i) : null;
             doorState.append(vd != null && vd.getOpen() ? 'Y' : 'n');
+            int damage = vd == null ? 0 : Math.min(vd.getMaxHealth() - vd.getHealth(), vd.getMaxHealth() - 1);
+            if (damage > 0) {
+                Element doorElem = new Element("door");
+                doorElem.setAttribute("doorIndex", Integer.toString(i));
+                doorElem.setAttribute("damage", Integer.toString(damage));
+                doorElem.setAttribute("brokenOpen", "null");
+                doorsElem.addContent(doorElem);
+            }
         }
         doorsElem.getChild("isOpen").setText(doorState.toString());
 
