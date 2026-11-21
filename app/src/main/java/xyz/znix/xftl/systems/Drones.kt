@@ -101,6 +101,17 @@ class Drones(blueprint: SystemBlueprint) : MainSystem(blueprint) {
         return powerManager.setItemPower(slot, power)
     }
 
+    /**
+     * Turn on a drone that was already deployed when a run was saved in
+     * vanilla's format: it comes back launched, and costs no drone part.
+     */
+    fun restoreDeployedDrone(slot: Int) {
+        val parts = ship.dronesCount
+        ship.dronesCount = max(parts, 1)
+        setDronePower(slot, true)
+        ship.dronesCount = parts
+    }
+
     private fun setDronePowerInternal(slot: Int, power: Boolean) {
         val info = drones[slot] ?: return
 

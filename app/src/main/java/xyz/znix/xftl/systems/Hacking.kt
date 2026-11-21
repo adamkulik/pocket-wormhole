@@ -67,6 +67,15 @@ class Hacking(blueprint: SystemBlueprint) : MainSystem(blueprint) {
     val droneLanded: Boolean get() = projectile?.hasLanded == true
     val droneInFlight: Boolean get() = projectile?.hasLanded == false
 
+    /** The room the landed probe is on, for vanilla-format saves. */
+    val landedTarget: Room? get() = projectile?.takeIf { it.hasLanded }?.target
+
+    /** How long the running pulse has left, for vanilla-format saves. */
+    val pulseRemaining: Float? get() = timeRemaining
+
+    /** How long a pulse lasts now, for vanilla-format saves. */
+    val pulseDuration: Float get() = duration
+
     private var buttonHeight: Int = 1
 
     private var timeRemaining: Float? = null
@@ -283,6 +292,19 @@ class Hacking(blueprint: SystemBlueprint) : MainSystem(blueprint) {
         projectile.destroyByDisrupt()
         this.projectile = null
         ionTimer += Cloaking.COOLDOWN
+    }
+
+    /**
+     * Put back a probe that was on [target] when a run was saved in vanilla's
+     * format, with the pulse that was running if there was one.
+     */
+    fun restoreLandedProbe(target: Room, pulse: Float?) {
+        val probe = HackingDroneProjectile(target)
+        probe.hacking = this
+        probe.placeLanded()
+        target.ship.projectiles += probe
+        projectile = probe
+        timeRemaining = pulse
     }
 
     fun startHackingPulse() {
@@ -530,6 +552,18 @@ class Hacking(blueprint: SystemBlueprint) : MainSystem(blueprint) {
 
             // Play the landing sound
             hacking.landSound.play()
+        }
+
+        /** On the target already, past its landing animations. */
+        fun placeLanded() {
+            targetPos = calculateTargetPosition()
+            setInitialPath(targetPos + ConstPoint(fromDirection.x, fromDirection.y), targetPos)
+            placeAtTarget()
+            hasLanded = true
+            drawUnderShip = false
+            landAnimation.timer = landAnimation.duration
+            extendAnimation.timer = extendAnimation.duration
+            target.system?.hackedBy = hacking
         }
 
         /**

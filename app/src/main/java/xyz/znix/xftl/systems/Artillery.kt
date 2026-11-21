@@ -24,8 +24,8 @@ class Artillery(blueprint: SystemBlueprint) : MainSystem(blueprint) {
     // progress fraction while changing power. This means that if you charge
     // the bar to half way on one power then finish it on four power, it's
     // going to take the average of 50 and 20 seconds.
-    private var chargeProgress: Float = 0f
-        set(value) {
+    var chargeProgress: Float = 0f
+        private set(value) {
             field = value.coerceIn(0f..1f)
         }
 

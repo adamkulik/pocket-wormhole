@@ -64,9 +64,15 @@ class Beacon(
             else -> State.VISITED_CLEAR
         }
 
+    /**
+     * The hazard a vanilla save says this beacon has. A beacon with a ship
+     * saves the ship's event, which doesn't say that it's next to a sun.
+     */
+    var vanillaEnvironment: EnvironmentType? = null
+
     val environmentType: EnvironmentType
         get() {
-            val type = event.environment ?: EnvironmentType.NORMAL
+            val type = vanillaEnvironment ?: event.environment ?: EnvironmentType.NORMAL
             return when {
                 !isOvertaken -> type
 
@@ -162,6 +168,18 @@ class Beacon(
      */
     val overtakeFlashAnimationOffset: Float = VisualRandom.nextFloat()
 
+    /**
+     * Vanilla's "seen" flag from an imported vanilla save (the player has
+     * seen what's at this beacon), kept for exporting the run again.
+     */
+    var vanillaSeen: Boolean = false
+
+    /**
+     * The event a vanilla save had spawn the ship here, for when the run is
+     * exported again: the beacon's own event's name can't always load it.
+     */
+    var vanillaShipEvent: String? = null
+
     var isOvertaken: Boolean = false
         set(value) {
             field = value
@@ -244,6 +262,9 @@ class Beacon(
         SaveUtil.addTagBoolIfTrue(elem, "isBase", isBase)
         SaveUtil.addTagBoolIfTrue(elem, "hasStore", hasStore)
         SaveUtil.addTagBoolIfTrue(elem, "hasQuest", hasQuest)
+        SaveUtil.addTagBoolIfTrue(elem, "vanillaSeen", vanillaSeen)
+        vanillaShipEvent?.let { SaveUtil.addTag(elem, "vanillaShipEvent", it) }
+        vanillaEnvironment?.let { SaveUtil.addTag(elem, "vanillaEnvironment", it.name) }
 
         // Save the event by name - events are immutable and are
         // loaded from the game's XML, so we only need to uniquely
@@ -310,6 +331,9 @@ class Beacon(
             beacon.visited = SaveUtil.getAttrBool(elem, "visited")
             beacon.hasStore = SaveUtil.getOptionalTagBool(elem, "hasStore") ?: false
             beacon.hasQuest = SaveUtil.getOptionalTagBool(elem, "hasQuest") ?: false
+            beacon.vanillaSeen = SaveUtil.getOptionalTagBool(elem, "vanillaSeen") ?: false
+            beacon.vanillaShipEvent = SaveUtil.getOptionalTag(elem, "vanillaShipEvent")
+            beacon.vanillaEnvironment = SaveUtil.getOptionalTag(elem, "vanillaEnvironment")?.let(EnvironmentType::valueOf)
 
             // Load environment-specific data, if we've visited this beacon.
             val envName = elem.getAttributeValue("env")

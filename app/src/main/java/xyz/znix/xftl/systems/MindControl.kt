@@ -127,6 +127,13 @@ class MindControl(blueprint: SystemBlueprint) : MainSystem(blueprint) {
         }
     }
 
+    /** Takes hold of [crew] with [left] seconds to go, as a loaded vanilla save had it. */
+    fun restoreControl(crew: LivingCrew, left: Float) {
+        crew.mindControlledBy = this
+        controlledCrew = crew
+        timeRemaining = left
+    }
+
     fun isControlling(crew: LivingCrew): Boolean {
         // Check if one of the ships has jumped away, or is no longer
         // hostile towards the other.

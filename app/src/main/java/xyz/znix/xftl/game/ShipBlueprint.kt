@@ -73,6 +73,9 @@ class ShipBlueprint(private val elem: Element, df: Datafile) : Blueprint(elem) {
     val hardpoints: List<ParsedHardpoint>
     val systems: List<ParsedSystem>
 
+    /** How many artillery guns this ship has: each one is a system of its own in vanilla's saves. */
+    val artilleryCount: Int get() = elem.getChild("systemList").getChildren("artillery").size
+
     val initialWeapons: List<String>
     val initialDrones: List<String>
     val initialAugments: List<String>

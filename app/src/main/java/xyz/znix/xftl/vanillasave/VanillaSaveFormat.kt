@@ -89,6 +89,9 @@ object VanillaSaveFormat {
      * runs instead.
      */
     val TAIL_PREFIX: ByteArray = TEMPLATE_TAIL.copyOfRange(0, 131)
+
+    /** Where TAIL_PREFIX has its "ship nearby" flag (false), after the encounter. */
+    const val TAIL_NEARBY_FLAG = 91
     val TAIL_SUFFIX: ByteArray = TEMPLATE_TAIL.copyOfRange(387, TEMPLATE_TAIL.size)
 }
 
@@ -122,6 +125,11 @@ class VanillaSaveByteWriter {
 class VanillaSaveReader(private val data: ByteArray) {
     var pos = 0
         private set
+
+    /** Go back to [position], eg after peeking at a string. */
+    fun seek(position: Int) {
+        pos = position
+    }
 
     fun int(): Int {
         val v = (data[pos].toInt() and 0xFF) or

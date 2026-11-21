@@ -22,6 +22,7 @@ object VanillaSaveApplier {
             val beacon: Beacon = sector.beacons.getOrNull(index) ?: break
 
             beacon.visited = vb.visitCount > 0
+            beacon.vanillaSeen = vb.seen
             if (vb.fleetPresence > 0) {
                 beacon.isOvertaken = true
             }
@@ -30,7 +31,8 @@ object VanillaSaveApplier {
             // Jumping to such a beacon re-runs the event, like vanilla
             // re-running its ship event.
             if (vb.enemyPresent) {
-                game.eventManager.getByDeserialisationIdOrNull(vb.shipEventId)?.let { beacon.event = it }
+                beacon.vanillaShipEvent = vb.shipEventId
+                game.eventManager.getVanillaEvent(vb.shipEventId)?.let { beacon.event = it }
             }
 
             if (vb.storePresent && vb.store != null) {
@@ -42,7 +44,7 @@ object VanillaSaveApplier {
         // Quests parked on beacons
         for ((eventId, beaconId) in data.questEvents) {
             val beacon = sector.beacons.getOrNull(beaconId)
-            val event = game.eventManager.getByDeserialisationIdOrNull(eventId)
+            val event = game.eventManager.getVanillaEvent(eventId)
             if (event == null) {
                 continue
             }
@@ -56,7 +58,7 @@ object VanillaSaveApplier {
 
         // Quests delayed to the next sector
         for (eventId in data.distantQuests) {
-            game.eventManager.getByDeserialisationIdOrNull(eventId)?.let { game.addDelayedQuest(it) }
+            game.eventManager.getVanillaEvent(eventId)?.let { game.addDelayedQuest(it) }
         }
     }
 

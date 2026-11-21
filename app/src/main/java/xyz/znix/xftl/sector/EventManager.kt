@@ -66,6 +66,13 @@ class EventManager(
      * installed. */
     fun getByDeserialisationIdOrNull(id: String): Event? = byDeserialisationId[id]
 
+    /**
+     * An event a vanilla save names: vanilla saves store event names (an
+     * event, or an event list such as REBEL), our own saves our IDs.
+     */
+    fun getVanillaEvent(id: String): Event? =
+        byDeserialisationId[id] ?: events[id]?.resolve()
+
     fun getChoiceByDeserialisationId(id: String): Choice {
         return byChoiceId[id] ?: error("Missing choice with deserialisation ID '$id'")
     }
@@ -229,7 +236,7 @@ class EventManager(
             return textLists[it] ?: error("Missing textList $it")
         }
         elem.getAttributeValue("id")?.let {
-            return EventText(translator[it])
+            return EventText(translator[it], it)
         }
         // The CRYSTAL_HELP_DIG event has an empty string for
         // the crew clone message (since that is never triggered).

@@ -596,7 +596,8 @@ class TextList(val name: String, val items: List<IEventText>) : IEventText {
     override fun resolve(rand: Random): String = items.random(rand).resolve(rand)
 }
 
-class EventText(val localised: String) : IEventText {
+/** [id] is the text's id in the text files, if it has one (vanilla saves name texts by id). */
+class EventText(val localised: String, val id: String? = null) : IEventText {
     override fun resolve(rand: Random): String = localised
 
     // TODO handle the 'planet' and 'back' image names
