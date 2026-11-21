@@ -567,7 +567,8 @@ object VanillaSaveWriter {
             val chargeTime = if (bpId != null)
                 (game.blueprintManager[bpId] as? AbstractWeaponBlueprint)?.chargeTime ?: 10f
             else 10f
-            writeWeaponModule(w, (chargeTime * 1000).toInt())
+            val goal = (chargeTime * 1000).toInt()
+            writeWeaponModule(w, goal, (artillery.chargeProgress * goal).toInt().coerceIn(0, goal))
         }
 
         // Standalone (system-less) drones: none.

@@ -153,6 +153,8 @@ class VanillaSaveData {
         var damageProgress: Int = 0
         var hackLevel: Int = 0
         var hacked: Boolean = false
+        /** The fraction of an artillery gun's cooldown elapsed, when available. */
+        var artilleryCharge: Float? = null
         // Vanilla's temporary capacity modifiers: cap, loss, divisor.
         // Real saves carry (1000, 0, 1) on every system.
         var tempCapacityCap: Int = 0
@@ -447,18 +449,25 @@ object VanillaSaveParser {
             val count = r.int()
             check(count == ship.weapons.size) { "weapon modules" }
             val charges = ArrayList<Int>()
-            repeat(count) { charges += readWeaponModule(r) }
+            repeat(count) { charges += readWeaponModule(r).ticks }
             ship.weaponCharge.clear()
             ship.weaponCharge += charges
         }
-        repeat(ship.artillery.size) { readWeaponModule(r) }
+        for (artillery in ship.artillery) {
+            val charge = readWeaponModule(r)
+            if (charge.goal > 0) {
+                artillery.artilleryCharge = (charge.ticks.toFloat() / charge.goal).coerceIn(0f, 1f)
+            }
+        }
         return r.int() == 0 // drones without a system aren't read yet
     }
 
-    /** A weapon's state; returns its charge, in cooldown ticks. */
-    private fun readWeaponModule(r: VanillaSaveReader): Int {
-        val charge = r.int()
-        repeat(5) { r.int() } // goal, subcooldown and its goal, boost, charge
+    private data class WeaponCharge(val ticks: Int, val goal: Int)
+
+    /** A weapon's state; returns its main cooldown in ticks. */
+    private fun readWeaponModule(r: VanillaSaveReader): WeaponCharge {
+        val charge = WeaponCharge(r.int(), r.int())
+        repeat(4) { r.int() } // subcooldown and its goal, boost, charge
         repeat(r.int() * 2) { r.int() } // current targets
         repeat(r.int() * 2) { r.int() } // previous targets
         r.bool(); r.bool(); r.int() // autofire, fire when ready, target

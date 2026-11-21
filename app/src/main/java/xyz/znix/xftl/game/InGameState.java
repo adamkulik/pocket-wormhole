@@ -726,6 +726,9 @@ public class InGameState extends MainGame.GameState {
             if (xftlName.equals("cloaking")) {
                 sysElem.setAttribute("cloakingTicks", Float.toString(vs.getCloakTicks() / VanillaSaveFormat.TICKS_PER_SECOND));
             }
+            if ("artillery".equals(slot) && vsSys.getArtilleryCharge() != null) {
+                sysElem.setAttribute("charge", Float.toString(vsSys.getArtilleryCharge()));
+            }
         }
 
         // Crew: replace the default crew with the saved one.
